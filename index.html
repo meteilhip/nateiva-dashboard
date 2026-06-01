@@ -3186,18 +3186,27 @@ function localFallback(action, params) {
     case 'addFollowup': {
       var fu = {
         ID: 'FU-' + Date.now(),
-        Timestamp: new Date().toISOString(),
+        Timestamp: params.date ? new Date(params.date + 'T' + (params.timeStart || '08:00')).toISOString() : new Date().toISOString(),
         Expert: params.expert,
         SchoolName: params.schoolName,
+        Year: params.year || '2026',
+        Date: params.date || new Date().toISOString().split('T')[0],
+        TimeStart: params.timeStart || '',
         ContactName: params.contactName || '',
         ContactPhone: params.contactPhone || '',
         FollowupType: params.followupType,
-        Notes: params.notes || '',
         Outcome: params.outcome || '',
-        NextAction: params.nextAction || '',
-        NextDate: params.nextDate || '',
-        Cost: params.cost || 0,
+        Duration: params.duration || '',
+        CallCount: params.callCount || '1',
+        Notes: params.notes || '',
+        Rating: params.rating || '',
         Status: params.status || 'En cours',
+        Cost: params.cost || 0,
+        ActSecondCall: params.actSecondCall || '',
+        ActSendWhatsApp: params.actSendWhatsApp || '',
+        ActTransmitSuperior: params.actTransmitSuperior || '',
+        ActPlanVisit: params.actPlanVisit || '',
+        NextDate: params.nextDate || '',
         City: params.city || '',
         Sector: params.sector || ''
       };
@@ -3389,22 +3398,42 @@ function rSuivi() {
   if (isSuper) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
   h += '</div>';
 
-  // Panel: Add followup
-  h += '<div class="suivi-panel act" id="stab-add"><div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
+  // Links to Google Forms
+  h += '<div class="suivi-panel act" id="stab-add">';
+  h += '<div class="note teal" style="margin-bottom:20px"><b>📝 Formulaires Google:</b> ';
+  h += '<a href="https://docs.google.com/forms/d/1PBuLuUl77BLQV2DRzUub7DGrJkkGhtKJDOZygb1f-T4/edit" target="_blank" style="color:var(--teal);font-weight:700;margin-right:16px">Fiche de Prospection</a>';
+  h += '<a href="https://docs.google.com/forms/d/1_PsQd_S66_2bhNihxmaVgkxM_3XqGSwL8km43D16Fa0/edit" target="_blank" style="color:var(--teal);font-weight:700">Suivi Téléphonique</a></div>';
+
+  // Panel: Add followup - matching Google Form fields
+  h += '<div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
   h += '<div class="form-grid">';
-  h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
+  h += '<div class="form-field"><label>Nom de l\'Établissement *</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
   h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école"></div>';
-  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option></select></div>';
-  h += '<div class="form-field"><label>Nom du contact</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor"></div>';
+  h += '<div class="form-field"><label>Année de prospection *</label><select id="fuYear"><option value="2026">2026</option><option value="2025">2025</option></select></div>';
+  h += '<div class="form-field"><label>Ville *</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Date du suivi</label><input type="date" id="fuDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+  h += '<div class="form-field"><label>Heure de début</label><input type="time" id="fuTimeStart"></div>';
+  h += '<div class="form-field"><label>Contact appelé (Nom et Fonction)</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor - Directeur"></div>';
   h += '<div class="form-field"><label>Téléphone</label><input type="text" id="fuPhone" placeholder="Ex: 675 876 770"></div>';
-  h += '<div class="form-field"><label>Résultat</label><select id="fuOutcome"><option value="">-- Résultat --</option><option value="Intéressé">Intéressé</option><option value="Pas intéressé">Pas intéressé</option><option value="Rappeler plus tard">Rappeler plus tard</option><option value="Dossier transmis">Dossier transmis</option><option value="RDV fixé">RDV fixé</option><option value="Démo faite">Démo faite</option><option value="Converti">Converti / Signé</option><option value="Pas joignable">Pas joignable</option></select></div>';
-  h += '<div class="form-field"><label>Statut</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé</option></select></div>';
-  h += '<div class="form-field" id="fuCostWrap"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
-  h += '<div class="form-field"><label>Prochaine action</label><input type="text" id="fuNextAction" placeholder="Rappeler lundi..."></div>';
-  h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="fuNextDate"></div>';
-  h += '<div class="form-field full"><label>Notes / Détails</label><textarea id="fuNotes" placeholder="Décrivez ce qui s\'est passé..."></textarea></div>';
-  h += '<div class="form-field"><label>Ville</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-  h += '<div class="form-field"><label>Secteur</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel téléphonique</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite sur site</option></select></div>';
+  h += '<div class="form-field"><label>Statut de l\'appel</label><select id="fuOutcome"><option value="">-- Statut --</option><option value="Répondu - Intéressé">Répondu - Intéressé</option><option value="Répondu - Pas intéressé">Répondu - Pas intéressé</option><option value="Répondu - Rappeler plus tard">Répondu - Rappeler plus tard</option><option value="Répondu - Dossier transmis">Répondu - Dossier transmis au supérieur</option><option value="Répondu - RDV fixé">Répondu - RDV fixé</option><option value="Répondu - Démo faite">Répondu - Démo faite</option><option value="Répondu - Converti">Répondu - Converti / Signé</option><option value="Pas de réponse">Pas de réponse</option><option value="Numéro incorrect">Numéro incorrect</option><option value="Messagerie">Messagerie vocale</option></select></div>';
+  h += '<div class="form-field"><label>Durée totale de l\'appel (minutes)</label><input type="number" id="fuDuration" placeholder="Ex: 5" min="0"></div>';
+  h += '<div class="form-field"><label>Nombre de fois appelé</label><input type="number" id="fuCallCount" placeholder="Ex: 1" min="1" value="1"></div>';
+  h += '<div class="form-field full"><label>Détails des points discutés (résumé)</label><textarea id="fuNotes" placeholder="Résumé de la conversation, informations recueillies..."></textarea></div>';
+  h += '<div class="form-field"><label>Évaluation collaboration (1=Très faible, 5=Excellente)</label><select id="fuRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2 - Faible</option><option value="3">3 - Moyenne</option><option value="4">4 - Bonne</option><option value="5">5 - Excellente</option></select></div>';
+  h += '<div class="form-field"><label>Statut global</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance nécessaire</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé (perdu)</option></select></div>';
+  h += '<div class="form-field" id="fuCostWrap" style="display:none"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
+
+  // Actions de suivi (checkbox grid from Google Form)
+  h += '<div class="form-field full"><label>Actions de suivi requises</label>';
+  h += '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-top:8px;font-size:13px">';
+  h += '<div style="font-weight:700;font-size:11px;font-family:\'JetBrains Mono\',monospace"></div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--green)">OUI</div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--red)">NON</div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--saffron)">EN COURS</div>';
+  var actions = [["fuAct1","Prévoir un second appel"],["fuAct2","Envoi document(s) par WhatsApp"],["fuAct3","Transmission dossier au supérieur"],["fuAct4","Planifier une visite sur site"]];
+  actions.forEach(function(a) { h += '<div>' + a[1] + '</div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="Oui"></div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="Non"></div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="En cours"></div>'; });
+  h += '</div></div>';
+
+  h += '<div class="form-field"><label>Prochaine échéance de suivi</label><input type="date" id="fuNextDate"></div>';
+  h += '<div class="form-field"><label>Secteur / Quartier</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '</div><div class="form-submit"><button class="btn-save" onclick="submitFollowup()">Enregistrer le suivi</button></div></div>';
 
   // Quick school list
@@ -3434,10 +3463,17 @@ function rSuivi() {
     h += '<div class="fu-body">' + (esc(f.Notes) || '<i style="color:var(--g400)">Pas de notes</i>') + '</div>';
     h += '<div class="fu-footer"><span>Date: <b>' + fuDate(f.Timestamp) + '</b></span>';
     if (f.ContactName) h += '<span>Contact: <b>' + esc(f.ContactName) + '</b></span>';
-    if (f.Outcome) h += '<span>Résultat: <b>' + esc(f.Outcome) + '</b></span>';
+    if (f.Outcome) h += '<span>Statut appel: <b>' + esc(f.Outcome) + '</b></span>';
+    if (f.Duration) h += '<span>Durée: <b>' + f.Duration + ' min</b></span>';
+    if (f.CallCount && Number(f.CallCount) > 1) h += '<span>Appelé: <b>' + f.CallCount + 'x</b></span>';
+    if (f.Rating) h += '<span>Note: <b>' + f.Rating + '/5</b></span>';
     if (f.Status) h += '<span>Statut: <b>' + esc(f.Status) + '</b></span>';
     if (Number(f.Cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(f.Cost) + ' FCFA</span>';
-    if (f.NextAction) h += '<span>Prochaine: <b>' + esc(f.NextAction) + '</b></span>';
+    if (f.ActSecondCall === 'Oui') h += '<span style="color:var(--green)">📞 2nd appel prévu</span>';
+    if (f.ActSendWhatsApp === 'Oui') h += '<span style="color:var(--green)">💬 Doc WhatsApp</span>';
+    if (f.ActTransmitSuperior === 'Oui') h += '<span style="color:var(--green)">📤 Transmis supérieur</span>';
+    if (f.ActPlanVisit === 'Oui') h += '<span style="color:var(--green)">🚶 Visite prévue</span>';
+    if (f.NextDate) h += '<span>Échéance: <b>' + f.NextDate + '</b></span>';
     h += '</div></div>';
   });
   h += '</div></div></div>';
@@ -3605,17 +3641,28 @@ async function submitFollowup() {
   var schoolSel = document.getElementById('fuSchool').value;
   var schoolName = schoolSel === '__other__' ? document.getElementById('fuSchoolCustom').value.trim() : schoolSel;
   if (!schoolName) { showToast('Veuillez sélectionner une école', true); return; }
+  // Collect action checkboxes
+  var getRadio = function(name) { var el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : ''; };
   var data = {
     action: 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
+    year: document.getElementById('fuYear').value,
+    date: document.getElementById('fuDate').value,
+    timeStart: document.getElementById('fuTimeStart') ? document.getElementById('fuTimeStart').value : '',
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
-    notes: document.getElementById('fuNotes').value.trim(),
     outcome: document.getElementById('fuOutcome').value,
-    nextAction: document.getElementById('fuNextAction').value.trim(),
-    nextDate: document.getElementById('fuNextDate').value,
-    cost: document.getElementById('fuType').value === 'VISIT' ? (Number(document.getElementById('fuCost').value) || 0) : 0,
+    duration: document.getElementById('fuDuration') ? document.getElementById('fuDuration').value : '',
+    callCount: document.getElementById('fuCallCount') ? document.getElementById('fuCallCount').value : '1',
+    notes: document.getElementById('fuNotes').value.trim(),
+    rating: document.getElementById('fuRating') ? document.getElementById('fuRating').value : '',
     status: document.getElementById('fuStatus').value,
+    cost: document.getElementById('fuType').value === 'VISIT' ? (Number(document.getElementById('fuCost').value) || 0) : 0,
+    actSecondCall: getRadio('fuAct1'),
+    actSendWhatsApp: getRadio('fuAct2'),
+    actTransmitSuperior: getRadio('fuAct3'),
+    actPlanVisit: getRadio('fuAct4'),
+    nextDate: document.getElementById('fuNextDate').value,
     city: document.getElementById('fuCity').value,
     sector: document.getElementById('fuSector').value.trim()
   };
@@ -3627,11 +3674,15 @@ async function submitFollowup() {
     document.getElementById('fuPhone').value = '';
     document.getElementById('fuNotes').value = '';
     document.getElementById('fuOutcome').selectedIndex = 0;
-    document.getElementById('fuNextAction').value = '';
     document.getElementById('fuNextDate').value = '';
     document.getElementById('fuCost').value = '0';
     document.getElementById('fuStatus').selectedIndex = 0;
     document.getElementById('fuSector').value = '';
+    if (document.getElementById('fuDuration')) document.getElementById('fuDuration').value = '';
+    if (document.getElementById('fuCallCount')) document.getElementById('fuCallCount').value = '1';
+    if (document.getElementById('fuRating')) document.getElementById('fuRating').selectedIndex = 0;
+    if (document.getElementById('fuTimeStart')) document.getElementById('fuTimeStart').value = '';
+    document.querySelectorAll('#followupForm input[type=radio]').forEach(function(r) { r.checked = false; });
     rSuivi();
   } else { showToast(res.error || 'Erreur', true); }
 }
