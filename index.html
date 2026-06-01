@@ -1159,10 +1159,12 @@ body{
   cursor:pointer;box-shadow:var(--shadow-red);transition:all .25s;
 }
 .not-logged-in button:hover{transform:translateY(-2px)}
+.app.locked{filter:blur(12px);pointer-events:none;user-select:none}
+.login-overlay .login-close{display:none}
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app locked" id="mainApp">
 
 <!-- HERO -->
 <header class="hero">
@@ -1265,7 +1267,7 @@ body{
 <div class="pane" id="p-glossary"></div>
 <div class="pane act" id="p-suivi"></div>
 
-<div id="loginOverlay" class="login-overlay" style="display:none">
+<div id="loginOverlay" class="login-overlay" style="display:flex">
   <div class="login-box">
     <button class="login-close" onclick="closeLogin()">&times;</button>
     <h2>Connexion <span style="color:var(--red);font-style:italic">Suivi</span></h2>
@@ -3181,10 +3183,10 @@ async function doLogin() {
   btn.disabled = true; btn.textContent = 'Connexion...';
   var res = await apiCall('login', { user: user, pass: pass });
   btn.disabled = false; btn.textContent = 'Se connecter';
-  if (res.success) { currentUser = res.user; localStorage.setItem('nateiva_user', JSON.stringify(currentUser)); closeLogin(); showToast('Bienvenue ' + currentUser.fullName + '!'); rSuivi(); }
+  if (res.success) { currentUser = res.user; localStorage.setItem('nateiva_user', JSON.stringify(currentUser)); closeLogin(); document.getElementById('mainApp').classList.remove('locked'); showToast('Bienvenue ' + currentUser.fullName + '!'); rSuivi(); }
   else { errEl.textContent = res.error; errEl.style.display = 'block'; }
 }
-function doLogout() { currentUser = null; localStorage.removeItem('nateiva_user'); rSuivi(); }
+function doLogout() { currentUser = null; localStorage.removeItem('nateiva_user'); document.getElementById('mainApp').classList.add('locked'); showLogin(); rSuivi(); }
 function showToast(msg, isErr) { var t = document.getElementById('toastMsg'); t.textContent = msg; t.className = 'toast show' + (isErr ? ' error' : ''); setTimeout(function() { t.className = 'toast'; }, 3000); }
 
 // --- Stats & Rankings ---
@@ -3307,15 +3309,19 @@ function rSuivi() {
   h += '<div class="suivi-kpi"><div class="sk-icon">🆕</div><div class="sk-val">' + stats.newProsp + '</div><div class="sk-lbl">Nvlles prospections</div></div>';
   h += '</div>';
 
-  // Tabs
+  // Tabs — regular users see limited tabs, super admins see all
   h += '<div class="suivi-tabs">';
   h += '<button class="suivi-tab act" data-stab="entry">+ Entrée</button>';
-  h += '<button class="suivi-tab" data-stab="history">Journal (' + myEntries.length + ')</button>';
-  h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
-  h += '<button class="suivi-tab" data-stab="ranking">🏆 Classement</button>';
-  h += '<button class="suivi-tab" data-stab="deals">💼 Deals</button>';
-  h += '<button class="suivi-tab" data-stab="analytics">📊 Analytics</button>';
-  if (isSuper) h += '<button class="suivi-tab" data-stab="invite">👥 Utilisateurs</button>';
+  h += '<button class="suivi-tab" data-stab="history">Mon journal (' + myEntries.length + ')</button>';
+  h += '<button class="suivi-tab" data-stab="mystats">📊 Mes stats</button>';
+  if (isSuper) {
+    h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
+    h += '<button class="suivi-tab" data-stab="ranking">🏆 Classement</button>';
+    h += '<button class="suivi-tab" data-stab="deals">💼 Deals</button>';
+    h += '<button class="suivi-tab" data-stab="analytics">📊 Analytics équipe</button>';
+    h += '<button class="suivi-tab" data-stab="overview">🎯 Vue d\'ensemble</button>';
+    h += '<button class="suivi-tab" data-stab="invite">👥 Utilisateurs</button>';
+  }
   h += '</div>';
 
   // ====== TAB: ENTRY (mobile-first wizard) ======
@@ -3388,6 +3394,60 @@ function rSuivi() {
   h += '</div>'; // close form-grid
   h += '<div class="form-submit"><button class="btn-save" onclick="submitEntry()" style="width:100%;padding:18px;font-size:16px">✅ Enregistrer</button></div>';
   h += '</div></div>'; // close form-card, stab-entry
+
+  // ====== TAB: MY STATS (visible to everyone — only own data) ======
+  h += '<div class="suivi-panel" id="stab-mystats"><div class="form-card"><h3>Mes <span class="it">statistiques</span></h3>';
+  var myTime = {};
+  // Rebuild time data for current user only
+  (function() {
+    var ts2 = [];
+    RAW.forEach(function(r) { if (r.e === me && r.t) ts2.push({ time: new Date(r.t), mode: 'EN PERSONNE' }); });
+    suiviEntries.forEach(function(e) { if (e.expert === me) ts2.push({ time: new Date(e.date || e.createdAt), mode: e.mode || '' }); });
+    var wd = new Set(), dh = {}, vis2=0, cal2=0, ph2=0, wa2=0, sm2=0;
+    var f2 = null, l2 = null;
+    ts2.forEach(function(t) {
+      var dk = t.time.toDateString(); wd.add(dk);
+      if (!f2||t.time<f2) f2=t.time; if (!l2||t.time>l2) l2=t.time;
+      if(!dh[dk]) dh[dk]=new Set(); dh[dk].add(t.time.getHours());
+      if(t.mode==='EN PERSONNE')vis2++; else if(t.mode==='TELEPHONE')ph2++; else if(t.mode==='WHATSAPP')wa2++; else if(t.mode==='SMS')sm2++;
+    });
+    var wh2=0; Object.keys(dh).forEach(function(k){wh2+=dh[k].size;});
+    cal2 = f2&&l2 ? Math.max(1,Math.ceil((l2-f2)/86400000)+1) : 0;
+    myTime = { entries:ts2.length, days:wd.size, hours:wh2, perDay:wd.size?(ts2.length/wd.size).toFixed(1):0, rate:cal2?Math.round(wd.size/cal2*100):0, vis:vis2, ph:ph2, wa:wa2, sm:sm2, last:l2?Math.ceil((new Date()-l2)/86400000):999 };
+  })();
+
+  h += '<div class="suivi-kpis">';
+  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Mon score · Rang #' + (myRank?myRank.rank:'—') + ' / ' + suiviRankings.length + '</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📅</div><div class="sk-val">' + myTime.days + '</div><div class="sk-lbl">Jours travaillés</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">⏰</div><div class="sk-val">' + myTime.hours + '<small>h</small></div><div class="sk-lbl">Heures estimées</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📝</div><div class="sk-val">' + myTime.perDay + '</div><div class="sk-lbl">Entrées / jour</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + myTime.rate + '<small>%</small></div><div class="sk-lbl">Taux activité</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🔄</div><div class="sk-val">' + myTime.last + '<small>j</small></div><div class="sk-lbl">Depuis dernier</div></div>';
+  h += '</div>';
+
+  // Personal mode breakdown
+  h += '<div style="margin:20px 0"><h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Mes activités par mode</h4>';
+  var myTotal = myTime.vis + myTime.ph + myTime.wa + myTime.sm;
+  if (myTotal > 0) {
+    h += '<div style="display:flex;height:32px;border-radius:8px;overflow:hidden;margin-bottom:8px">';
+    if (myTime.vis) h += '<div style="width:' + (myTime.vis/myTotal*100) + '%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.vis + ' 🚶</div>';
+    if (myTime.ph) h += '<div style="width:' + (myTime.ph/myTotal*100) + '%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.ph + ' 📞</div>';
+    if (myTime.wa) h += '<div style="width:' + (myTime.wa/myTotal*100) + '%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.wa + ' 💬</div>';
+    if (myTime.sm) h += '<div style="width:' + (myTime.sm/myTotal*100) + '%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.sm + ' 📱</div>';
+    h += '</div>';
+    h += '<div style="display:flex;gap:16px;font-size:12px;color:var(--g600);flex-wrap:wrap">';
+    h += '<span>🚶 En personne: <b>' + myTime.vis + '</b></span><span>📞 Téléphone: <b>' + myTime.ph + '</b></span><span>💬 WhatsApp: <b>' + myTime.wa + '</b></span><span>📱 SMS: <b>' + myTime.sm + '</b></span>';
+    h += '</div>';
+  } else { h += '<p style="color:var(--g400)">Aucune activité enregistrée.</p>'; }
+  h += '</div>';
+
+  // Personal KPIs: phone vs field comparison
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0">';
+  h += '<div style="padding:20px;background:linear-gradient(135deg,var(--red-soft),var(--paper));border:1.5px solid var(--g200);border-radius:14px;text-align:center"><div style="font-size:28px">🚶</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--red)">' + myTime.vis + '</div><div style="font-size:11px;color:var(--g600);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Terrain</div></div>';
+  h += '<div style="padding:20px;background:linear-gradient(135deg,var(--teal-soft),var(--paper));border:1.5px solid var(--g200);border-radius:14px;text-align:center"><div style="font-size:28px">📞</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--teal)">' + (myTime.ph + myTime.wa + myTime.sm) + '</div><div style="font-size:11px;color:var(--g600);font-weight:700;text-transform:uppercase;letter-spacing:.08em">À distance</div></div>';
+  h += '</div>';
+
+  h += '</div></div>';
 
   // ====== TAB: HISTORY ======
   h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Journal des <span class="it">entrées</span>' + (isSuper ? ' (équipe)' : '') + '</h3>';
@@ -3703,6 +3763,100 @@ function rSuivi() {
 
   h += '</div></div>';
 
+  // ====== TAB: VUE D'ENSEMBLE (super admin — unified phone + field KPIs) ======
+  if (isSuper) {
+    h += '<div class="suivi-panel" id="stab-overview"><div class="form-card"><h3>Vue d\'ensemble <span class="it">Noah</span></h3>';
+    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">KPIs unifiés terrain + téléphone pour l\'ensemble de l\'équipe. Avantage compétitif et métriques de performance globale.</p>';
+
+    // Aggregate all team data
+    var teamTotalEntries = suiviEntries.length;
+    var teamTotalRAW = RAW.length;
+    var teamVisits = suiviEntries.filter(function(e){return e.mode==='EN PERSONNE';}).length + teamTotalRAW;
+    var teamCalls = suiviEntries.filter(function(e){return e.mode==='TELEPHONE';}).length;
+    var teamWA = suiviEntries.filter(function(e){return e.mode==='WHATSAPP';}).length;
+    var teamSMS = suiviEntries.filter(function(e){return e.mode==='SMS';}).length;
+    var teamAllContacts = teamVisits + teamCalls + teamWA + teamSMS;
+    var teamClosed = suiviEntries.filter(function(e){return e.status==='Converti';}).length;
+    var teamHot = RAW.filter(function(r){return r.r>=60;}).length;
+    var teamSchools = new Set(); RAW.forEach(function(r){if(r.n) teamSchools.add(r.n.toUpperCase());}); suiviEntries.forEach(function(e){if(e.school) teamSchools.add(e.school.toUpperCase());});
+    var teamCost = suiviEntries.reduce(function(s,e){return s+(Number(e.cost)||0);},0);
+    var teamRevenue = teamClosed * 60000;
+    var teamCloseRate = teamSchools.size > 0 ? Math.round(teamClosed / teamSchools.size * 100) : 0;
+
+    // Douala vs Yaoundé split
+    var dlaEntries = RAW.filter(function(r){return r.v==='DOUALA';}).length + suiviEntries.filter(function(e){return e.city==='DOUALA';}).length;
+    var ydeEntries = RAW.filter(function(r){return r.v==='YAOUNDE';}).length + suiviEntries.filter(function(e){return e.city==='YAOUNDE';}).length;
+
+    // KPI cards — row 1: volume
+    h += '<div class="suivi-kpis">';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">📊</div><div class="sk-val">' + (teamTotalRAW + teamTotalEntries) + '</div><div class="sk-lbl">Total contacts (RAW + Suivi)</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🏫</div><div class="sk-val">' + teamSchools.size + '</div><div class="sk-lbl">Écoles uniques</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">' + teamClosed + '</div><div class="sk-lbl">Deals fermés</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(teamRevenue) + '</div><div class="sk-lbl">Revenu potentiel FCFA</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📈</div><div class="sk-val">' + teamCloseRate + '<small>%</small></div><div class="sk-lbl">Taux de closing</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + teamHot + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
+    h += '</div>';
+
+    // KPI cards — row 2: channels
+    h += '<div class="suivi-kpis" style="margin-top:-12px">';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">🚶</div><div class="sk-val">' + teamVisits + '</div><div class="sk-lbl">Visites terrain</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-icon">📞</div><div class="sk-val">' + teamCalls + '</div><div class="sk-lbl">Appels tél.</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">💬</div><div class="sk-val">' + teamWA + '</div><div class="sk-lbl">WhatsApp</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">📱</div><div class="sk-val">' + teamSMS + '</div><div class="sk-lbl">SMS</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">💵</div><div class="sk-val">' + fmt(teamCost) + '</div><div class="sk-lbl">Coûts terrain total</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">💵</div><div class="sk-val">' + (teamClosed>0?fmt(Math.round(teamCost/teamClosed)):'—') + '</div><div class="sk-lbl">Coût / acquisition</div></div>';
+    h += '</div>';
+
+    // Channel efficiency — terrain vs distance
+    var fieldTotal = teamVisits;
+    var remoteTotal = teamCalls + teamWA + teamSMS;
+    var fieldPct = teamAllContacts > 0 ? Math.round(fieldTotal / teamAllContacts * 100) : 0;
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">';
+    h += '<div style="padding:24px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:14px;text-align:center"><div style="font-size:36px">🚶</div><div style="font-family:\'Fraunces\',serif;font-size:42px;font-weight:600;margin:8px 0">' + fieldTotal + '</div><div style="font-size:13px;opacity:.9">Terrain (' + fieldPct + '%)</div><div style="font-size:11px;opacity:.7;margin-top:4px">Coût: ' + fmt(teamCost) + ' FCFA</div></div>';
+    h += '<div style="padding:24px;background:linear-gradient(135deg,var(--teal),var(--teal-deep));color:var(--paper);border-radius:14px;text-align:center"><div style="font-size:36px">📞</div><div style="font-family:\'Fraunces\',serif;font-size:42px;font-weight:600;margin:8px 0">' + remoteTotal + '</div><div style="font-size:13px;opacity:.9">À distance (' + (100-fieldPct) + '%)</div><div style="font-size:11px;opacity:.7;margin-top:4px">Tél: ' + teamCalls + ' · WA: ' + teamWA + ' · SMS: ' + teamSMS + '</div></div>';
+    h += '</div>';
+
+    // Douala vs Yaoundé
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+    h += '<div style="padding:20px;background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;border-left:5px solid var(--saffron);text-align:center"><div style="font-size:24px">🏙️</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--saffron)">' + dlaEntries + '</div><div style="font-size:12px;color:var(--g600);font-weight:700">DOUALA</div></div>';
+    h += '<div style="padding:20px;background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;border-left:5px solid var(--purple);text-align:center"><div style="font-size:24px">🏙️</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--purple)">' + ydeEntries + '</div><div style="font-size:12px;color:var(--g600);font-weight:700">YAOUNDÉ</div></div>';
+    h += '</div>';
+
+    // Expert performance table (all-in-one)
+    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">Performance par expert — Terrain + Téléphone</h4>';
+    h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Expert</th><th>🚶 Terrain</th><th>📞 Tél</th><th>💬 WA</th><th>📱 SMS</th><th>Total</th><th>🔥 Chauds</th><th>✅ Fermés</th><th>💰 Coûts</th><th>Jours</th><th>Score</th></tr></thead><tbody>';
+    suiviRankings.forEach(function(r) {
+      var ed2 = suiviEntries.filter(function(e){return e.expert===r.expert;});
+      var vis3 = r.prosp + ed2.filter(function(e){return e.mode==='EN PERSONNE';}).length;
+      var ph3 = ed2.filter(function(e){return e.mode==='TELEPHONE';}).length;
+      var wa3 = ed2.filter(function(e){return e.mode==='WHATSAPP';}).length;
+      var sm3 = ed2.filter(function(e){return e.mode==='SMS';}).length;
+      var tot3 = vis3 + ph3 + wa3 + sm3;
+      h += '<tr><td><b>' + esc(r.expert) + '</b></td>';
+      h += '<td class="num">' + vis3 + '</td><td class="num">' + ph3 + '</td><td class="num">' + wa3 + '</td><td class="num">' + sm3 + '</td>';
+      h += '<td class="num" style="font-weight:700">' + tot3 + '</td>';
+      h += '<td class="num" style="color:var(--saffron)">' + r.hot + '</td>';
+      h += '<td class="num" style="color:var(--green)">' + r.closedCount + '</td>';
+      h += '<td class="num" style="color:var(--red)">' + fmt(r.totalCost) + '</td>';
+      h += '<td class="num">' + r.days + '</td>';
+      h += '<td class="num" style="font-weight:700">' + r.score + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    // Competitive advantage metrics
+    h += '<div style="margin-top:20px;padding:20px;background:linear-gradient(135deg,var(--ink),var(--g800));border-radius:14px;color:var(--paper)">';
+    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--saffron-bright);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Avantage compétitif NATEIVA</h4>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">';
+    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + teamSchools.size + '</div><div style="font-size:11px;color:var(--g400)">Écoles contactées</div></div>';
+    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + allExperts.length + '</div><div style="font-size:11px;color:var(--g400)">Experts actifs</div></div>';
+    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + (teamAllContacts) + '</div><div style="font-size:11px;color:var(--g400)">Points de contact total</div></div>';
+    var avgPerSchool = teamSchools.size > 0 ? (teamAllContacts / teamSchools.size).toFixed(1) : 0;
+    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + avgPerSchool + '</div><div style="font-size:11px;color:var(--g400)">Contacts moy / école</div></div>';
+    h += '</div></div>';
+
+    h += '</div></div>';
+  }
+
   // ====== TAB: INVITE (super admin) ======
   if (isSuper) {
     h += '<div class="suivi-panel" id="stab-invite"><div class="form-card"><h3>Gestion <span class="it">utilisateurs</span></h3>';
@@ -3837,6 +3991,11 @@ async function submitInvite() {
   if (res.success) { showToast(res.message); rSuivi(); } else { showToast(res.error, true); }
 }
 
+// Auto-login if session exists, otherwise show login
+if (currentUser) {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('mainApp').classList.remove('locked');
+}
 rSuivi();
 renderAll();
 </script>
