@@ -3102,11 +3102,11 @@ function renderAll(){
 }
 
 // =============================================================
-// SUIVI — STATE (must be before renderAll)
+// SUIVI 360 — STATE (must be before renderAll)
 // =============================================================
 var APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
 var currentUser = JSON.parse(localStorage.getItem('nateiva_user') || 'null');
-var suiviFollowups = JSON.parse(localStorage.getItem('nateiva_followups') || '[]');
+var suiviEntries = JSON.parse(localStorage.getItem('nateiva_entries') || '[]');
 var suiviRankings = [];
 var SUPER_ADMINS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
 
@@ -3119,61 +3119,18 @@ var DEFAULT_USERS = [
   { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Expert', city: 'YAOUNDE' },
   { username: 'noah', password: 'noah2026', fullName: 'Noah', role: 'SuperAdmin', city: 'ALL' }
 ];
-
-// Load invited users from localStorage
 var invitedUsers = JSON.parse(localStorage.getItem('nateiva_invited_users') || '[]');
-
 function getAllUsers() { return DEFAULT_USERS.concat(invitedUsers); }
-
-function isSuperAdmin(name) {
-  if (!name) return false;
-  return SUPER_ADMINS.some(a => a.toLowerCase() === name.toLowerCase());
-}
-
-renderAll();
+function isSuperAdmin(name) { if (!name) return false; return SUPER_ADMINS.some(function(a) { return a.toLowerCase() === name.toLowerCase(); }); }
 
 // =============================================================
-// SUIVI — FOLLOW-UP TRACKER WITH LOGIN
+// SUIVI 360 — CORE FUNCTIONS
 // =============================================================
-
-// --- Compute days on field = distinct days with at least one entry ---
 function getDaysOnField(expertName) {
   var daySet = new Set();
-  for (var i = 0; i < RAW.length; i++) {
-    var r = RAW[i];
-    if (r.e === expertName && r.t) {
-      var d = new Date(r.t);
-      daySet.add(d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate());
-    }
-  }
-  for (var j = 0; j < suiviFollowups.length; j++) {
-    var fu = suiviFollowups[j];
-    if (fu.Expert === expertName && fu.Timestamp) {
-      var d2 = new Date(fu.Timestamp);
-      daySet.add(d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate());
-    }
-  }
+  RAW.forEach(function(r) { if (r.e === expertName && r.t) { var d = new Date(r.t); daySet.add(d.toDateString()); } });
+  suiviEntries.forEach(function(f) { if (f.expert === expertName && f.date) { daySet.add(new Date(f.date).toDateString()); } });
   return daySet.size;
-}
-
-// --- API calls (with offline fallback to localStorage) ---
-async function apiCall(action, params) {
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(action, params);
-  try {
-    var url = new URL(APPS_SCRIPT_URL);
-    url.searchParams.set('action', action);
-    if (params) Object.keys(params).forEach(function(k) { url.searchParams.set(k, params[k]); });
-    var resp = await fetch(url.toString());
-    return await resp.json();
-  } catch (e) { return localFallback(action, params); }
-}
-
-async function apiPost(data) {
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(data.action, data);
-  try {
-    var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) });
-    return await resp.json();
-  } catch (e) { return localFallback(data.action, data); }
 }
 
 function localFallback(action, params) {
@@ -3183,57 +3140,35 @@ function localFallback(action, params) {
       if (u) return { success: true, user: { username: u.username, fullName: u.fullName, role: u.role, city: u.city } };
       return { success: false, error: 'Identifiants incorrects' };
     }
-    case 'addFollowup': {
-      var fu = {
-        ID: 'FU-' + Date.now(),
-        Timestamp: params.date ? new Date(params.date + 'T' + (params.timeStart || '08:00')).toISOString() : new Date().toISOString(),
-        Expert: params.expert,
-        SchoolName: params.schoolName,
-        Year: params.year || '2026',
-        Date: params.date || new Date().toISOString().split('T')[0],
-        TimeStart: params.timeStart || '',
-        ContactName: params.contactName || '',
-        ContactPhone: params.contactPhone || '',
-        FollowupType: params.followupType,
-        Outcome: params.outcome || '',
-        Duration: params.duration || '',
-        CallCount: params.callCount || '1',
-        Notes: params.notes || '',
-        Rating: params.rating || '',
-        NewRate: params.newRate || '',
-        Status: params.status || 'En cours',
-        Cost: params.cost || 0,
-        ActSecondCall: params.actSecondCall || '',
-        ActSendWhatsApp: params.actSendWhatsApp || '',
-        ActTransmitSuperior: params.actTransmitSuperior || '',
-        ActPlanVisit: params.actPlanVisit || '',
-        NextDate: params.nextDate || '',
-        City: params.city || '',
-        Sector: params.sector || ''
-      };
-      suiviFollowups.push(fu);
-      localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
-      return { success: true, id: fu.ID, message: 'Suivi ajouté avec succès' };
+    case 'addEntry': {
+      var entry = Object.assign({ id: 'E-' + Date.now(), createdAt: new Date().toISOString() }, params);
+      delete entry.action;
+      suiviEntries.push(entry);
+      localStorage.setItem('nateiva_entries', JSON.stringify(suiviEntries));
+      return { success: true, message: 'Enregistré!' };
     }
     case 'addUser': {
-      var exists = getAllUsers().find(function(x) { return x.username === params.username; });
-      if (exists) return { success: false, error: 'Ce nom d\'utilisateur existe déjà' };
-      var newUser = { username: params.username, password: params.password, fullName: params.fullName, role: params.role || 'Expert', city: params.city || 'DOUALA' };
-      invitedUsers.push(newUser);
+      if (getAllUsers().find(function(x) { return x.username === params.username; })) return { success: false, error: 'Nom d\'utilisateur existe déjà' };
+      invitedUsers.push({ username: params.username, password: params.password, fullName: params.fullName, role: params.role || 'Expert', city: params.city || 'DOUALA' });
       localStorage.setItem('nateiva_invited_users', JSON.stringify(invitedUsers));
-      return { success: true, message: 'Utilisateur ' + params.fullName + ' ajouté avec succès' };
+      return { success: true, message: params.fullName + ' ajouté!' };
     }
-    default: return { success: false, error: 'Local fallback: ' + action };
+    default: return { success: false, error: 'Unknown: ' + action };
   }
 }
 
-// --- Login ---
-function showLogin() {
-  document.getElementById('loginOverlay').style.display = 'flex';
-  document.getElementById('loginUser').focus();
+async function apiCall(action, params) {
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(action, params);
+  try { var r = await fetch(APPS_SCRIPT_URL + '?action=' + action + '&' + new URLSearchParams(params)); return await r.json(); } catch(e) { return localFallback(action, params); }
 }
-function closeLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
+async function apiPost(data) {
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(data.action, data);
+  try { var r = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(data) }); return await r.json(); } catch(e) { return localFallback(data.action, data); }
+}
 
+// --- Login/Logout ---
+function showLogin() { document.getElementById('loginOverlay').style.display = 'flex'; var u = document.getElementById('loginUser'); if(u) u.focus(); }
+function closeLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
 document.getElementById('loginPass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 document.getElementById('loginUser').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
 
@@ -3242,582 +3177,439 @@ async function doLogin() {
   var pass = document.getElementById('loginPass').value;
   var errEl = document.getElementById('loginError');
   var btn = document.getElementById('loginBtn');
-  if (!user || !pass) { errEl.textContent = 'Veuillez remplir tous les champs'; errEl.style.display = 'block'; return; }
+  if (!user || !pass) { errEl.textContent = 'Remplissez tous les champs'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Connexion...';
   var res = await apiCall('login', { user: user, pass: pass });
   btn.disabled = false; btn.textContent = 'Se connecter';
-  if (res.success) {
-    currentUser = res.user;
-    localStorage.setItem('nateiva_user', JSON.stringify(currentUser));
-    closeLogin();
-    errEl.style.display = 'none';
-    showToast('Bienvenue ' + currentUser.fullName + '!');
-    rSuivi();
-  } else {
-    errEl.textContent = res.error || 'Erreur de connexion';
-    errEl.style.display = 'block';
-  }
+  if (res.success) { currentUser = res.user; localStorage.setItem('nateiva_user', JSON.stringify(currentUser)); closeLogin(); showToast('Bienvenue ' + currentUser.fullName + '!'); rSuivi(); }
+  else { errEl.textContent = res.error; errEl.style.display = 'block'; }
 }
+function doLogout() { currentUser = null; localStorage.removeItem('nateiva_user'); rSuivi(); }
+function showToast(msg, isErr) { var t = document.getElementById('toastMsg'); t.textContent = msg; t.className = 'toast show' + (isErr ? ' error' : ''); setTimeout(function() { t.className = 'toast'; }, 3000); }
 
-function doLogout() {
-  currentUser = null;
-  localStorage.removeItem('nateiva_user');
-  rSuivi();
-}
+// --- Stats & Rankings ---
+function computeStats(expertName) {
+  var rd = RAW.filter(function(r) { return r.e === expertName; });
+  var ed = suiviEntries.filter(function(e) { return e.expert === expertName; });
+  var days = getDaysOnField(expertName);
+  var prosp = rd.length;
+  var hot = rd.filter(function(r) { return r.r >= 60; }).length;
+  var avgRate = rd.length ? Math.round(rd.reduce(function(s,r) { return s + (r.r||0); }, 0) / rd.length) : 0;
 
-function showToast(msg, isError) {
-  var t = document.getElementById('toastMsg');
-  t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(function() { t.className = 'toast'; }, 3000);
-}
+  // Entries breakdown
+  var newProsp = ed.filter(function(e) { return e.entryType === 'prospection'; }).length;
+  var followups = ed.filter(function(e) { return e.entryType === 'followup'; }).length;
+  var inPerson = ed.filter(function(e) { return e.mode === 'EN PERSONNE'; }).length;
+  var byPhone = ed.filter(function(e) { return e.mode === 'TELEPHONE'; }).length;
+  var byWhatsApp = ed.filter(function(e) { return e.mode === 'WHATSAPP'; }).length;
+  var bySMS = ed.filter(function(e) { return e.mode === 'SMS'; }).length;
+  var totalCost = ed.reduce(function(s,e) { return s + (Number(e.cost)||0); }, 0);
 
-// --- Expert stats from RAW + followups ---
-function computeExpertStats(expertName) {
-  var rawData = RAW.filter(function(r) { return r.e === expertName; });
-  var fuData = suiviFollowups.filter(function(f) { return f.Expert === expertName; });
-  var daysOnField = getDaysOnField(expertName);
-  var totalProspections = rawData.length;
-  var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
-  var avgRate = rawData.length ? Math.round(rawData.reduce(function(s, r) { return s + (r.r || 0); }, 0) / rawData.length) : 0;
-  var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
-  var converted = 0, inProgress = 0, relance = 0;
+  // Deals closed
+  var closed = ed.filter(function(e) { return e.status === 'Converti'; });
+  var closedCount = closed.length;
+
+  // Time to close: days between first RAW entry for a school and the close date
+  var closeTimes = [];
+  closed.forEach(function(c) {
+    var firstEntry = null;
+    rd.forEach(function(r) { if (r.n && c.school && r.n.toUpperCase() === c.school.toUpperCase()) { var d = new Date(r.t); if (!firstEntry || d < firstEntry) firstEntry = d; } });
+    ed.forEach(function(e) { if (e.school && c.school && e.school.toUpperCase() === c.school.toUpperCase() && e.id !== c.id) { var d = new Date(e.date || e.createdAt); if (!firstEntry || d < firstEntry) firstEntry = d; } });
+    if (firstEntry) { var closeDate = new Date(c.date || c.createdAt); var daysDiff = Math.ceil((closeDate - firstEntry) / 86400000); if (daysDiff >= 0) closeTimes.push(daysDiff); }
+  });
+  var avgCloseTime = closeTimes.length ? Math.round(closeTimes.reduce(function(a,b){return a+b;},0) / closeTimes.length) : 0;
+
+  // Follow-ups per school
   var schoolsFollowed = new Set();
-  for (var i = 0; i < fuData.length; i++) {
-    var f = fuData[i];
-    if (f.FollowupType === 'CALL') calls++;
-    else if (f.FollowupType === 'WHATSAPP') whatsapp++;
-    else if (f.FollowupType === 'SMS') sms++;
-    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
-    if (f.Status === 'Converti') converted++;
-    else if (f.Status === 'En cours') inProgress++;
-    else if (f.Status === 'Relance') relance++;
-    schoolsFollowed.add(f.SchoolName);
-  }
-  var totalFollowups = calls + whatsapp + sms + visits;
-  var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score) };
+  ed.forEach(function(e) { if (e.school) schoolsFollowed.add(e.school.toUpperCase()); });
+
+  // Close rate
+  var totalSchools = new Set();
+  rd.forEach(function(r) { if(r.n) totalSchools.add(r.n.toUpperCase()); });
+  ed.forEach(function(e) { if(e.school) totalSchools.add(e.school.toUpperCase()); });
+  var closeRate = totalSchools.size > 0 ? Math.round(closedCount / totalSchools.size * 100) : 0;
+
+  // Score
+  var score = (closedCount * 50) + (hot * 15) + (followups * 5) + (newProsp * 8) + (inPerson * 8) + (byPhone * 5) + (byWhatsApp * 3) + (bySMS * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
+
+  return { days:days, prosp:prosp, hot:hot, avgRate:avgRate, newProsp:newProsp, followups:followups, inPerson:inPerson, byPhone:byPhone, byWhatsApp:byWhatsApp, bySMS:bySMS, totalCost:totalCost, closedCount:closedCount, avgCloseTime:avgCloseTime, schoolsFollowed:schoolsFollowed.size, totalSchools:totalSchools.size, closeRate:closeRate, score:Math.max(0,score), totalEntries: ed.length };
 }
 
 function buildRankings() {
-  var experts = [];
-  var seen = {};
-  for (var i = 0; i < RAW.length; i++) {
-    if (RAW[i].e && !seen[RAW[i].e]) { seen[RAW[i].e] = true; experts.push(RAW[i].e); }
-  }
-  suiviRankings = experts.map(function(e) {
-    var stats = computeExpertStats(e);
-    return Object.assign({ expert: e }, stats);
-  });
+  var seen = {}, experts = [];
+  RAW.forEach(function(r) { if (r.e && !seen[r.e]) { seen[r.e] = true; experts.push(r.e); } });
+  suiviEntries.forEach(function(e) { if (e.expert && !seen[e.expert]) { seen[e.expert] = true; experts.push(e.expert); } });
+  suiviRankings = experts.map(function(e) { return Object.assign({ expert: e }, computeStats(e)); });
   suiviRankings.sort(function(a, b) { return b.score - a.score; });
   suiviRankings.forEach(function(r, i) { r.rank = i + 1; });
 }
 
-function getSchoolSuggestions(expert) {
-  var schools = RAW.filter(function(r) { return r.e === expert; }).map(function(r) {
-    return { name: r.n, contact: r.rn, phone: r.pw || r.pn, city: r.v, sector: r.v === 'YAOUNDE' ? r.sy : r.sd, rate: r.r };
-  });
-  var unique = [], seen = new Set();
-  for (var i = 0; i < schools.length; i++) {
-    var key = schools[i].name.toUpperCase();
-    if (!seen.has(key)) { seen.add(key); unique.push(schools[i]); }
-  }
-  return unique.sort(function(a, b) { return (b.rate || 0) - (a.rate || 0); });
-}
-
-// --- Render Suivi ---
+// --- RENDER SUIVI ---
 function rSuivi() {
   buildRankings();
   var el = document.getElementById('p-suivi');
   if (!el) return;
 
   if (!currentUser) {
-    el.innerHTML = '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2><p>Connectez-vous pour accéder à votre tableau de bord personnel, enregistrer vos follow-ups (appels, WhatsApp, SMS, visites terrain), voir votre score et votre classement dans l\'équipe.</p></div><div class="not-logged-in"><h2>Connectez-vous pour continuer</h2><p>Chaque expert a son propre compte pour suivre ses follow-ups et voir son classement.</p><button onclick="showLogin()">Se connecter</button></div>';
+    el.innerHTML = '<div class="page-intro" data-num="8"><h2>Suivi <span class="it">360</span></h2><p>Connectez-vous pour enregistrer vos prospections terrain et téléphoniques, suivre vos écoles et voir votre classement.</p></div><div class="not-logged-in"><h2>Connectez-vous</h2><p>Chaque expert a son propre compte.</p><button onclick="showLogin()">Se connecter</button></div>';
     return;
   }
 
   var me = currentUser.fullName;
   var isSuper = isSuperAdmin(me);
-  var stats = computeExpertStats(me);
+  var stats = computeStats(me);
   var myRank = suiviRankings.find(function(r) { return r.expert === me; });
-  var myFollowups = suiviFollowups.filter(function(f) { return isSuper || f.Expert === me; }).sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
+  var myEntries = suiviEntries.filter(function(e) { return isSuper || e.expert === me; }).sort(function(a,b) { return new Date(b.createdAt) - new Date(a.createdAt); });
 
-  // School options: super admins see all, others see only theirs
-  var allSchools = isSuper
-    ? Array.from(new Set(RAW.map(function(r) { return r.n; }))).sort()
-    : Array.from(new Set(RAW.filter(function(r) { return r.e === me; }).map(function(r) { return r.n; }))).sort();
-  var schoolOpts = allSchools.map(function(s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+  // All school names for select
+  var schoolSet = new Set();
+  (isSuper ? RAW : RAW.filter(function(r){return r.e===me;})).forEach(function(r){if(r.n) schoolSet.add(r.n);});
+  suiviEntries.forEach(function(e){if(e.school && (isSuper || e.expert===me)) schoolSet.add(e.school);});
+  var schoolList = Array.from(schoolSet).sort();
+  var schoolOpts = schoolList.map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
 
-  var schools = isSuper ? getSchoolSuggestions(null) : getSchoolSuggestions(me);
-  if (isSuper) {
-    var allSch = RAW.map(function(r) {
-      return { name: r.n, contact: r.rn, phone: r.pw || r.pn, city: r.v, sector: r.v === 'YAOUNDE' ? r.sy : r.sd, rate: r.r, expert: r.e };
-    });
-    var uniq = [], sn = new Set();
-    for (var i = 0; i < allSch.length; i++) { var k = allSch[i].name.toUpperCase(); if (!sn.has(k)) { sn.add(k); uniq.push(allSch[i]); } }
-    schools = uniq.sort(function(a, b) { return (b.rate || 0) - (a.rate || 0); });
-    allSchools = Array.from(new Set(RAW.map(function(r) { return r.n; }))).sort();
-    schoolOpts = allSchools.map(function(s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
-  }
-
-  var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : '🚶 VISITE'; };
-  var fuDate = function(ts) { return new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  var modeIcon = function(m) { return m==='EN PERSONNE'?'🚶':m==='TELEPHONE'?'📞':m==='WHATSAPP'?'💬':'📱'; };
+  var modeClass = function(m) { return m==='EN PERSONNE'?'type-VISIT':m==='TELEPHONE'?'type-CALL':m==='WHATSAPP'?'type-WHATSAPP':'type-SMS'; };
+  var typeLabel = function(t) { return t==='prospection'?'Nouvelle prospection':'Suivi'; };
+  var fmtD = function(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); };
 
   var h = '';
-  h += '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2>';
-  h += '<p>Tableau de bord ' + (isSuper ? '<b>Super Admin</b>' : 'personnel') + ' de <b>' + esc(me) + '</b>. ' + (isSuper ? 'Vous voyez les données de toute l\'équipe.' : 'Enregistrez vos follow-ups et consultez votre classement.') + '</p></div>';
-
   // Header
+  h += '<div class="page-intro" data-num="8"><h2>Suivi <span class="it">360</span></h2>';
+  h += '<p>' + (isSuper ? '<b>Super Admin</b> — ' : '') + 'Bienvenue <b>' + esc(me) + '</b>. Enregistrez vos prospections et follow-ups, en personne ou par téléphone.</p>';
+  h += '<div class="quick-links" style="margin-top:12px"><a href="https://docs.google.com/forms/d/1PBuLuUl77BLQV2DRzUub7DGrJkkGhtKJDOZygb1f-T4/viewform" target="_blank">📝 Form Prospection</a><a href="https://docs.google.com/forms/d/1_PsQd_S66_2bhNihxmaVgkxM_3XqGSwL8km43D16Fa0/viewform" target="_blank">📞 Form Suivi Tél.</a></div></div>';
+
   h += '<div class="suivi-header"><div class="suivi-user">';
   h += '<div class="suivi-avatar">' + me.charAt(0).toUpperCase() + '</div>';
-  h += '<div><div class="suivi-name">' + esc(me) + '</div>';
-  h += '<div class="suivi-role">' + (isSuper ? 'SUPER ADMIN' : 'EXPERT') + ' · ' + esc(currentUser.city) + '</div></div>';
-  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
+  h += '<div><div class="suivi-name">' + esc(me) + '</div><div class="suivi-role">' + (isSuper?'SUPER ADMIN':'EXPERT') + ' · ' + esc(currentUser.city) + '</div></div>';
+  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.days + '</span> jours terrain</div>';
   h += '</div><div class="suivi-actions">';
-  h += '<button class="primary" onclick="showFollowupForm()">+ Nouveau suivi</button>';
-  if (isSuper) h += '<button onclick="showInviteForm()">+ Inviter</button>';
+  h += '<button class="primary" onclick="showEntryWizard()">+ Nouvelle entrée</button>';
+  if (isSuper) h += '<button onclick="switchTab(\'invite\')">+ Inviter</button>';
   h += '<button onclick="doLogout()">Déconnexion</button>';
   h += '</div></div>';
 
-  // KPIs
+  // KPIs — 2 rows
   h += '<div class="suivi-kpis">';
-  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalProspections + '</div><div class="sk-lbl">Prospections</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.totalFollowups + '</div><div class="sk-lbl">Follow-ups total</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
+  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🏫</div><div class="sk-val">' + stats.totalSchools + '</div><div class="sk-lbl">Écoles total</div></div>';
+  h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">' + stats.closedCount + '</div><div class="sk-lbl">Deals fermés</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.closeRate + '<small>%</small></div><div class="sk-lbl">Taux de closing</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">⏱️</div><div class="sk-val">' + stats.avgCloseTime + '<small>j</small></div><div class="sk-lbl">Moy. jours pour closer</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain FCFA</div></div>';
+  h += '</div>';
+  h += '<div class="suivi-kpis" style="margin-top:-12px">';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🚶</div><div class="sk-val">' + stats.inPerson + '</div><div class="sk-lbl">En personne</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.byPhone + '</div><div class="sk-lbl">Par téléphone</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">💬</div><div class="sk-val">' + stats.byWhatsApp + '</div><div class="sk-lbl">WhatsApp</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hot + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📈</div><div class="sk-val">' + stats.followups + '</div><div class="sk-lbl">Follow-ups</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🆕</div><div class="sk-val">' + stats.newProsp + '</div><div class="sk-lbl">Nvlles prospections</div></div>';
   h += '</div>';
 
-  // Sub-tabs
+  // Tabs
   h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab act" data-stab="add">+ Ajouter</button>';
-  h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
-  h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
-  h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
+  h += '<button class="suivi-tab act" data-stab="entry">+ Entrée</button>';
+  h += '<button class="suivi-tab" data-stab="history">Journal (' + myEntries.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
-  if (isSuper) h += '<button class="suivi-tab" data-stab="team">Équipe complète</button>';
-  if (isSuper) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
+  h += '<button class="suivi-tab" data-stab="ranking">🏆 Classement</button>';
+  h += '<button class="suivi-tab" data-stab="deals">💼 Deals</button>';
+  if (isSuper) h += '<button class="suivi-tab" data-stab="invite">👥 Utilisateurs</button>';
   h += '</div>';
 
-  // Links to Google Forms
-  h += '<div class="suivi-panel act" id="stab-add">';
-  h += '<div class="note teal" style="margin-bottom:20px"><b>📝 Formulaires Google:</b> ';
-  h += '<a href="https://docs.google.com/forms/d/1PBuLuUl77BLQV2DRzUub7DGrJkkGhtKJDOZygb1f-T4/edit" target="_blank" style="color:var(--teal);font-weight:700;margin-right:16px">Fiche de Prospection</a>';
-  h += '<a href="https://docs.google.com/forms/d/1_PsQd_S66_2bhNihxmaVgkxM_3XqGSwL8km43D16Fa0/edit" target="_blank" style="color:var(--teal);font-weight:700">Suivi Téléphonique</a></div>';
+  // ====== TAB: ENTRY (mobile-first wizard) ======
+  h += '<div class="suivi-panel act" id="stab-entry">';
+  h += '<div class="form-card" id="entryForm"><h3>Nouvelle <span class="it">entrée 360</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Prospection ou suivi, en personne ou par téléphone — tout se fait ici.</p>';
 
-  // Panel: Add followup - matching Google Form fields
-  h += '<div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
-  h += '<div class="form-grid">';
-  h += '<div class="form-field"><label>Nom de l\'Établissement *</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
-  h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école"></div>';
-  h += '<div class="form-field"><label>Année de prospection *</label><select id="fuYear"><option value="2026">2026</option><option value="2025">2025</option></select></div>';
-  h += '<div class="form-field"><label>Ville *</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-  h += '<div class="form-field"><label>Date du suivi</label><input type="date" id="fuDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
-  h += '<div class="form-field"><label>Heure de début</label><input type="time" id="fuTimeStart"></div>';
-  h += '<div class="form-field"><label>Contact appelé (Nom et Fonction)</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor - Directeur"></div>';
-  h += '<div class="form-field"><label>Téléphone</label><input type="text" id="fuPhone" placeholder="Ex: 675 876 770"></div>';
-  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel téléphonique</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite sur site</option></select></div>';
-  h += '<div class="form-field"><label>Statut de l\'appel</label><select id="fuOutcome"><option value="">-- Statut --</option><option value="Répondu - Intéressé">Répondu - Intéressé</option><option value="Répondu - Pas intéressé">Répondu - Pas intéressé</option><option value="Répondu - Rappeler plus tard">Répondu - Rappeler plus tard</option><option value="Répondu - Dossier transmis">Répondu - Dossier transmis au supérieur</option><option value="Répondu - RDV fixé">Répondu - RDV fixé</option><option value="Répondu - Démo faite">Répondu - Démo faite</option><option value="Répondu - Converti">Répondu - Converti / Signé</option><option value="Pas de réponse">Pas de réponse</option><option value="Numéro incorrect">Numéro incorrect</option><option value="Messagerie">Messagerie vocale</option></select></div>';
-  h += '<div class="form-field"><label>Durée totale de l\'appel (minutes)</label><input type="number" id="fuDuration" placeholder="Ex: 5" min="0"></div>';
-  h += '<div class="form-field"><label>Nombre de fois appelé</label><input type="number" id="fuCallCount" placeholder="Ex: 1" min="1" value="1"></div>';
-  h += '<div class="form-field full"><label>Détails des points discutés (résumé)</label><textarea id="fuNotes" placeholder="Résumé de la conversation, informations recueillies..."></textarea></div>';
-  h += '<div class="form-field"><label>Évaluation collaboration (1=Très faible, 5=Excellente)</label><select id="fuRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2 - Faible</option><option value="3">3 - Moyenne</option><option value="4">4 - Bonne</option><option value="5">5 - Excellente</option></select></div>';
-  h += '<div class="form-field"><label>Nouveau taux de conversion *</label><select id="fuNewRate"><option value="">-- Pas de changement --</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option></select></div>';
-  h += '<div class="form-field"><label>Statut global</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance nécessaire</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé (perdu)</option></select></div>';
-  h += '<div class="form-field" id="fuCostWrap" style="display:none"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
-
-  // Actions de suivi (checkbox grid from Google Form)
-  h += '<div class="form-field full"><label>Actions de suivi requises</label>';
-  h += '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-top:8px;font-size:13px">';
-  h += '<div style="font-weight:700;font-size:11px;font-family:\'JetBrains Mono\',monospace"></div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--green)">OUI</div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--red)">NON</div><div style="text-align:center;font-size:10px;font-weight:700;color:var(--saffron)">EN COURS</div>';
-  var actions = [["fuAct1","Prévoir un second appel"],["fuAct2","Envoi document(s) par WhatsApp"],["fuAct3","Transmission dossier au supérieur"],["fuAct4","Planifier une visite sur site"]];
-  actions.forEach(function(a) { h += '<div>' + a[1] + '</div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="Oui"></div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="Non"></div><div style="text-align:center"><input type="radio" name="' + a[0] + '" value="En cours"></div>'; });
+  // Step 1: Type + Mode (big buttons, mobile-friendly)
+  h += '<div style="margin-bottom:20px"><label class="form-field" style="margin-bottom:10px"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;font-weight:700">1. Que faites-vous?</label></label>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h += '<button type="button" class="wiz-btn" data-field="entryType" data-val="prospection" onclick="wizSelect(this)" style="padding:18px;border:2px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-size:14px;font-weight:700;transition:all .2s"><span style="font-size:28px;display:block;margin-bottom:6px">🆕</span>Nouvelle prospection</button>';
+  h += '<button type="button" class="wiz-btn" data-field="entryType" data-val="followup" onclick="wizSelect(this)" style="padding:18px;border:2px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-size:14px;font-weight:700;transition:all .2s"><span style="font-size:28px;display:block;margin-bottom:6px">🔄</span>Suivi / Follow-up</button>';
   h += '</div></div>';
 
-  h += '<div class="form-field"><label>Prochaine échéance de suivi</label><input type="date" id="fuNextDate"></div>';
-  h += '<div class="form-field"><label>Secteur / Quartier</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
-  h += '</div><div class="form-submit"><button class="btn-save" onclick="submitFollowup()">Enregistrer le suivi</button></div></div>';
+  h += '<div style="margin-bottom:20px"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;font-weight:700">2. Comment?</label>';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
+  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="EN PERSONNE" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">🚶</span>En personne</button>';
+  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="TELEPHONE" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">📞</span>Téléphone</button>';
+  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="WHATSAPP" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">💬</span>WhatsApp</button>';
+  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="SMS" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">📱</span>SMS</button>';
+  h += '</div></div>';
 
-  // Quick school list
-  h += '<div class="form-card"><h3>Écoles à <span class="it">relancer</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Cliquez pour pré-remplir le formulaire.</p>';
-  h += '<div style="max-height:400px;overflow-y:auto">';
-  schools.slice(0, 25).forEach(function(s) {
-    h += '<div class="fu-item type-CALL" style="cursor:pointer" onclick="prefillFromSchool(\'' + esc(s.name).replace(/'/g, "\\'") + '\',\'' + esc(s.contact || '').replace(/'/g, "\\'") + '\',\'' + esc(s.phone || '').replace(/'/g, "\\'") + '\',\'' + esc(s.city || '').replace(/'/g, "\\'") + '\',\'' + esc(s.sector || '').replace(/'/g, "\\'") + '\')">';
-    h += '<div class="fu-head"><span class="fu-school">' + esc(s.name) + '</span>' + (s.rate != null ? pct(s.rate) : '<span class="pct pct-dead">—</span>') + '</div>';
+  // Step 2: School + basic info
+  h += '<div class="form-grid" style="margin-bottom:16px">';
+  h += '<div class="form-field"><label>3. École *</label><select id="eSchool"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__new__">✏️ Nouvelle école</option></select></div>';
+  h += '<div class="form-field" id="eNewSchoolWrap" style="display:none"><label>Nom nouvelle école</label><input type="text" id="eNewSchool" placeholder="Nom de l\'école"></div>';
+  h += '<div class="form-field"><label>Ville *</label><select id="eCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Date</label><input type="date" id="eDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+
+  // Prospection-specific fields
+  h += '<div class="form-field" id="eTypeWrap"><label>Type d\'école</label><select id="eSchoolType"><option value="">--</option><option value="Primaire">Primaire</option><option value="Secondaire">Secondaire</option><option value="Maternelle">Maternelle</option><option value="Bilingue">Bilingue</option></select></div>';
+  h += '<div class="form-field" id="eCatWrap"><label>Catégorie</label><select id="eCat"><option value="">--</option><option value="TRES HAUTE STANDING">Très haute standing</option><option value="HAUTE STANDING">Haute standing</option><option value="STANDIG MOYEN">Standing moyen</option><option value="BASSE STANDING">Basse standing</option><option value="TRES BASSE STANDING">Très basse standing</option></select></div>';
+  h += '<div class="form-field" id="eEffWrap"><label>Effectifs élèves</label><input type="text" id="eEffectifs" placeholder="Ex: 250"></div>';
+
+  // Contact
+  h += '<div class="form-field"><label>4. Contact (Nom & Fonction)</label><input type="text" id="eContact" placeholder="M. Agbor - Directeur"></div>';
+  h += '<div class="form-field"><label>Poste</label><select id="eRole"><option value="">--</option><option value="DIRECTEUR (TRICE)">Directeur(trice)</option><option value="PRINCIPAL">Principal</option><option value="PROVISEUR">Proviseur</option><option value="VICE PRINCIPAL">Vice-Principal</option><option value="VICE DIRECTEUR">Vice-Directeur</option><option value="SECRETAIRE">Secrétaire</option><option value="INFORMATICIEN">Informaticien</option><option value="PDG">PDG / Fondateur</option><option value="CENSEUR">Censeur</option><option value="SURVEILLANT">Surveillant</option><option value="AUTRE">Autre</option></select></div>';
+  h += '<div class="form-field"><label>Tél WhatsApp</label><input type="tel" id="ePhoneWA" placeholder="6XX XXX XXX"></div>';
+  h += '<div class="form-field"><label>Tél non-WhatsApp</label><input type="tel" id="ePhoneOther" placeholder="6XX XXX XXX"></div>';
+
+  // Phone-specific fields
+  h += '<div class="form-field" id="eDurationWrap"><label>Durée appel (min)</label><input type="number" id="eDuration" placeholder="5" min="0"></div>';
+  h += '<div class="form-field" id="eCallCountWrap"><label>Nb fois appelé</label><input type="number" id="eCallCount" value="1" min="1"></div>';
+
+  // Conversation
+  h += '<div class="form-field full"><label>5. Résumé conversation</label><textarea id="eConvo" placeholder="Points discutés, réactions, informations recueillies..." style="min-height:70px"></textarea></div>';
+
+  // Outcome + Rate
+  h += '<div class="form-field"><label>6. Taux de conversion *</label><select id="eRate"><option value="">--</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option></select></div>';
+  h += '<div class="form-field"><label>Évaluation collaboration (1-5)</label><select id="eRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2</option><option value="3">3 - Moyenne</option><option value="4">4</option><option value="5">5 - Excellente</option></select></div>';
+  h += '<div class="form-field"><label>Statut *</label><select id="eStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 DEAL FERMÉ</option><option value="Terminé">⚫ Perdu</option></select></div>';
+  h += '<div class="form-field" id="eCostWrap"><label>Coût déplacement FCFA</label><input type="number" id="eCost" placeholder="500" min="0" value="0"></div>';
+
+  // Actions
+  h += '<div class="form-field full"><label>7. Prochaines actions</label>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">';
+  var acts = [['actCall','📞 Rappeler'],['actWA','💬 Envoyer doc WA'],['actSuperior','📤 Transmettre supérieur'],['actVisit','🚶 Planifier visite'],['actDoc','📄 Envoyer dossier physique']];
+  acts.forEach(function(a) { h += '<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--g200);border-radius:10px;cursor:pointer;font-size:13px;background:var(--bg);transition:all .2s"><input type="checkbox" id="' + a[0] + '"> ' + a[1] + '</label>'; });
+  h += '</div></div>';
+  h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="eNextDate"></div>';
+
+  // Location
+  h += '<div class="form-field"><label>Secteur / Quartier</label><input type="text" id="eSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field full" id="eLocWrap"><label>Localisation exacte</label><input type="text" id="eLoc" placeholder="En face pharmacie, après Nestlé..."></div>';
+  h += '<div class="form-field full"><label>Remarques</label><textarea id="eRemarks" placeholder="Notes supplémentaires..." style="min-height:50px"></textarea></div>';
+
+  h += '</div>'; // close form-grid
+  h += '<div class="form-submit"><button class="btn-save" onclick="submitEntry()" style="width:100%;padding:18px;font-size:16px">✅ Enregistrer</button></div>';
+  h += '</div></div>'; // close form-card, stab-entry
+
+  // ====== TAB: HISTORY ======
+  h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Journal des <span class="it">entrées</span>' + (isSuper ? ' (équipe)' : '') + '</h3>';
+  if (!myEntries.length) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucune entrée.</p>';
+  myEntries.forEach(function(e) {
+    h += '<div class="fu-item ' + modeClass(e.mode) + '"><div class="fu-head"><span class="fu-school">' + esc(e.school||'') + '</span>';
+    h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+    if (isSuper) h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(e.expert) + '</span>';
+    h += '<span class="fu-type ' + (e.mode==='EN PERSONNE'?'VISIT':e.mode==='TELEPHONE'?'CALL':e.mode) + '">' + modeIcon(e.mode) + ' ' + (e.mode||'') + '</span>';
+    h += '<span style="font-size:10px;padding:3px 8px;border-radius:6px;background:' + (e.entryType==='prospection'?'var(--saffron-soft)':'var(--teal-soft)') + ';color:' + (e.entryType==='prospection'?'var(--saffron-deep)':'var(--teal)') + ';font-weight:700">' + typeLabel(e.entryType) + '</span>';
+    h += '</div></div>';
+    h += '<div class="fu-body">' + (esc(e.convo) || esc(e.remarks) || '<i style="color:var(--g400)">—</i>') + '</div>';
     h += '<div class="fu-footer">';
-    if (s.contact) h += '<span>Contact: <b>' + esc(s.contact) + '</b></span>';
-    if (s.phone) h += '<span>Tél: <b>' + esc(s.phone) + '</b></span>';
-    if (s.expert && isSuper) h += '<span>Expert: <b>' + esc(s.expert) + '</b></span>';
+    h += '<span>' + fmtD(e.date||e.createdAt) + '</span>';
+    if (e.contact) h += '<span>Contact: <b>' + esc(e.contact) + '</b></span>';
+    if (e.rate) h += '<span>Taux: ' + pct(Number(e.rate)) + '</span>';
+    if (e.status) h += '<span>Statut: <b>' + esc(e.status) + '</b></span>';
+    if (Number(e.cost) > 0) h += '<span class="fu-cost">' + fmt(e.cost) + ' F</span>';
+    if (e.duration) h += '<span>' + e.duration + ' min</span>';
     h += '</div></div>';
-  });
-  h += '</div></div></div>';
-
-  // Panel: History
-  h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique des <span class="it">follow-ups</span>' + (isSuper ? ' (toute l\'équipe)' : '') + '</h3>';
-  if (myFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucun follow-up enregistré.</p>';
-  h += '<div class="followup-list">';
-  myFollowups.forEach(function(f) {
-    h += '<div class="fu-item type-' + f.FollowupType + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
-    h += '<div style="display:flex;gap:8px;align-items:center">';
-    if (isSuper) h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
-    h += '<span class="fu-type ' + f.FollowupType + '">' + fuTypeIcon(f.FollowupType) + '</span></div></div>';
-    h += '<div class="fu-body">' + (esc(f.Notes) || '<i style="color:var(--g400)">Pas de notes</i>') + '</div>';
-    h += '<div class="fu-footer"><span>Date: <b>' + fuDate(f.Timestamp) + '</b></span>';
-    if (f.ContactName) h += '<span>Contact: <b>' + esc(f.ContactName) + '</b></span>';
-    if (f.Outcome) h += '<span>Statut appel: <b>' + esc(f.Outcome) + '</b></span>';
-    if (f.Duration) h += '<span>Durée: <b>' + f.Duration + ' min</b></span>';
-    if (f.CallCount && Number(f.CallCount) > 1) h += '<span>Appelé: <b>' + f.CallCount + 'x</b></span>';
-    if (f.Rating) h += '<span>Note: <b>' + f.Rating + '/5</b></span>';
-    if (f.Status) h += '<span>Statut: <b>' + esc(f.Status) + '</b></span>';
-    if (Number(f.Cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(f.Cost) + ' FCFA</span>';
-    if (f.NewRate) h += '<span style="color:var(--saffron);font-weight:700">Taux → ' + f.NewRate + '%</span>';
-    if (f.ActSecondCall === 'Oui') h += '<span style="color:var(--green)">📞 2nd appel prévu</span>';
-    if (f.ActSendWhatsApp === 'Oui') h += '<span style="color:var(--green)">💬 Doc WhatsApp</span>';
-    if (f.ActTransmitSuperior === 'Oui') h += '<span style="color:var(--green)">📤 Transmis supérieur</span>';
-    if (f.ActPlanVisit === 'Oui') h += '<span style="color:var(--green)">🚶 Visite prévue</span>';
-    if (f.NextDate) h += '<span>Échéance: <b>' + f.NextDate + '</b></span>';
-    h += '</div></div>';
-  });
-  h += '</div></div></div>';
-
-  // Panel: Rankings
-  h += '<div class="suivi-panel" id="stab-ranking"><div class="form-card"><h3>Classement <span class="it">équipe</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Score: conversions (40pts), deals chauds (15pts), relances (10pts), visites (8pts), appels (5pts), WhatsApp (3pts), SMS (2pts). Coûts: -2pts/1000F.</p>';
-  suiviRankings.forEach(function(r) {
-    h += '<div class="rank-card ' + (r.expert === me ? 'me' : '') + '"><div class="rank-pos">' + r.rank + '</div>';
-    h += '<div class="rank-info"><div class="rk-name">' + esc(r.expert) + (r.expert === me ? ' (vous)' : '') + '</div>';
-    h += '<div class="rk-meta"><span>' + r.totalProspections + ' prosp.</span><span>' + r.hotDeals + ' chauds</span><span>' + r.totalFollowups + ' follow-ups</span><span>' + r.converted + ' convertis</span><span>' + r.daysOnField + 'j terrain</span>';
-    if (r.totalCost > 0) h += '<span style="color:var(--red)">' + fmt(r.totalCost) + ' FCFA</span>';
-    h += '</div></div><div class="rank-score">' + r.score + '<small>points</small></div></div>';
   });
   h += '</div></div>';
 
-  // Panel: Costs
-  h += '<div class="suivi-panel" id="stab-costs"><div class="form-card"><h3>Suivi des <span class="it">coûts terrain</span></h3>';
-  h += '<div class="cost-summary">';
-  h += '<div class="cost-item"><div class="ci-val">' + fmt(stats.totalCost) + '</div><div class="ci-lbl">Total dépensé (FCFA)</div></div>';
-  h += '<div class="cost-item"><div class="ci-val">' + stats.visits + '</div><div class="ci-lbl">Visites terrain</div></div>';
-  h += '<div class="cost-item"><div class="ci-val">' + (stats.visits > 0 ? fmt(Math.round(stats.totalCost / stats.visits)) : '0') + '</div><div class="ci-lbl">Coût moyen / visite</div></div>';
-  h += '<div class="cost-item"><div class="ci-val">' + (stats.daysOnField > 0 ? fmt(Math.round(stats.totalCost / stats.daysOnField)) : '0') + '</div><div class="ci-lbl">Coût moyen / jour</div></div>';
-  h += '</div>';
-
-  // Visit detail list (own visits for regular, all for super admin)
-  var costFollowups = suiviFollowups.filter(function(f) { return f.FollowupType === 'VISIT' && (isSuper || f.Expert === me); });
-  if (costFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:30px">Aucune visite terrain enregistrée.</p>';
-  costFollowups.forEach(function(f) {
-    h += '<div class="fu-item type-VISIT"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
-    h += '<span class="fu-cost" style="font-size:16px">' + fmt(f.Cost || 0) + ' FCFA</span></div>';
-    h += '<div class="fu-footer"><span>' + new Date(f.Timestamp).toLocaleDateString('fr-FR') + '</span>';
-    if (isSuper) h += '<span>' + esc(f.Expert) + '</span>';
-    if (f.City) h += '<span>' + esc(f.City) + '</span>';
-    if (f.Outcome) h += '<span>' + esc(f.Outcome) + '</span>';
-    h += '</div></div>';
+  // ====== TAB: PROGRESSION ======
+  h += '<div class="suivi-panel" id="stab-progress"><div class="form-card"><h3>Progression des <span class="it">taux</span></h3>';
+  // Build rate history per school
+  var rateHist = {};
+  (isSuper ? RAW : RAW.filter(function(r){return r.e===me;})).forEach(function(r) {
+    var k = (r.n||'').toUpperCase(); if (!k) return;
+    if (!rateHist[k]) rateHist[k] = { name:r.n, points:[], expert:r.e };
+    rateHist[k].points.push({ date:r.t?new Date(r.t):new Date(), rate:r.r||0, label:'Initial', mode:'Prospection' });
   });
-
-  if (isSuper) {
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:24px 0 14px">Coûts par expert</h4>';
-    h += '<table class="tbl"><thead><tr><th>Expert</th><th>Visites</th><th>Total FCFA</th><th>Moy/visite</th><th>Jours terrain</th><th>Moy/jour</th></tr></thead><tbody>';
-    suiviRankings.forEach(function(r) {
-      h += '<tr><td><b>' + esc(r.expert) + '</b></td><td class="num">' + r.visits + '</td><td class="num" style="color:var(--red)">' + fmt(r.totalCost) + '</td>';
-      h += '<td class="num">' + (r.visits > 0 ? fmt(Math.round(r.totalCost / r.visits)) : '—') + '</td>';
-      h += '<td class="num">' + r.daysOnField + '</td>';
-      h += '<td class="num">' + (r.daysOnField > 0 ? fmt(Math.round(r.totalCost / r.daysOnField)) : '—') + '</td></tr>';
-    });
-    h += '</tbody></table>';
-  }
-  h += '</div></div>';
-
-  // Panel: Progression — rate evolution graph
-  h += '<div class="suivi-panel" id="stab-progress"><div class="form-card"><h3>Progression des <span class="it">taux de conversion</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Évolution des taux de conversion pour chaque école après chaque suivi. Le graphique montre le parcours de la prospection initiale jusqu\'au dernier suivi.</p>';
-
-  // Build progression data: for each school, get initial RAW rate + all follow-up rate changes
-  var progressData = {};
-  var myRAW = isSuper ? RAW : RAW.filter(function(r) { return r.e === me; });
-  myRAW.forEach(function(r) {
-    var key = r.n.toUpperCase();
-    if (!progressData[key]) progressData[key] = { name: r.n, points: [], expert: r.e };
-    progressData[key].points.push({ date: r.t ? new Date(r.t) : new Date(), rate: r.r || 0, type: 'Prospection', label: 'Initial' });
+  (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).forEach(function(e) {
+    if (!e.rate || !e.school) return;
+    var k = e.school.toUpperCase();
+    if (!rateHist[k]) rateHist[k] = { name:e.school, points:[], expert:e.expert };
+    rateHist[k].points.push({ date:new Date(e.date||e.createdAt), rate:Number(e.rate), label:(e.entryType==='followup'?'Suivi':'Prosp.'), mode:e.mode||'' });
   });
-  var myFU = isSuper ? suiviFollowups : suiviFollowups.filter(function(f) { return f.Expert === me; });
-  myFU.forEach(function(f) {
-    if (f.NewRate) {
-      var key = f.SchoolName.toUpperCase();
-      if (!progressData[key]) progressData[key] = { name: f.SchoolName, points: [], expert: f.Expert };
-      var typeLabel = f.FollowupType === 'CALL' ? 'Appel' : f.FollowupType === 'WHATSAPP' ? 'WhatsApp' : f.FollowupType === 'SMS' ? 'SMS' : 'Visite';
-      progressData[key].points.push({ date: new Date(f.Timestamp), rate: Number(f.NewRate), type: typeLabel, label: typeLabel + ' #' + (progressData[key].points.length) });
-    }
-  });
+  var withChanges = Object.keys(rateHist).filter(function(k){return rateHist[k].points.length>1;}).map(function(k){return rateHist[k];});
+  withChanges.sort(function(a,b){return b.points[b.points.length-1].rate - a.points[a.points.length-1].rate;});
 
-  // Filter to schools that have at least 1 rate change (more than just the initial)
-  var schoolsWithChanges = Object.keys(progressData).filter(function(k) { return progressData[k].points.length > 1; }).map(function(k) { return progressData[k]; });
-  schoolsWithChanges.sort(function(a, b) { return b.points[b.points.length-1].rate - a.points[a.points.length-1].rate; });
-
-  if (schoolsWithChanges.length === 0) {
-    h += '<div class="note" style="text-align:center;padding:40px">Aucune progression enregistrée. Quand vous faites un suivi, mettez à jour le <b>Nouveau taux de conversion</b> pour voir l\'évolution ici.</div>';
+  if (!withChanges.length) {
+    h += '<div class="note" style="text-align:center;padding:30px">Enregistrez des suivis avec un taux pour voir la progression ici.</div>';
   } else {
-    // Summary KPIs
-    var totalUp = 0, totalDown = 0, totalSame = 0;
-    schoolsWithChanges.forEach(function(s) {
-      var first = s.points[0].rate;
-      var last = s.points[s.points.length-1].rate;
-      if (last > first) totalUp++;
-      else if (last < first) totalDown++;
-      else totalSame++;
-    });
-    h += '<div class="suivi-kpis" style="margin-bottom:24px">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">📈</div><div class="sk-val" style="color:var(--green)">' + totalUp + '</div><div class="sk-lbl">En progression</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">📉</div><div class="sk-val" style="color:var(--red)">' + totalDown + '</div><div class="sk-lbl">En baisse</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--g400)"><div class="sk-icon">➡️</div><div class="sk-val" style="color:var(--g500)">' + totalSame + '</div><div class="sk-lbl">Stable</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">🏫</div><div class="sk-val">' + schoolsWithChanges.length + '</div><div class="sk-lbl">Écoles suivies</div></div>';
-    h += '</div>';
-
-    // Graph for each school
-    schoolsWithChanges.forEach(function(s) {
-      var first = s.points[0].rate;
-      var last = s.points[s.points.length-1].rate;
-      var diff = last - first;
-      var diffColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--g500)';
-      var diffSign = diff > 0 ? '+' : '';
-
-      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px;border-left:5px solid ' + diffColor + '">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap">';
-      h += '<div><div style="font-weight:700;font-size:15px;color:var(--ink)">' + esc(s.name) + '</div>';
-      if (isSuper && s.expert) h += '<div style="font-size:11px;color:var(--g500);font-family:\'JetBrains Mono\',monospace">' + esc(s.expert) + '</div>';
-      h += '</div>';
-      h += '<div style="display:flex;gap:12px;align-items:center">';
-      h += '<span style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:' + diffColor + '">' + diffSign + diff + '%</span>';
-      h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--g500)">' + first + '% → ' + last + '%</span>';
-      h += '</div></div>';
-
-      // Visual bar graph showing rate at each point
-      h += '<div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 0;border-top:1px solid var(--g100)">';
-      s.points.forEach(function(p, idx) {
-        var barH = Math.max(8, p.rate * 1.1);
-        var barColor = p.rate >= 60 ? 'var(--green)' : p.rate >= 40 ? 'var(--saffron)' : 'var(--g300)';
-        if (idx === s.points.length - 1 && diff > 0) barColor = 'var(--green)';
-        if (idx === s.points.length - 1 && diff < 0) barColor = 'var(--red)';
-        h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">';
-        h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:700;color:var(--ink)">' + p.rate + '%</div>';
-        h += '<div style="width:100%;max-width:60px;height:' + barH + 'px;background:' + barColor + ';border-radius:6px 6px 0 0;transition:height .5s"></div>';
-        h += '<div style="font-size:9px;color:var(--g500);text-align:center;font-family:\'JetBrains Mono\',monospace;line-height:1.2">' + p.label + '</div>';
-        h += '<div style="font-size:8px;color:var(--g400)">' + (p.date ? p.date.toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) : '') + '</div>';
-        h += '</div>';
+    var up=0,dn=0; withChanges.forEach(function(s){var d=s.points[s.points.length-1].rate-s.points[0].rate; if(d>0)up++; else if(d<0)dn++;});
+    h += '<div class="suivi-kpis" style="margin-bottom:20px"><div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">'+up+'</div><div class="sk-lbl">En hausse</div></div><div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val" style="color:var(--red)">'+dn+'</div><div class="sk-lbl">En baisse</div></div><div class="suivi-kpi"><div class="sk-val">'+withChanges.length+'</div><div class="sk-lbl">Écoles suivies</div></div></div>';
+    withChanges.forEach(function(s) {
+      var first=s.points[0].rate, last=s.points[s.points.length-1].rate, diff=last-first;
+      var col = diff>0?'var(--green)':diff<0?'var(--red)':'var(--g500)';
+      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:12px;border-left:5px solid '+col+'">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b>'+esc(s.name)+'</b>';
+      h += '<span style="font-family:\'Fraunces\',serif;font-size:24px;font-weight:600;color:'+col+'">'+(diff>0?'+':'')+diff+'%</span></div>';
+      h += '<div style="display:flex;align-items:flex-end;gap:4px;height:80px">';
+      s.points.forEach(function(p) {
+        var bH = Math.max(6,p.rate*0.75);
+        var bC = p.rate>=60?'var(--green)':p.rate>=40?'var(--saffron)':'var(--g300)';
+        h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:10px;font-weight:700">'+p.rate+'%</div><div style="width:100%;height:'+bH+'px;background:'+bC+';border-radius:4px 4px 0 0"></div><div style="font-size:8px;color:var(--g400)">'+p.label+'</div></div>';
       });
       h += '</div></div>';
     });
   }
-
-  // Also show ALL schools with current rates for tracking (no changes yet)
-  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Tous les taux actuels</h4>';
-  var allRates = {};
-  myRAW.forEach(function(r) {
-    var key = r.n.toUpperCase();
-    if (!allRates[key] || r.r > allRates[key].rate) allRates[key] = { name: r.n, rate: r.r, expert: r.e };
-  });
-  // Apply follow-up rate updates
-  myFU.forEach(function(f) {
-    if (f.NewRate) {
-      var key = f.SchoolName.toUpperCase();
-      if (allRates[key]) allRates[key].rate = Number(f.NewRate);
-      else allRates[key] = { name: f.SchoolName, rate: Number(f.NewRate), expert: f.Expert };
-    }
-  });
-  var rateList = Object.keys(allRates).map(function(k) { return allRates[k]; }).sort(function(a, b) { return (b.rate||0) - (a.rate||0); });
-  h += '<table class="tbl"><thead><tr><th>École</th>' + (isSuper ? '<th>Expert</th>' : '') + '<th>Taux actuel</th><th>Statut</th></tr></thead><tbody>';
-  rateList.forEach(function(r) {
-    h += '<tr><td><b>' + esc(r.name) + '</b></td>';
-    if (isSuper) h += '<td style="font-size:12px;color:var(--g500)">' + esc(r.expert) + '</td>';
-    h += '<td>' + pct(r.rate) + '</td>';
-    var hasChange = progressData[r.name.toUpperCase()] && progressData[r.name.toUpperCase()].points.length > 1;
-    h += '<td>' + (hasChange ? '<span style="color:var(--green);font-size:11px;font-weight:700">Suivi actif</span>' : '<span style="color:var(--g400);font-size:11px">Initial</span>') + '</td>';
-    h += '</tr>';
-  });
-  h += '</tbody></table>';
   h += '</div></div>';
 
-  // Panel: Team (super admin only)
-  if (isSuper) {
-    h += '<div class="suivi-panel" id="stab-team"><div class="form-card"><h3>Vue <span class="it">équipe complète</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Total: ' + suiviFollowups.length + ' follow-ups enregistrés</p>';
-    suiviFollowups.sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); }).forEach(function(f) {
-      h += '<div class="fu-item type-' + f.FollowupType + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
-      h += '<div style="display:flex;gap:8px;align-items:center"><span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
-      h += '<span class="fu-type ' + f.FollowupType + '">' + f.FollowupType + '</span></div></div>';
-      h += '<div class="fu-body">' + (esc(f.Notes) || '') + '</div>';
-      h += '<div class="fu-footer"><span>' + new Date(f.Timestamp).toLocaleDateString('fr-FR') + '</span>';
-      if (f.Status) h += '<span>' + esc(f.Status) + '</span>';
-      if (Number(f.Cost) > 0) h += '<span class="fu-cost">' + fmt(f.Cost) + ' FCFA</span>';
+  // ====== TAB: RANKING ======
+  h += '<div class="suivi-panel" id="stab-ranking"><div class="form-card"><h3>Classement <span class="it">équipe</span></h3>';
+  suiviRankings.forEach(function(r) {
+    h += '<div class="rank-card '+(r.expert===me?'me':'')+'"><div class="rank-pos">'+r.rank+'</div><div class="rank-info"><div class="rk-name">'+esc(r.expert)+(r.expert===me?' (vous)':'')+'</div>';
+    h += '<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.totalEntries+' entrées</span><span>'+r.closedCount+' fermés</span><span>'+r.closeRate+'% closing</span><span>'+r.days+'j</span></div>';
+    h += '</div><div class="rank-score">'+r.score+'<small>points</small></div></div>';
+  });
+  h += '</div></div>';
+
+  // ====== TAB: DEALS ======
+  h += '<div class="suivi-panel" id="stab-deals"><div class="form-card"><h3>Deals <span class="it">fermés</span></h3>';
+  var closedDeals = (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).filter(function(e){return e.status==='Converti';});
+  if (!closedDeals.length) {
+    h += '<div class="note green" style="text-align:center;padding:30px">Aucun deal fermé pour le moment. Quand vous changez le statut à "🟢 DEAL FERMÉ", il apparaît ici.</div>';
+  } else {
+    h += '<div class="suivi-kpis" style="margin-bottom:20px">';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">' + closedDeals.length + '</div><div class="sk-lbl">Deals fermés</div></div>';
+    var revenue = closedDeals.length * 60000;
+    h += '<div class="suivi-kpi"><div class="sk-val">' + fmt(revenue) + '</div><div class="sk-lbl">Revenu potentiel FCFA</div></div>';
+    var totalCostAll = (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).reduce(function(s,e){return s+(Number(e.cost)||0);},0);
+    h += '<div class="suivi-kpi"><div class="sk-val">' + (closedDeals.length>0?fmt(Math.round(totalCostAll/closedDeals.length)):'—') + '</div><div class="sk-lbl">Coût / acquisition</div></div>';
+    h += '</div>';
+    closedDeals.forEach(function(e) {
+      h += '<div class="fu-item type-VISIT" style="border-left-color:var(--green)"><div class="fu-head"><span class="fu-school">' + esc(e.school) + '</span><span style="color:var(--green);font-weight:700;font-size:16px">🟢 FERMÉ</span></div>';
+      h += '<div class="fu-footer"><span>' + fmtD(e.date||e.createdAt) + '</span>';
+      if (isSuper && e.expert) h += '<span>' + esc(e.expert) + '</span>';
+      if (e.contact) h += '<span>' + esc(e.contact) + '</span>';
       h += '</div></div>';
     });
-    h += '</div></div>';
+  }
+  h += '</div></div>';
 
-    // Panel: Invite/manage users
-    h += '<div class="suivi-panel" id="stab-invite"><div class="form-card"><h3>Gestion des <span class="it">utilisateurs</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Invitez de nouveaux experts terrain. Ils pourront se connecter et remplir le formulaire de suivi.</p>';
-    h += '<div class="form-grid" id="inviteFormGrid">';
-    h += '<div class="form-field"><label>Nom complet</label><input type="text" id="invFullName" placeholder="Ex: Kamga Jean"></div>';
-    h += '<div class="form-field"><label>Nom d\'utilisateur</label><input type="text" id="invUsername" placeholder="Ex: jean"></div>';
-    h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPassword" placeholder="Ex: jean123"></div>';
+  // ====== TAB: INVITE (super admin) ======
+  if (isSuper) {
+    h += '<div class="suivi-panel" id="stab-invite"><div class="form-card"><h3>Gestion <span class="it">utilisateurs</span></h3>';
+    h += '<div class="form-grid">';
+    h += '<div class="form-field"><label>Nom complet</label><input type="text" id="invName" placeholder="Kamga Jean"></div>';
+    h += '<div class="form-field"><label>Identifiant</label><input type="text" id="invUser" placeholder="jean"></div>';
+    h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPass" placeholder="jean123"></div>';
     h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-    h += '<div class="form-field"><label>Rôle</label><select id="invRole"><option value="Expert">Expert (voit ses données uniquement)</option><option value="SuperAdmin">Super Admin (voit tout)</option></select></div>';
-    h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter l\'utilisateur</button></div>';
-
-    // Existing users list
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Utilisateurs actuels</h4>';
-    h += '<table class="tbl"><thead><tr><th>Utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Ville</th><th>Source</th></tr></thead><tbody>';
-    getAllUsers().forEach(function(u) {
-      var isS = isSuperAdmin(u.fullName);
-      h += '<tr><td class="mono">' + esc(u.username) + '</td><td><b>' + esc(u.fullName) + '</b></td>';
-      h += '<td>' + (isS ? '<span style="color:var(--red);font-weight:700">SUPER ADMIN</span>' : 'Expert') + '</td>';
-      h += '<td>' + esc(u.city) + '</td>';
-      h += '<td><span class="src ' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'src-fondateur' : 'src-terrain') + '">' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'INITIAL' : 'INVITÉ') + '</span></td></tr>';
-    });
+    h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter</button></div>';
+    h += '<table class="tbl" style="margin-top:20px"><thead><tr><th>ID</th><th>Nom</th><th>Rôle</th><th>Ville</th></tr></thead><tbody>';
+    getAllUsers().forEach(function(u) { h += '<tr><td class="mono">'+esc(u.username)+'</td><td><b>'+esc(u.fullName)+'</b></td><td>'+(isSuperAdmin(u.fullName)?'<span style="color:var(--red);font-weight:700">SUPER ADMIN</span>':'Expert')+'</td><td>'+esc(u.city)+'</td></tr>'; });
     h += '</tbody></table></div></div>';
   }
 
   el.innerHTML = h;
 
-  // Bind sub-tab clicks
+  // Bind tabs
   el.querySelectorAll('.suivi-tab').forEach(function(tab) {
-    tab.onclick = function() {
-      el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-      el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-      tab.classList.add('act');
-      var panel = el.querySelector('#stab-' + tab.dataset.stab);
-      if (panel) panel.classList.add('act');
-    };
+    tab.onclick = function() { switchTab(tab.dataset.stab); };
   });
 
-  // Show/hide cost field
-  var typeSelect = document.getElementById('fuType');
-  if (typeSelect) {
-    typeSelect.onchange = function() {
-      var cw = document.getElementById('fuCostWrap');
-      if (cw) cw.style.display = typeSelect.value === 'VISIT' ? '' : 'none';
-    };
-    typeSelect.dispatchEvent(new Event('change'));
-  }
-}
-
-function prefillSchool() {
-  var sel = document.getElementById('fuSchool');
-  var cw = document.getElementById('fuSchoolCustomWrap');
-  if (sel.value === '__other__') { cw.style.display = ''; document.getElementById('fuSchoolCustom').focus(); }
-  else {
-    cw.style.display = 'none';
-    var school = RAW.find(function(r) { return r.n === sel.value; });
-    if (school) {
-      document.getElementById('fuContact').value = school.rn || '';
-      document.getElementById('fuPhone').value = school.pw || school.pn || '';
-      document.getElementById('fuCity').value = school.v || 'DOUALA';
-      document.getElementById('fuSector').value = (school.v === 'YAOUNDE' ? school.sy : school.sd) || '';
+  // School select change
+  var eSel = document.getElementById('eSchool');
+  if (eSel) eSel.onchange = function() {
+    document.getElementById('eNewSchoolWrap').style.display = eSel.value === '__new__' ? '' : 'none';
+    if (eSel.value && eSel.value !== '__new__') {
+      var r = RAW.find(function(x){return x.n===eSel.value;});
+      if (r) {
+        if (document.getElementById('eContact')) document.getElementById('eContact').value = r.rn || '';
+        if (document.getElementById('ePhoneWA')) document.getElementById('ePhoneWA').value = r.pw || '';
+        if (document.getElementById('ePhoneOther')) document.getElementById('ePhoneOther').value = r.pn || '';
+        if (document.getElementById('eCity')) document.getElementById('eCity').value = r.v || 'DOUALA';
+        if (document.getElementById('eSector')) document.getElementById('eSector').value = (r.v==='YAOUNDE'?r.sy:r.sd) || '';
+        if (document.getElementById('eLoc')) document.getElementById('eLoc').value = r.lo || '';
+        if (document.getElementById('eRole')) document.getElementById('eRole').value = r.rp || '';
+        if (document.getElementById('eCat')) document.getElementById('eCat').value = r.ca || '';
+        if (r.r && document.getElementById('eRate')) document.getElementById('eRate').value = r.r;
+      }
     }
-  }
-}
-
-function prefillFromSchool(name, contact, phone, city, sector) {
-  var sel = document.getElementById('fuSchool');
-  if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === name) { sel.selectedIndex = i; break; } } }
-  if (document.getElementById('fuContact')) document.getElementById('fuContact').value = contact || '';
-  if (document.getElementById('fuPhone')) document.getElementById('fuPhone').value = phone || '';
-  if (document.getElementById('fuCity')) document.getElementById('fuCity').value = city || 'DOUALA';
-  if (document.getElementById('fuSector')) document.getElementById('fuSector').value = sector || '';
-  document.getElementById('stab-add').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function showFollowupForm() {
-  var el = document.getElementById('p-suivi');
-  el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-  el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-  var at = el.querySelector('.suivi-tab[data-stab="add"]');
-  var ap = el.querySelector('#stab-add');
-  if (at) at.classList.add('act');
-  if (ap) ap.classList.add('act');
-  document.getElementById('followupForm').scrollIntoView({ behavior: 'smooth' });
-}
-
-function showInviteForm() {
-  var el = document.getElementById('p-suivi');
-  el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-  el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-  var t = el.querySelector('.suivi-tab[data-stab="invite"]');
-  var p = el.querySelector('#stab-invite');
-  if (t) t.classList.add('act');
-  if (p) p.classList.add('act');
-}
-
-async function submitFollowup() {
-  if (!currentUser) { showToast('Veuillez vous connecter', true); return; }
-  var schoolSel = document.getElementById('fuSchool').value;
-  var schoolName = schoolSel === '__other__' ? document.getElementById('fuSchoolCustom').value.trim() : schoolSel;
-  if (!schoolName) { showToast('Veuillez sélectionner une école', true); return; }
-  // Collect action checkboxes
-  var getRadio = function(name) { var el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : ''; };
-  var data = {
-    action: 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
-    year: document.getElementById('fuYear').value,
-    date: document.getElementById('fuDate').value,
-    timeStart: document.getElementById('fuTimeStart') ? document.getElementById('fuTimeStart').value : '',
-    contactName: document.getElementById('fuContact').value.trim(),
-    contactPhone: document.getElementById('fuPhone').value.trim(),
-    followupType: document.getElementById('fuType').value,
-    outcome: document.getElementById('fuOutcome').value,
-    duration: document.getElementById('fuDuration') ? document.getElementById('fuDuration').value : '',
-    callCount: document.getElementById('fuCallCount') ? document.getElementById('fuCallCount').value : '1',
-    notes: document.getElementById('fuNotes').value.trim(),
-    rating: document.getElementById('fuRating') ? document.getElementById('fuRating').value : '',
-    newRate: document.getElementById('fuNewRate') ? document.getElementById('fuNewRate').value : '',
-    status: document.getElementById('fuStatus').value,
-    cost: document.getElementById('fuType').value === 'VISIT' ? (Number(document.getElementById('fuCost').value) || 0) : 0,
-    actSecondCall: getRadio('fuAct1'),
-    actSendWhatsApp: getRadio('fuAct2'),
-    actTransmitSuperior: getRadio('fuAct3'),
-    actPlanVisit: getRadio('fuAct4'),
-    nextDate: document.getElementById('fuNextDate').value,
-    city: document.getElementById('fuCity').value,
-    sector: document.getElementById('fuSector').value.trim()
   };
+}
+
+// --- Wizard button select ---
+var wizState = { entryType: '', mode: '' };
+function wizSelect(btn) {
+  var field = btn.dataset.field;
+  var val = btn.dataset.val;
+  wizState[field] = val;
+  // Highlight
+  btn.parentElement.querySelectorAll('.wiz-btn[data-field="'+field+'"]').forEach(function(b) {
+    b.style.borderColor = 'var(--g200)'; b.style.background = 'var(--paper)'; b.style.color = 'var(--ink)';
+  });
+  btn.style.borderColor = 'var(--red)'; btn.style.background = 'linear-gradient(135deg, var(--red), var(--red-deep))'; btn.style.color = 'var(--paper)';
+
+  // Show/hide fields based on mode
+  var costWrap = document.getElementById('eCostWrap');
+  var durWrap = document.getElementById('eDurationWrap');
+  var ccWrap = document.getElementById('eCallCountWrap');
+  var locWrap = document.getElementById('eLocWrap');
+  if (costWrap) costWrap.style.display = wizState.mode === 'EN PERSONNE' ? '' : 'none';
+  if (durWrap) durWrap.style.display = (wizState.mode === 'TELEPHONE') ? '' : 'none';
+  if (ccWrap) ccWrap.style.display = (wizState.mode === 'TELEPHONE') ? '' : 'none';
+}
+
+function switchTab(name) {
+  var el = document.getElementById('p-suivi');
+  el.querySelectorAll('.suivi-tab').forEach(function(t){t.classList.remove('act');});
+  el.querySelectorAll('.suivi-panel').forEach(function(p){p.classList.remove('act');});
+  var tab = el.querySelector('.suivi-tab[data-stab="'+name+'"]');
+  var panel = el.querySelector('#stab-'+name);
+  if (tab) tab.classList.add('act');
+  if (panel) panel.classList.add('act');
+}
+
+function showEntryWizard() { switchTab('entry'); var f = document.getElementById('entryForm'); if(f) f.scrollIntoView({behavior:'smooth'}); }
+
+// --- Submit entry ---
+async function submitEntry() {
+  if (!currentUser) { showToast('Connectez-vous', true); return; }
+  if (!wizState.entryType) { showToast('Choisissez: Prospection ou Suivi', true); return; }
+  if (!wizState.mode) { showToast('Choisissez le mode: En personne, Téléphone...', true); return; }
+  var schoolSel = document.getElementById('eSchool').value;
+  var school = schoolSel === '__new__' ? (document.getElementById('eNewSchool').value||'').trim() : schoolSel;
+  if (!school) { showToast('Sélectionnez une école', true); return; }
+
+  var data = {
+    action: 'addEntry',
+    expert: currentUser.fullName,
+    entryType: wizState.entryType,
+    mode: wizState.mode,
+    school: school,
+    schoolType: document.getElementById('eSchoolType') ? document.getElementById('eSchoolType').value : '',
+    category: document.getElementById('eCat') ? document.getElementById('eCat').value : '',
+    effectifs: document.getElementById('eEffectifs') ? document.getElementById('eEffectifs').value : '',
+    city: document.getElementById('eCity').value,
+    date: document.getElementById('eDate').value,
+    contact: document.getElementById('eContact').value.trim(),
+    role: document.getElementById('eRole') ? document.getElementById('eRole').value : '',
+    phoneWA: document.getElementById('ePhoneWA') ? document.getElementById('ePhoneWA').value.trim() : '',
+    phoneOther: document.getElementById('ePhoneOther') ? document.getElementById('ePhoneOther').value.trim() : '',
+    duration: document.getElementById('eDuration') ? document.getElementById('eDuration').value : '',
+    callCount: document.getElementById('eCallCount') ? document.getElementById('eCallCount').value : '',
+    convo: document.getElementById('eConvo').value.trim(),
+    rate: document.getElementById('eRate') ? document.getElementById('eRate').value : '',
+    rating: document.getElementById('eRating') ? document.getElementById('eRating').value : '',
+    status: document.getElementById('eStatus').value,
+    cost: wizState.mode === 'EN PERSONNE' ? (Number(document.getElementById('eCost').value)||0) : 0,
+    actCall: document.getElementById('actCall') && document.getElementById('actCall').checked ? 'Oui' : '',
+    actWA: document.getElementById('actWA') && document.getElementById('actWA').checked ? 'Oui' : '',
+    actSuperior: document.getElementById('actSuperior') && document.getElementById('actSuperior').checked ? 'Oui' : '',
+    actVisit: document.getElementById('actVisit') && document.getElementById('actVisit').checked ? 'Oui' : '',
+    actDoc: document.getElementById('actDoc') && document.getElementById('actDoc').checked ? 'Oui' : '',
+    nextDate: document.getElementById('eNextDate').value,
+    sector: document.getElementById('eSector').value.trim(),
+    location: document.getElementById('eLoc') ? document.getElementById('eLoc').value.trim() : '',
+    remarks: document.getElementById('eRemarks') ? document.getElementById('eRemarks').value.trim() : ''
+  };
+
   var res = await apiPost(data);
-  if (res.success) {
-    showToast(res.message || 'Suivi enregistré!');
-    document.getElementById('fuSchool').selectedIndex = 0;
-    document.getElementById('fuContact').value = '';
-    document.getElementById('fuPhone').value = '';
-    document.getElementById('fuNotes').value = '';
-    document.getElementById('fuOutcome').selectedIndex = 0;
-    document.getElementById('fuNextDate').value = '';
-    document.getElementById('fuCost').value = '0';
-    document.getElementById('fuStatus').selectedIndex = 0;
-    document.getElementById('fuSector').value = '';
-    if (document.getElementById('fuDuration')) document.getElementById('fuDuration').value = '';
-    if (document.getElementById('fuCallCount')) document.getElementById('fuCallCount').value = '1';
-    if (document.getElementById('fuRating')) document.getElementById('fuRating').selectedIndex = 0;
-    if (document.getElementById('fuNewRate')) document.getElementById('fuNewRate').selectedIndex = 0;
-    if (document.getElementById('fuTimeStart')) document.getElementById('fuTimeStart').value = '';
-    document.querySelectorAll('#followupForm input[type=radio]').forEach(function(r) { r.checked = false; });
-    rSuivi();
-  } else { showToast(res.error || 'Erreur', true); }
+  if (res.success) { showToast('✅ ' + (res.message||'Enregistré!')); rSuivi(); }
+  else { showToast(res.error || 'Erreur', true); }
 }
 
 async function submitInvite() {
-  var fullName = document.getElementById('invFullName').value.trim();
-  var username = document.getElementById('invUsername').value.trim().toLowerCase();
-  var password = document.getElementById('invPassword').value;
+  var fn = document.getElementById('invName').value.trim();
+  var un = document.getElementById('invUser').value.trim().toLowerCase();
+  var pw = document.getElementById('invPass').value;
   var city = document.getElementById('invCity').value;
-  var role = document.getElementById('invRole').value;
-  if (!fullName || !username || !password) { showToast('Remplissez tous les champs', true); return; }
-  if (role === 'SuperAdmin') SUPER_ADMINS.push(fullName);
-  var res = await apiPost({ action: 'addUser', fullName: fullName, username: username, password: password, city: city, role: role });
-  if (res.success) {
-    showToast(res.message);
-    document.getElementById('invFullName').value = '';
-    document.getElementById('invUsername').value = '';
-    document.getElementById('invPassword').value = '';
-    rSuivi();
-  } else { showToast(res.error || 'Erreur', true); }
+  if (!fn || !un || !pw) { showToast('Remplissez tout', true); return; }
+  var res = await apiPost({ action:'addUser', fullName:fn, username:un, password:pw, city:city, role:'Expert' });
+  if (res.success) { showToast(res.message); rSuivi(); } else { showToast(res.error, true); }
 }
 
 rSuivi();
