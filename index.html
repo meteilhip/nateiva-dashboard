@@ -1161,6 +1161,44 @@ body{
 .not-logged-in button:hover{transform:translateY(-2px)}
 .app.locked{filter:blur(12px);pointer-events:none;user-select:none}
 .login-overlay .login-close{display:none}
+
+/* MOBILE-FIRST UX */
+@media(max-width:600px){
+  .suivi-header{flex-direction:column;align-items:stretch;gap:12px}
+  .suivi-user{flex-wrap:wrap}
+  .suivi-actions{justify-content:stretch}
+  .suivi-actions button{flex:1;min-width:0;padding:12px 8px;font-size:10px}
+  .suivi-kpis{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}
+  .suivi-kpi{padding:14px 10px!important}
+  .suivi-kpi .sk-val{font-size:24px!important}
+  .suivi-kpi .sk-lbl{font-size:8px!important;letter-spacing:.06em!important}
+  .suivi-tabs{gap:4px!important;padding:4px!important}
+  .suivi-tab{padding:8px 10px!important;font-size:11px!important}
+  .form-card{padding:16px!important;border-radius:14px!important}
+  .form-card h3{font-size:20px!important}
+  .form-grid{grid-template-columns:1fr!important;gap:12px!important}
+  .form-field input,.form-field select,.form-field textarea{font-size:16px!important;padding:14px!important}
+  .form-submit button{width:100%!important;padding:18px!important;font-size:16px!important}
+  .days-badge{margin-left:0!important;margin-top:8px}
+  .rank-card{flex-wrap:wrap;padding:14px!important;gap:10px!important}
+  .rank-pos{font-size:28px!important;min-width:36px!important}
+  .rank-score{font-size:24px!important;min-width:60px!important}
+  .rk-meta{font-size:9px!important;gap:6px!important}
+  .fu-item{padding:12px 14px!important}
+  .fu-footer{font-size:10px!important;gap:8px!important}
+  .tbl{font-size:11px!important}
+  .tbl th,.tbl td{padding:8px 6px!important}
+  .page-intro{padding:20px!important;border-radius:14px!important}
+  .page-intro h2{font-size:28px!important}
+  .login-box{padding:32px 24px!important;border-radius:18px!important}
+  .login-box h2{font-size:24px!important}
+  .cost-summary{grid-template-columns:repeat(2,1fr)!important}
+  .nav-main{gap:3px!important;padding:4px!important}
+  .nav-btn{min-width:60px!important;padding:8px 6px!important}
+  .nav-btn .nav-icon{font-size:16px!important}
+  .nav-btn .nav-label{font-size:10px!important}
+  .nav-btn .nav-desc{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -3373,6 +3411,12 @@ function rSuivi() {
   h += '<div class="form-field"><label>6. Taux de conversion *</label><select id="eRate"><option value="">--</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option></select></div>';
   h += '<div class="form-field"><label>Évaluation collaboration (1-5)</label><select id="eRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2</option><option value="3">3 - Moyenne</option><option value="4">4</option><option value="5">5 - Excellente</option></select></div>';
   h += '<div class="form-field"><label>Statut *</label><select id="eStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 DEAL FERMÉ</option><option value="Terminé">⚫ Perdu</option></select></div>';
+  h += '<div class="form-field"><label>💰 Valeur du deal (FCFA)</label>';
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">';
+  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="60000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">60 000</button>';
+  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="250000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">250 000</button>';
+  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="500000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">500 000+</button>';
+  h += '</div></div>';
   h += '<div class="form-field" id="eCostWrap"><label>Coût déplacement FCFA</label><input type="number" id="eCost" placeholder="500" min="0" value="0"></div>';
 
   // Actions
@@ -3465,7 +3509,8 @@ function rSuivi() {
     if (e.contact) h += '<span>Contact: <b>' + esc(e.contact) + '</b></span>';
     if (e.rate) h += '<span>Taux: ' + pct(Number(e.rate)) + '</span>';
     if (e.status) h += '<span>Statut: <b>' + esc(e.status) + '</b></span>';
-    if (Number(e.cost) > 0) h += '<span class="fu-cost">' + fmt(e.cost) + ' F</span>';
+    if (e.dealValue) h += '<span style="color:var(--green);font-weight:700">💰 ' + fmt(e.dealValue) + ' F</span>';
+    if (Number(e.cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(e.cost) + ' F</span>';
     if (e.duration) h += '<span>' + e.duration + ' min</span>';
     h += '</div></div>';
   });
@@ -3528,16 +3573,18 @@ function rSuivi() {
   } else {
     h += '<div class="suivi-kpis" style="margin-bottom:20px">';
     h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">' + closedDeals.length + '</div><div class="sk-lbl">Deals fermés</div></div>';
-    var revenue = closedDeals.length * 60000;
+    var revenue = closedDeals.reduce(function(s,e){return s+(Number(e.dealValue)||60000);},0);
     h += '<div class="suivi-kpi"><div class="sk-val">' + fmt(revenue) + '</div><div class="sk-lbl">Revenu potentiel FCFA</div></div>';
     var totalCostAll = (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).reduce(function(s,e){return s+(Number(e.cost)||0);},0);
     h += '<div class="suivi-kpi"><div class="sk-val">' + (closedDeals.length>0?fmt(Math.round(totalCostAll/closedDeals.length)):'—') + '</div><div class="sk-lbl">Coût / acquisition</div></div>';
     h += '</div>';
     closedDeals.forEach(function(e) {
-      h += '<div class="fu-item type-VISIT" style="border-left-color:var(--green)"><div class="fu-head"><span class="fu-school">' + esc(e.school) + '</span><span style="color:var(--green);font-weight:700;font-size:16px">🟢 FERMÉ</span></div>';
+      h += '<div class="fu-item type-VISIT" style="border-left-color:var(--green)"><div class="fu-head"><span class="fu-school">' + esc(e.school) + '</span>';
+      h += '<span style="color:var(--green);font-weight:700;font-size:16px">💰 ' + fmt(Number(e.dealValue)||60000) + ' F</span></div>';
       h += '<div class="fu-footer"><span>' + fmtD(e.date||e.createdAt) + '</span>';
       if (isSuper && e.expert) h += '<span>' + esc(e.expert) + '</span>';
       if (e.contact) h += '<span>' + esc(e.contact) + '</span>';
+      h += '<span style="color:var(--green);font-weight:700">🟢 FERMÉ</span>';
       h += '</div></div>';
     });
   }
@@ -3780,7 +3827,7 @@ function rSuivi() {
     var teamHot = RAW.filter(function(r){return r.r>=60;}).length;
     var teamSchools = new Set(); RAW.forEach(function(r){if(r.n) teamSchools.add(r.n.toUpperCase());}); suiviEntries.forEach(function(e){if(e.school) teamSchools.add(e.school.toUpperCase());});
     var teamCost = suiviEntries.reduce(function(s,e){return s+(Number(e.cost)||0);},0);
-    var teamRevenue = teamClosed * 60000;
+    var teamRevenue = suiviEntries.filter(function(e){return e.status==='Converti';}).reduce(function(s,e){return s+(Number(e.dealValue)||60000);},0);
     var teamCloseRate = teamSchools.size > 0 ? Math.round(teamClosed / teamSchools.size * 100) : 0;
 
     // Douala vs Yaoundé split
@@ -3900,7 +3947,7 @@ function rSuivi() {
 }
 
 // --- Wizard button select ---
-var wizState = { entryType: '', mode: '' };
+var wizState = { entryType: '', mode: '', dealValue: '' };
 function wizSelect(btn) {
   var field = btn.dataset.field;
   var val = btn.dataset.val;
@@ -3963,6 +4010,7 @@ async function submitEntry() {
     rate: document.getElementById('eRate') ? document.getElementById('eRate').value : '',
     rating: document.getElementById('eRating') ? document.getElementById('eRating').value : '',
     status: document.getElementById('eStatus').value,
+    dealValue: wizState.dealValue || '',
     cost: wizState.mode === 'EN PERSONNE' ? (Number(document.getElementById('eCost').value)||0) : 0,
     actCall: document.getElementById('actCall') && document.getElementById('actCall').checked ? 'Oui' : '',
     actWA: document.getElementById('actWA') && document.getElementById('actWA').checked ? 'Oui' : '',
