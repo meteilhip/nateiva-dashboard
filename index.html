@@ -3314,6 +3314,7 @@ function rSuivi() {
   h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
   h += '<button class="suivi-tab" data-stab="ranking">🏆 Classement</button>';
   h += '<button class="suivi-tab" data-stab="deals">💼 Deals</button>';
+  h += '<button class="suivi-tab" data-stab="analytics">📊 Analytics</button>';
   if (isSuper) h += '<button class="suivi-tab" data-stab="invite">👥 Utilisateurs</button>';
   h += '</div>';
 
@@ -3480,6 +3481,226 @@ function rSuivi() {
       h += '</div></div>';
     });
   }
+  h += '</div></div>';
+
+  // ====== TAB: ANALYTICS — Time & Performance ======
+  h += '<div class="suivi-panel" id="stab-analytics"><div class="form-card"><h3>Analytics <span class="it">Performance</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Analyse du temps de travail, fréquence des activités et comparaison d\'équipe. Basé sur les timestamps automatiques de chaque entrée.</p>';
+
+  // Build time analytics per expert
+  var timeData = {};
+  var allExperts = [];
+  var seenExp = {};
+  RAW.forEach(function(r) { if (r.e && !seenExp[r.e]) { seenExp[r.e] = true; allExperts.push(r.e); } });
+  suiviEntries.forEach(function(e) { if (e.expert && !seenExp[e.expert]) { seenExp[e.expert] = true; allExperts.push(e.expert); } });
+
+  allExperts.forEach(function(exp) {
+    var timestamps = [];
+    // From RAW prospections
+    RAW.forEach(function(r) { if (r.e === exp && r.t) timestamps.push({ time: new Date(r.t), type: 'prospection', mode: 'EN PERSONNE' }); });
+    // From entries
+    suiviEntries.forEach(function(e) { if (e.expert === exp) timestamps.push({ time: new Date(e.date || e.createdAt), type: e.entryType || 'followup', mode: e.mode || '' }); });
+
+    timestamps.sort(function(a, b) { return a.time - b.time; });
+
+    // Calculate work days, hours per day, entries per day
+    var workDays = new Set();
+    var hourBuckets = {};
+    var dayActivity = {};
+    var weekdays = {};
+    var totalVisits = 0, totalCalls = 0, totalWA = 0, totalSMS = 0;
+    var firstDate = null, lastDate = null;
+
+    timestamps.forEach(function(ts) {
+      var dayKey = ts.time.toDateString();
+      workDays.add(dayKey);
+      if (!firstDate || ts.time < firstDate) firstDate = ts.time;
+      if (!lastDate || ts.time > lastDate) lastDate = ts.time;
+
+      // Hour distribution
+      var hour = ts.time.getHours();
+      hourBuckets[hour] = (hourBuckets[hour] || 0) + 1;
+
+      // Day of week
+      var dow = ts.time.getDay();
+      weekdays[dow] = (weekdays[dow] || 0) + 1;
+
+      // Daily count
+      dayActivity[dayKey] = (dayActivity[dayKey] || 0) + 1;
+
+      // Mode breakdown
+      if (ts.mode === 'EN PERSONNE') totalVisits++;
+      else if (ts.mode === 'TELEPHONE') totalCalls++;
+      else if (ts.mode === 'WHATSAPP') totalWA++;
+      else if (ts.mode === 'SMS') totalSMS++;
+    });
+
+    var totalEntries = timestamps.length;
+    var numWorkDays = workDays.size;
+    var calendarDays = firstDate && lastDate ? Math.max(1, Math.ceil((lastDate - firstDate) / 86400000) + 1) : 0;
+    var entriesPerWorkDay = numWorkDays > 0 ? (totalEntries / numWorkDays).toFixed(1) : 0;
+    var workRate = calendarDays > 0 ? Math.round(numWorkDays / calendarDays * 100) : 0;
+
+    // Estimate work hours: count distinct hours with activity per day, sum them
+    var workHours = 0;
+    var dayHours = {};
+    timestamps.forEach(function(ts) {
+      var dk = ts.time.toDateString();
+      if (!dayHours[dk]) dayHours[dk] = new Set();
+      dayHours[dk].add(ts.time.getHours());
+    });
+    Object.keys(dayHours).forEach(function(dk) { workHours += dayHours[dk].size; });
+
+    // Peak hour
+    var peakHour = 0, peakCount = 0;
+    Object.keys(hourBuckets).forEach(function(h2) { if (hourBuckets[h2] > peakCount) { peakCount = hourBuckets[h2]; peakHour = h2; } });
+
+    // Peak day
+    var dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    var peakDay = 0, peakDayCount = 0;
+    Object.keys(weekdays).forEach(function(d) { if (weekdays[d] > peakDayCount) { peakDayCount = weekdays[d]; peakDay = d; } });
+
+    // Longest streak (consecutive calendar days with activity)
+    var sortedDays = Array.from(workDays).map(function(d) { return new Date(d); }).sort(function(a,b) { return a-b; });
+    var streak = 0, maxStreak = 0, prevDay = null;
+    sortedDays.forEach(function(d) {
+      if (prevDay && (d - prevDay) <= 86400000 * 1.5) { streak++; } else { streak = 1; }
+      if (streak > maxStreak) maxStreak = streak;
+      prevDay = d;
+    });
+
+    // Days since last activity
+    var daysSinceLast = lastDate ? Math.ceil((new Date() - lastDate) / 86400000) : 999;
+
+    timeData[exp] = {
+      totalEntries: totalEntries, numWorkDays: numWorkDays, calendarDays: calendarDays,
+      entriesPerWorkDay: entriesPerWorkDay, workRate: workRate, workHours: workHours,
+      avgHoursPerDay: numWorkDays > 0 ? (workHours / numWorkDays).toFixed(1) : 0,
+      peakHour: peakHour, peakDay: dayNames[peakDay] || '—',
+      maxStreak: maxStreak, daysSinceLast: daysSinceLast,
+      totalVisits: totalVisits, totalCalls: totalCalls, totalWA: totalWA, totalSMS: totalSMS,
+      hourBuckets: hourBuckets, weekdays: weekdays
+    };
+  });
+
+  // Team averages
+  var teamAvgEntries = 0, teamAvgDays = 0, teamAvgHours = 0, teamAvgRate = 0;
+  var activeExperts = allExperts.filter(function(e) { return timeData[e].totalEntries > 0; });
+  if (activeExperts.length > 0) {
+    teamAvgEntries = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].totalEntries; }, 0) / activeExperts.length);
+    teamAvgDays = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].numWorkDays; }, 0) / activeExperts.length);
+    teamAvgHours = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].workHours; }, 0) / activeExperts.length);
+    teamAvgRate = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].workRate; }, 0) / activeExperts.length);
+  }
+
+  // Show own stats first (or team if super admin)
+  var myTime = timeData[me] || { totalEntries:0, numWorkDays:0, workHours:0, entriesPerWorkDay:0, workRate:0, avgHoursPerDay:0, peakHour:0, peakDay:'—', maxStreak:0, daysSinceLast:999 };
+
+  h += '<div class="suivi-kpis">';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📅</div><div class="sk-val">' + myTime.numWorkDays + '</div><div class="sk-lbl">Jours travaillés</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">⏰</div><div class="sk-val">' + myTime.workHours + '<small>h</small></div><div class="sk-lbl">Heures estimées</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📝</div><div class="sk-val">' + myTime.entriesPerWorkDay + '</div><div class="sk-lbl">Entrées / jour travaillé</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + myTime.maxStreak + '<small>j</small></div><div class="sk-lbl">Plus longue série</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + myTime.workRate + '<small>%</small></div><div class="sk-lbl">Taux d\'activité</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🕐</div><div class="sk-val">' + myTime.peakHour + '<small>h</small></div><div class="sk-lbl">Heure de pointe</div></div>';
+  h += '</div>';
+
+  // Hour distribution bar chart
+  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
+  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Distribution horaire ' + (isSuper ? '(équipe)' : '') + '</h4>';
+  h += '<div style="display:flex;align-items:flex-end;gap:2px;height:80px">';
+  var maxHourVal = 1;
+  var hourData = isSuper ? {} : (myTime.hourBuckets || {});
+  if (isSuper) { allExperts.forEach(function(e) { var hb = timeData[e].hourBuckets || {}; Object.keys(hb).forEach(function(hh) { hourData[hh] = (hourData[hh]||0) + hb[hh]; }); }); }
+  for (var hh = 6; hh <= 20; hh++) { if ((hourData[hh]||0) > maxHourVal) maxHourVal = hourData[hh]; }
+  for (var hh2 = 6; hh2 <= 20; hh2++) {
+    var hv = hourData[hh2] || 0;
+    var barH2 = Math.max(2, Math.round(hv / maxHourVal * 70));
+    var barC2 = hh2 >= 8 && hh2 <= 12 ? 'var(--red)' : hh2 >= 13 && hh2 <= 17 ? 'var(--saffron)' : 'var(--g300)';
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
+    h += '<div style="font-size:8px;color:var(--g500);font-weight:700">' + hv + '</div>';
+    h += '<div style="width:100%;height:' + barH2 + 'px;background:' + barC2 + ';border-radius:3px 3px 0 0"></div>';
+    h += '<div style="font-size:8px;color:var(--g400)">' + hh2 + 'h</div></div>';
+  }
+  h += '</div></div>';
+
+  // ====== TEAM COMPARISON TABLE (visible to all, super admin sees details) ======
+  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
+  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Comparaison équipe — Temps de travail</h4>';
+  h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Expert</th><th>Entrées</th><th>Jours</th><th>Heures</th><th>Moy/jour</th><th>Taux activité</th><th>Série max</th><th>Dernier actif</th><th>Statut</th></tr></thead><tbody>';
+
+  // Sort by work hours descending
+  var sortedExperts = allExperts.slice().sort(function(a,b) { return timeData[b].workHours - timeData[a].workHours; });
+  sortedExperts.forEach(function(exp) {
+    var td = timeData[exp];
+    var isMe = exp === me;
+    // Determine status
+    var statusLabel, statusColor;
+    if (td.daysSinceLast > 7) { statusLabel = '🔴 INACTIF ' + td.daysSinceLast + 'j'; statusColor = 'var(--red)'; }
+    else if (td.totalEntries < teamAvgEntries * 0.5 && teamAvgEntries > 0) { statusLabel = '🟠 SOUS-PERFORMANT'; statusColor = 'var(--saffron)'; }
+    else if (td.workRate < teamAvgRate * 0.5 && teamAvgRate > 0) { statusLabel = '🟠 IRRÉGULIER'; statusColor = 'var(--saffron)'; }
+    else if (td.totalEntries >= teamAvgEntries * 1.2) { statusLabel = '🟢 TOP'; statusColor = 'var(--green)'; }
+    else { statusLabel = '🟡 OK'; statusColor = 'var(--g600)'; }
+
+    h += '<tr style="' + (isMe ? 'background:var(--bg-warm)' : '') + '">';
+    h += '<td><b>' + esc(exp) + '</b>' + (isMe ? ' (vous)' : '') + '</td>';
+    h += '<td class="num">' + td.totalEntries + '</td>';
+    h += '<td class="num">' + td.numWorkDays + '</td>';
+    h += '<td class="num">' + td.workHours + 'h</td>';
+    h += '<td class="num">' + td.entriesPerWorkDay + '</td>';
+    // Activity rate with color bar
+    h += '<td><div style="display:flex;align-items:center;gap:6px"><div style="width:50px;height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + Math.min(100, td.workRate) + '%;background:' + (td.workRate >= 60 ? 'var(--green)' : td.workRate >= 30 ? 'var(--saffron)' : 'var(--red)') + ';border-radius:4px"></div></div><span class="num">' + td.workRate + '%</span></div></td>';
+    h += '<td class="num">' + td.maxStreak + 'j</td>';
+    h += '<td class="num">' + (td.daysSinceLast < 999 ? td.daysSinceLast + 'j' : '—') + '</td>';
+    h += '<td style="color:' + statusColor + ';font-weight:700;font-size:11px">' + statusLabel + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+
+  // Team averages footer
+  h += '<div style="margin-top:12px;padding:12px 16px;background:var(--g100);border-radius:10px;font-size:12px;color:var(--g600);font-family:\'JetBrains Mono\',monospace">';
+  h += 'MOY. ÉQUIPE: ' + teamAvgEntries + ' entrées · ' + teamAvgDays + ' jours · ' + teamAvgHours + 'h · ' + teamAvgRate + '% activité</div>';
+  h += '</div>';
+
+  // ====== ALERTS — People not pulling their weight ======
+  var alerts = [];
+  sortedExperts.forEach(function(exp) {
+    var td = timeData[exp];
+    if (td.daysSinceLast > 7) alerts.push({ expert: exp, type: 'INACTIF', msg: 'Aucune activité depuis ' + td.daysSinceLast + ' jours', severity: 'red' });
+    else if (td.daysSinceLast > 3) alerts.push({ expert: exp, type: 'RALENTI', msg: 'Dernière activité il y a ' + td.daysSinceLast + ' jours', severity: 'saffron' });
+    if (teamAvgEntries > 0 && td.totalEntries < teamAvgEntries * 0.4) alerts.push({ expert: exp, type: 'SOUS-PERFORMANT', msg: td.totalEntries + ' entrées vs ' + teamAvgEntries + ' moyenne équipe (' + Math.round(td.totalEntries/teamAvgEntries*100) + '%)', severity: 'red' });
+    if (teamAvgHours > 0 && td.workHours < teamAvgHours * 0.4) alerts.push({ expert: exp, type: 'PEU D\'HEURES', msg: td.workHours + 'h vs ' + teamAvgHours + 'h moyenne (' + Math.round(td.workHours/teamAvgHours*100) + '%)', severity: 'saffron' });
+    if (td.workRate < 20 && td.calendarDays > 7) alerts.push({ expert: exp, type: 'IRRÉGULIER', msg: 'Actif seulement ' + td.workRate + '% des jours calendaires', severity: 'saffron' });
+  });
+
+  if (alerts.length > 0) {
+    h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
+    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">⚠️ Alertes performance</h4>';
+    alerts.forEach(function(a) {
+      h += '<div style="padding:10px 16px;margin-bottom:8px;border-left:4px solid var(--' + a.severity + ');background:var(--' + a.severity + '-soft);border-radius:8px;display:flex;justify-content:space-between;align-items:center">';
+      h += '<div><b style="color:var(--ink)">' + esc(a.expert) + '</b> <span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--' + a.severity + ');font-weight:700;margin-left:8px">' + a.type + '</span></div>';
+      h += '<div style="font-size:12px;color:var(--g700)">' + a.msg + '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  // Mode breakdown chart per expert
+  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px">';
+  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Répartition par mode de contact</h4>';
+  sortedExperts.forEach(function(exp) {
+    var td = timeData[exp];
+    var total = td.totalVisits + td.totalCalls + td.totalWA + td.totalSMS;
+    if (total === 0) return;
+    h += '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><b style="font-size:13px">' + esc(exp) + '</b><span style="font-size:12px;color:var(--g500)">' + total + ' total</span></div>';
+    h += '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden">';
+    if (td.totalVisits) h += '<div style="width:' + (td.totalVisits/total*100) + '%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalVisits + ' 🚶</div>';
+    if (td.totalCalls) h += '<div style="width:' + (td.totalCalls/total*100) + '%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalCalls + ' 📞</div>';
+    if (td.totalWA) h += '<div style="width:' + (td.totalWA/total*100) + '%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalWA + ' 💬</div>';
+    if (td.totalSMS) h += '<div style="width:' + (td.totalSMS/total*100) + '%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalSMS + ' 📱</div>';
+    h += '</div></div>';
+  });
+  h += '</div>';
+
   h += '</div></div>';
 
   // ====== TAB: INVITE (super admin) ======
