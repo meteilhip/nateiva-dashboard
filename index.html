@@ -3200,6 +3200,7 @@ function localFallback(action, params) {
         CallCount: params.callCount || '1',
         Notes: params.notes || '',
         Rating: params.rating || '',
+        NewRate: params.newRate || '',
         Status: params.status || 'En cours',
         Cost: params.cost || 0,
         ActSecondCall: params.actSecondCall || '',
@@ -3394,6 +3395,7 @@ function rSuivi() {
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
+  h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
   if (isSuper) h += '<button class="suivi-tab" data-stab="team">Équipe complète</button>';
   if (isSuper) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
   h += '</div>';
@@ -3421,6 +3423,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Nombre de fois appelé</label><input type="number" id="fuCallCount" placeholder="Ex: 1" min="1" value="1"></div>';
   h += '<div class="form-field full"><label>Détails des points discutés (résumé)</label><textarea id="fuNotes" placeholder="Résumé de la conversation, informations recueillies..."></textarea></div>';
   h += '<div class="form-field"><label>Évaluation collaboration (1=Très faible, 5=Excellente)</label><select id="fuRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2 - Faible</option><option value="3">3 - Moyenne</option><option value="4">4 - Bonne</option><option value="5">5 - Excellente</option></select></div>';
+  h += '<div class="form-field"><label>Nouveau taux de conversion *</label><select id="fuNewRate"><option value="">-- Pas de changement --</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option></select></div>';
   h += '<div class="form-field"><label>Statut global</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance nécessaire</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé (perdu)</option></select></div>';
   h += '<div class="form-field" id="fuCostWrap" style="display:none"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
 
@@ -3469,6 +3472,7 @@ function rSuivi() {
     if (f.Rating) h += '<span>Note: <b>' + f.Rating + '/5</b></span>';
     if (f.Status) h += '<span>Statut: <b>' + esc(f.Status) + '</b></span>';
     if (Number(f.Cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(f.Cost) + ' FCFA</span>';
+    if (f.NewRate) h += '<span style="color:var(--saffron);font-weight:700">Taux → ' + f.NewRate + '%</span>';
     if (f.ActSecondCall === 'Oui') h += '<span style="color:var(--green)">📞 2nd appel prévu</span>';
     if (f.ActSendWhatsApp === 'Oui') h += '<span style="color:var(--green)">💬 Doc WhatsApp</span>';
     if (f.ActTransmitSuperior === 'Oui') h += '<span style="color:var(--green)">📤 Transmis supérieur</span>';
@@ -3523,6 +3527,115 @@ function rSuivi() {
     });
     h += '</tbody></table>';
   }
+  h += '</div></div>';
+
+  // Panel: Progression — rate evolution graph
+  h += '<div class="suivi-panel" id="stab-progress"><div class="form-card"><h3>Progression des <span class="it">taux de conversion</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Évolution des taux de conversion pour chaque école après chaque suivi. Le graphique montre le parcours de la prospection initiale jusqu\'au dernier suivi.</p>';
+
+  // Build progression data: for each school, get initial RAW rate + all follow-up rate changes
+  var progressData = {};
+  var myRAW = isSuper ? RAW : RAW.filter(function(r) { return r.e === me; });
+  myRAW.forEach(function(r) {
+    var key = r.n.toUpperCase();
+    if (!progressData[key]) progressData[key] = { name: r.n, points: [], expert: r.e };
+    progressData[key].points.push({ date: r.t ? new Date(r.t) : new Date(), rate: r.r || 0, type: 'Prospection', label: 'Initial' });
+  });
+  var myFU = isSuper ? suiviFollowups : suiviFollowups.filter(function(f) { return f.Expert === me; });
+  myFU.forEach(function(f) {
+    if (f.NewRate) {
+      var key = f.SchoolName.toUpperCase();
+      if (!progressData[key]) progressData[key] = { name: f.SchoolName, points: [], expert: f.Expert };
+      var typeLabel = f.FollowupType === 'CALL' ? 'Appel' : f.FollowupType === 'WHATSAPP' ? 'WhatsApp' : f.FollowupType === 'SMS' ? 'SMS' : 'Visite';
+      progressData[key].points.push({ date: new Date(f.Timestamp), rate: Number(f.NewRate), type: typeLabel, label: typeLabel + ' #' + (progressData[key].points.length) });
+    }
+  });
+
+  // Filter to schools that have at least 1 rate change (more than just the initial)
+  var schoolsWithChanges = Object.keys(progressData).filter(function(k) { return progressData[k].points.length > 1; }).map(function(k) { return progressData[k]; });
+  schoolsWithChanges.sort(function(a, b) { return b.points[b.points.length-1].rate - a.points[a.points.length-1].rate; });
+
+  if (schoolsWithChanges.length === 0) {
+    h += '<div class="note" style="text-align:center;padding:40px">Aucune progression enregistrée. Quand vous faites un suivi, mettez à jour le <b>Nouveau taux de conversion</b> pour voir l\'évolution ici.</div>';
+  } else {
+    // Summary KPIs
+    var totalUp = 0, totalDown = 0, totalSame = 0;
+    schoolsWithChanges.forEach(function(s) {
+      var first = s.points[0].rate;
+      var last = s.points[s.points.length-1].rate;
+      if (last > first) totalUp++;
+      else if (last < first) totalDown++;
+      else totalSame++;
+    });
+    h += '<div class="suivi-kpis" style="margin-bottom:24px">';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">📈</div><div class="sk-val" style="color:var(--green)">' + totalUp + '</div><div class="sk-lbl">En progression</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">📉</div><div class="sk-val" style="color:var(--red)">' + totalDown + '</div><div class="sk-lbl">En baisse</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--g400)"><div class="sk-icon">➡️</div><div class="sk-val" style="color:var(--g500)">' + totalSame + '</div><div class="sk-lbl">Stable</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">🏫</div><div class="sk-val">' + schoolsWithChanges.length + '</div><div class="sk-lbl">Écoles suivies</div></div>';
+    h += '</div>';
+
+    // Graph for each school
+    schoolsWithChanges.forEach(function(s) {
+      var first = s.points[0].rate;
+      var last = s.points[s.points.length-1].rate;
+      var diff = last - first;
+      var diffColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--g500)';
+      var diffSign = diff > 0 ? '+' : '';
+
+      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px;border-left:5px solid ' + diffColor + '">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap">';
+      h += '<div><div style="font-weight:700;font-size:15px;color:var(--ink)">' + esc(s.name) + '</div>';
+      if (isSuper && s.expert) h += '<div style="font-size:11px;color:var(--g500);font-family:\'JetBrains Mono\',monospace">' + esc(s.expert) + '</div>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:12px;align-items:center">';
+      h += '<span style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:' + diffColor + '">' + diffSign + diff + '%</span>';
+      h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--g500)">' + first + '% → ' + last + '%</span>';
+      h += '</div></div>';
+
+      // Visual bar graph showing rate at each point
+      h += '<div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 0;border-top:1px solid var(--g100)">';
+      s.points.forEach(function(p, idx) {
+        var barH = Math.max(8, p.rate * 1.1);
+        var barColor = p.rate >= 60 ? 'var(--green)' : p.rate >= 40 ? 'var(--saffron)' : 'var(--g300)';
+        if (idx === s.points.length - 1 && diff > 0) barColor = 'var(--green)';
+        if (idx === s.points.length - 1 && diff < 0) barColor = 'var(--red)';
+        h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">';
+        h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:700;color:var(--ink)">' + p.rate + '%</div>';
+        h += '<div style="width:100%;max-width:60px;height:' + barH + 'px;background:' + barColor + ';border-radius:6px 6px 0 0;transition:height .5s"></div>';
+        h += '<div style="font-size:9px;color:var(--g500);text-align:center;font-family:\'JetBrains Mono\',monospace;line-height:1.2">' + p.label + '</div>';
+        h += '<div style="font-size:8px;color:var(--g400)">' + (p.date ? p.date.toLocaleDateString('fr-FR', {day:'2-digit',month:'short'}) : '') + '</div>';
+        h += '</div>';
+      });
+      h += '</div></div>';
+    });
+  }
+
+  // Also show ALL schools with current rates for tracking (no changes yet)
+  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Tous les taux actuels</h4>';
+  var allRates = {};
+  myRAW.forEach(function(r) {
+    var key = r.n.toUpperCase();
+    if (!allRates[key] || r.r > allRates[key].rate) allRates[key] = { name: r.n, rate: r.r, expert: r.e };
+  });
+  // Apply follow-up rate updates
+  myFU.forEach(function(f) {
+    if (f.NewRate) {
+      var key = f.SchoolName.toUpperCase();
+      if (allRates[key]) allRates[key].rate = Number(f.NewRate);
+      else allRates[key] = { name: f.SchoolName, rate: Number(f.NewRate), expert: f.Expert };
+    }
+  });
+  var rateList = Object.keys(allRates).map(function(k) { return allRates[k]; }).sort(function(a, b) { return (b.rate||0) - (a.rate||0); });
+  h += '<table class="tbl"><thead><tr><th>École</th>' + (isSuper ? '<th>Expert</th>' : '') + '<th>Taux actuel</th><th>Statut</th></tr></thead><tbody>';
+  rateList.forEach(function(r) {
+    h += '<tr><td><b>' + esc(r.name) + '</b></td>';
+    if (isSuper) h += '<td style="font-size:12px;color:var(--g500)">' + esc(r.expert) + '</td>';
+    h += '<td>' + pct(r.rate) + '</td>';
+    var hasChange = progressData[r.name.toUpperCase()] && progressData[r.name.toUpperCase()].points.length > 1;
+    h += '<td>' + (hasChange ? '<span style="color:var(--green);font-size:11px;font-weight:700">Suivi actif</span>' : '<span style="color:var(--g400);font-size:11px">Initial</span>') + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
   h += '</div></div>';
 
   // Panel: Team (super admin only)
@@ -3656,6 +3769,7 @@ async function submitFollowup() {
     callCount: document.getElementById('fuCallCount') ? document.getElementById('fuCallCount').value : '1',
     notes: document.getElementById('fuNotes').value.trim(),
     rating: document.getElementById('fuRating') ? document.getElementById('fuRating').value : '',
+    newRate: document.getElementById('fuNewRate') ? document.getElementById('fuNewRate').value : '',
     status: document.getElementById('fuStatus').value,
     cost: document.getElementById('fuType').value === 'VISIT' ? (Number(document.getElementById('fuCost').value) || 0) : 0,
     actSecondCall: getRadio('fuAct1'),
@@ -3681,6 +3795,7 @@ async function submitFollowup() {
     if (document.getElementById('fuDuration')) document.getElementById('fuDuration').value = '';
     if (document.getElementById('fuCallCount')) document.getElementById('fuCallCount').value = '1';
     if (document.getElementById('fuRating')) document.getElementById('fuRating').selectedIndex = 0;
+    if (document.getElementById('fuNewRate')) document.getElementById('fuNewRate').selectedIndex = 0;
     if (document.getElementById('fuTimeStart')) document.getElementById('fuTimeStart').value = '';
     document.querySelectorAll('#followupForm input[type=radio]').forEach(function(r) { r.checked = false; });
     rSuivi();
