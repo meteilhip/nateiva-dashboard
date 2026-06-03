@@ -3206,1078 +3206,384 @@ function renderAll(){
 }
 
 // =============================================================
-// SUIVI 360 — STATE (must be before renderAll)
+// SUIVI 360 v3 — STATE
 // =============================================================
-var APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
-var currentUser = JSON.parse(localStorage.getItem('nateiva_user') || 'null');
-var suiviEntries = JSON.parse(localStorage.getItem('nateiva_entries') || '[]');
-var suiviRankings = [];
-var SUPER_ADMINS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
-
-var DEFAULT_USERS = [
-  { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'DOUALA' },
-  { username: 'fabiola', password: 'fabiola123', fullName: 'Kendo Fabiola', role: 'Expert', city: 'DOUALA' },
-  { username: 'ida', password: 'ida123', fullName: 'Emambo Ida', role: 'Expert', city: 'DOUALA' },
-  { username: 'guy', password: 'guy123', fullName: 'Ntsa Guy', role: 'SuperAdmin', city: 'YAOUNDE' },
-  { username: 'brice', password: 'brice123', fullName: 'Mbeuka brice', role: 'SuperAdmin', city: 'DOUALA' },
-  { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Expert', city: 'YAOUNDE' },
-  { username: 'noah', password: 'noah2026', fullName: 'Noah', role: 'SuperAdmin', city: 'ALL' }
+var APPS_SCRIPT_URL='YOUR_APPS_SCRIPT_URL_HERE';
+var currentUser=JSON.parse(localStorage.getItem('nateiva_user')||'null');
+var suiviEntries=JSON.parse(localStorage.getItem('nateiva_entries')||'[]');
+var suiviRankings=[];
+var SUPER_ADMINS=['Noah','Mbeuka brice','Ntsa Guy'];
+var DEFAULT_USERS=[
+{username:'ivan',password:'ivan123',fullName:'Ivan',role:'Expert',city:'DOUALA'},
+{username:'fabiola',password:'fabiola123',fullName:'Kendo Fabiola',role:'Expert',city:'DOUALA'},
+{username:'ida',password:'ida123',fullName:'Emambo Ida',role:'Expert',city:'DOUALA'},
+{username:'guy',password:'guy123',fullName:'Ntsa Guy',role:'SuperAdmin',city:'YAOUNDE'},
+{username:'brice',password:'brice123',fullName:'Mbeuka brice',role:'SuperAdmin',city:'DOUALA'},
+{username:'taylor',password:'taylor123',fullName:'Kessi Taylor',role:'Expert',city:'YAOUNDE'},
+{username:'noah',password:'noah2026',fullName:'Noah',role:'SuperAdmin',city:'ALL'}
 ];
-var invitedUsers = JSON.parse(localStorage.getItem('nateiva_invited_users') || '[]');
-function getAllUsers() { return DEFAULT_USERS.concat(invitedUsers); }
-function isSuperAdmin(name) { if (!name) return false; return SUPER_ADMINS.some(function(a) { return a.toLowerCase() === name.toLowerCase(); }); }
+var invitedUsers=JSON.parse(localStorage.getItem('nateiva_invited_users')||'[]');
+function getAllUsers(){return DEFAULT_USERS.concat(invitedUsers)}
+function isSA(n){return n&&SUPER_ADMINS.some(function(a){return a.toLowerCase()===n.toLowerCase()})}
+var wizState={entryType:'',mode:'',dealValue:''};
 
-// =============================================================
-// SUIVI 360 — CORE FUNCTIONS
-// =============================================================
-function getDaysOnField(expertName) {
-  var daySet = new Set();
-  RAW.forEach(function(r) { if (r.e === expertName && r.t) { var d = new Date(r.t); daySet.add(d.toDateString()); } });
-  suiviEntries.forEach(function(f) { if (f.expert === expertName && f.date) { daySet.add(new Date(f.date).toDateString()); } });
-  return daySet.size;
+// === HELPERS ===
+function getDaysOnField(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
+function localFB(a,p){
+  if(a==='login'){var u=getAllUsers().find(function(x){return x.username===p.user&&x.password===p.pass});return u?{success:true,user:{username:u.username,fullName:u.fullName,role:u.role,city:u.city}}:{success:false,error:'Identifiants incorrects'}}
+  if(a==='addEntry'){var e=Object.assign({id:'E-'+Date.now(),createdAt:new Date().toISOString()},p);delete e.action;suiviEntries.push(e);localStorage.setItem('nateiva_entries',JSON.stringify(suiviEntries));return{success:true,message:'Enregistre!'}}
+  if(a==='addUser'){if(getAllUsers().find(function(x){return x.username===p.username}))return{success:false,error:'Existe deja'};invitedUsers.push({username:p.username,password:p.password,fullName:p.fullName,role:p.role||'Expert',city:p.city||'DOUALA'});localStorage.setItem('nateiva_invited_users',JSON.stringify(invitedUsers));return{success:true,message:p.fullName+' ajoute!'}}
+  return{success:false,error:'Unknown'}
+}
+async function apiCall(a,p){if(APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_URL_HERE')return localFB(a,p);try{var r=await fetch(APPS_SCRIPT_URL+'?action='+a+'&'+new URLSearchParams(p));return await r.json()}catch(e){return localFB(a,p)}}
+async function apiPost(d){if(APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_URL_HERE')return localFB(d.action,d);try{var r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(d)});return await r.json()}catch(e){return localFB(d.action,d)}}
+
+// === AUTH ===
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';var u=document.getElementById('loginUser');if(u)u.focus()}
+function closeLogin(){document.getElementById('loginOverlay').style.display='none'}
+document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('loginUser').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginPass').focus()});
+async function doLogin(){
+  var u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value,err=document.getElementById('loginError'),btn=document.getElementById('loginBtn');
+  if(!u||!p){err.textContent='Remplissez tous les champs';err.style.display='block';return}
+  btn.disabled=true;btn.textContent='Connexion...';var r=await apiCall('login',{user:u,pass:p});btn.disabled=false;btn.textContent='Se connecter';
+  if(r.success){currentUser=r.user;localStorage.setItem('nateiva_user',JSON.stringify(currentUser));closeLogin();document.getElementById('mainApp').classList.remove('locked');showToast('Bienvenue '+currentUser.fullName+'!');rSuivi()}
+  else{err.textContent=r.error;err.style.display='block'}
+}
+function doLogout(){currentUser=null;localStorage.removeItem('nateiva_user');document.getElementById('mainApp').classList.add('locked');showLogin();rSuivi()}
+function showToast(m,e){var t=document.getElementById('toastMsg');t.textContent=m;t.className='toast show'+(e?' error':'');setTimeout(function(){t.className='toast'},3000)}
+
+// === STATS ===
+function computeStats(name){
+  var rd=RAW.filter(function(r){return r.e===name}),ed=suiviEntries.filter(function(e){return e.expert===name}),days=getDaysOnField(name);
+  var prosp=rd.length,hot=rd.filter(function(r){return r.r>=60}).length,avgR=rd.length?Math.round(rd.reduce(function(s,r){return s+(r.r||0)},0)/rd.length):0;
+  var nP=ed.filter(function(e){return e.entryType==='prospection'}).length,fu=ed.filter(function(e){return e.entryType==='followup'}).length;
+  var vis=ed.filter(function(e){return e.mode==='EN PERSONNE'}).length,ph=ed.filter(function(e){return e.mode==='TELEPHONE'}).length;
+  var wa=ed.filter(function(e){return e.mode==='WHATSAPP'}).length,sm=ed.filter(function(e){return e.mode==='SMS'}).length;
+  var cost=ed.reduce(function(s,e){return s+(Number(e.cost)||0)},0);
+  var cl=ed.filter(function(e){return e.status==='Converti'});var clC=cl.length;
+  var rev=cl.reduce(function(s,e){return s+(Number(e.dealValue)||60000)},0);
+  var schs=new Set();rd.forEach(function(r){if(r.n)schs.add(r.n.toUpperCase())});ed.forEach(function(e){if(e.school)schs.add(e.school.toUpperCase())});
+  var cr=schs.size>0?Math.round(clC/schs.size*100):0;
+  var sc=(clC*50)+(hot*15)+(fu*5)+(nP*8)+(vis*8)+(ph*5)+(wa*3)+(sm*2)+Math.round(avgR/5)-Math.floor(cost/1000)*2;
+  return{days:days,prosp:prosp,hot:hot,avgR:avgR,nP:nP,fu:fu,vis:vis,ph:ph,wa:wa,sm:sm,cost:cost,clC:clC,rev:rev,schs:schs.size,cr:cr,sc:Math.max(0,sc),tot:ed.length}
+}
+function buildRankings(){
+  var seen={},ex=[];RAW.forEach(function(r){if(r.e&&!seen[r.e]){seen[r.e]=true;ex.push(r.e)}});
+  suiviEntries.forEach(function(e){if(e.expert&&!seen[e.expert]){seen[e.expert]=true;ex.push(e.expert)}});
+  suiviRankings=ex.map(function(e){return Object.assign({expert:e},computeStats(e))});
+  suiviRankings.sort(function(a,b){return b.sc-a.sc});
+  suiviRankings.forEach(function(r,i){r.rank=i+1})
 }
 
-function localFallback(action, params) {
-  switch (action) {
-    case 'login': {
-      var u = getAllUsers().find(function(x) { return x.username === params.user && x.password === params.pass; });
-      if (u) return { success: true, user: { username: u.username, fullName: u.fullName, role: u.role, city: u.city } };
-      return { success: false, error: 'Identifiants incorrects' };
-    }
-    case 'addEntry': {
-      var entry = Object.assign({ id: 'E-' + Date.now(), createdAt: new Date().toISOString() }, params);
-      delete entry.action;
-      suiviEntries.push(entry);
-      localStorage.setItem('nateiva_entries', JSON.stringify(suiviEntries));
-      return { success: true, message: 'Enregistré!' };
-    }
-    case 'addUser': {
-      if (getAllUsers().find(function(x) { return x.username === params.username; })) return { success: false, error: 'Nom d\'utilisateur existe déjà' };
-      invitedUsers.push({ username: params.username, password: params.password, fullName: params.fullName, role: params.role || 'Expert', city: params.city || 'DOUALA' });
-      localStorage.setItem('nateiva_invited_users', JSON.stringify(invitedUsers));
-      return { success: true, message: params.fullName + ' ajouté!' };
-    }
-    default: return { success: false, error: 'Unknown: ' + action };
-  }
-}
-
-async function apiCall(action, params) {
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(action, params);
-  try { var r = await fetch(APPS_SCRIPT_URL + '?action=' + action + '&' + new URLSearchParams(params)); return await r.json(); } catch(e) { return localFallback(action, params); }
-}
-async function apiPost(data) {
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(data.action, data);
-  try { var r = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(data) }); return await r.json(); } catch(e) { return localFallback(data.action, data); }
-}
-
-// --- Login/Logout ---
-function showLogin() { document.getElementById('loginOverlay').style.display = 'flex'; var u = document.getElementById('loginUser'); if(u) u.focus(); }
-function closeLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
-document.getElementById('loginPass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
-document.getElementById('loginUser').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
-
-async function doLogin() {
-  var user = document.getElementById('loginUser').value.trim().toLowerCase();
-  var pass = document.getElementById('loginPass').value;
-  var errEl = document.getElementById('loginError');
-  var btn = document.getElementById('loginBtn');
-  if (!user || !pass) { errEl.textContent = 'Remplissez tous les champs'; errEl.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Connexion...';
-  var res = await apiCall('login', { user: user, pass: pass });
-  btn.disabled = false; btn.textContent = 'Se connecter';
-  if (res.success) { currentUser = res.user; localStorage.setItem('nateiva_user', JSON.stringify(currentUser)); closeLogin(); document.getElementById('mainApp').classList.remove('locked'); showToast('Bienvenue ' + currentUser.fullName + '!'); rSuivi(); }
-  else { errEl.textContent = res.error; errEl.style.display = 'block'; }
-}
-function doLogout() { currentUser = null; localStorage.removeItem('nateiva_user'); document.getElementById('mainApp').classList.add('locked'); showLogin(); rSuivi(); }
-function showToast(msg, isErr) { var t = document.getElementById('toastMsg'); t.textContent = msg; t.className = 'toast show' + (isErr ? ' error' : ''); setTimeout(function() { t.className = 'toast'; }, 3000); }
-
-// --- Stats & Rankings ---
-function computeStats(expertName) {
-  var rd = RAW.filter(function(r) { return r.e === expertName; });
-  var ed = suiviEntries.filter(function(e) { return e.expert === expertName; });
-  var days = getDaysOnField(expertName);
-  var prosp = rd.length;
-  var hot = rd.filter(function(r) { return r.r >= 60; }).length;
-  var avgRate = rd.length ? Math.round(rd.reduce(function(s,r) { return s + (r.r||0); }, 0) / rd.length) : 0;
-
-  // Entries breakdown
-  var newProsp = ed.filter(function(e) { return e.entryType === 'prospection'; }).length;
-  var followups = ed.filter(function(e) { return e.entryType === 'followup'; }).length;
-  var inPerson = ed.filter(function(e) { return e.mode === 'EN PERSONNE'; }).length;
-  var byPhone = ed.filter(function(e) { return e.mode === 'TELEPHONE'; }).length;
-  var byWhatsApp = ed.filter(function(e) { return e.mode === 'WHATSAPP'; }).length;
-  var bySMS = ed.filter(function(e) { return e.mode === 'SMS'; }).length;
-  var totalCost = ed.reduce(function(s,e) { return s + (Number(e.cost)||0); }, 0);
-
-  // Deals closed
-  var closed = ed.filter(function(e) { return e.status === 'Converti'; });
-  var closedCount = closed.length;
-
-  // Time to close: days between first RAW entry for a school and the close date
-  var closeTimes = [];
-  closed.forEach(function(c) {
-    var firstEntry = null;
-    rd.forEach(function(r) { if (r.n && c.school && r.n.toUpperCase() === c.school.toUpperCase()) { var d = new Date(r.t); if (!firstEntry || d < firstEntry) firstEntry = d; } });
-    ed.forEach(function(e) { if (e.school && c.school && e.school.toUpperCase() === c.school.toUpperCase() && e.id !== c.id) { var d = new Date(e.date || e.createdAt); if (!firstEntry || d < firstEntry) firstEntry = d; } });
-    if (firstEntry) { var closeDate = new Date(c.date || c.createdAt); var daysDiff = Math.ceil((closeDate - firstEntry) / 86400000); if (daysDiff >= 0) closeTimes.push(daysDiff); }
-  });
-  var avgCloseTime = closeTimes.length ? Math.round(closeTimes.reduce(function(a,b){return a+b;},0) / closeTimes.length) : 0;
-
-  // Follow-ups per school
-  var schoolsFollowed = new Set();
-  ed.forEach(function(e) { if (e.school) schoolsFollowed.add(e.school.toUpperCase()); });
-
-  // Close rate
-  var totalSchools = new Set();
-  rd.forEach(function(r) { if(r.n) totalSchools.add(r.n.toUpperCase()); });
-  ed.forEach(function(e) { if(e.school) totalSchools.add(e.school.toUpperCase()); });
-  var closeRate = totalSchools.size > 0 ? Math.round(closedCount / totalSchools.size * 100) : 0;
-
-  // Score
-  var score = (closedCount * 50) + (hot * 15) + (followups * 5) + (newProsp * 8) + (inPerson * 8) + (byPhone * 5) + (byWhatsApp * 3) + (bySMS * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-
-  return { days:days, prosp:prosp, hot:hot, avgRate:avgRate, newProsp:newProsp, followups:followups, inPerson:inPerson, byPhone:byPhone, byWhatsApp:byWhatsApp, bySMS:bySMS, totalCost:totalCost, closedCount:closedCount, avgCloseTime:avgCloseTime, schoolsFollowed:schoolsFollowed.size, totalSchools:totalSchools.size, closeRate:closeRate, score:Math.max(0,score), totalEntries: ed.length };
-}
-
-function buildRankings() {
-  var seen = {}, experts = [];
-  RAW.forEach(function(r) { if (r.e && !seen[r.e]) { seen[r.e] = true; experts.push(r.e); } });
-  suiviEntries.forEach(function(e) { if (e.expert && !seen[e.expert]) { seen[e.expert] = true; experts.push(e.expert); } });
-  suiviRankings = experts.map(function(e) { return Object.assign({ expert: e }, computeStats(e)); });
-  suiviRankings.sort(function(a, b) { return b.score - a.score; });
-  suiviRankings.forEach(function(r, i) { r.rank = i + 1; });
-}
-
-// --- RENDER SUIVI ---
-function rSuivi() {
+// === RENDER ===
+function rSuivi(){
   buildRankings();
-  var el = document.getElementById('p-suivi');
-  if (!el) return;
+  var el=document.getElementById('p-suivi');if(!el)return;
+  if(!currentUser){el.innerHTML='<div class="not-logged-in" style="padding:80px 20px"><h2 style="font-family:Fraunces,serif;font-size:42px;font-weight:600;margin-bottom:12px">NATEIVA <span style="color:var(--red);font-style:italic">360</span></h2><p style="font-size:16px;color:var(--g500);margin-bottom:32px">Connectez-vous pour commencer</p><button onclick="showLogin()" style="padding:18px 48px;font-size:16px;border-radius:14px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border:none;font-weight:700;cursor:pointer;box-shadow:var(--shadow-red)">Se connecter</button></div>';return}
+  var me=currentUser.fullName,sa=isSA(me),st=computeStats(me),mr=suiviRankings.find(function(r){return r.expert===me});
+  var myE=suiviEntries.filter(function(e){return sa||e.expert===me}).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
+  var scOpts='';var scSet=new Set();(sa?RAW:RAW.filter(function(r){return r.e===me})).forEach(function(r){if(r.n)scSet.add(r.n)});suiviEntries.forEach(function(e){if(e.school&&(sa||e.expert===me))scSet.add(e.school)});
+  Array.from(scSet).sort().forEach(function(s){scOpts+='<option value="'+esc(s)+'">'+esc(s)+'</option>'});
+  var fD=function(d){if(!d)return'-';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})};
+  var mI=function(m){return m==='EN PERSONNE'?'🚶':m==='TELEPHONE'?'📞':m==='WHATSAPP'?'💬':'📱'};
+  var mC=function(m){return m==='EN PERSONNE'?'type-VISIT':m==='TELEPHONE'?'type-CALL':m==='WHATSAPP'?'type-WHATSAPP':'type-SMS'};
 
-  if (!currentUser) {
-    el.innerHTML = '<div class="page-intro" data-num="8"><h2>Suivi <span class="it">360</span></h2><p>Connectez-vous pour enregistrer vos prospections terrain et téléphoniques, suivre vos écoles et voir votre classement.</p></div><div class="not-logged-in"><h2>Connectez-vous</h2><p>Chaque expert a son propre compte.</p><button onclick="showLogin()">Se connecter</button></div>';
-    return;
-  }
+  var h='';
+  // ======== HOME SCREEN — 2 big action cards ========
+  h+='<div id="suiviHome" style="padding:20px 0">';
+  // Welcome bar
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;flex-wrap:wrap;gap:12px">';
+  h+='<div style="display:flex;align-items:center;gap:14px"><div class="suivi-avatar">'+me.charAt(0).toUpperCase()+'</div>';
+  h+='<div><div style="font-size:13px;color:var(--g500)">Bonjour</div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600">'+esc(me)+'</div></div></div>';
+  h+='<div style="display:flex;gap:8px;align-items:center"><div class="days-badge"><span class="days-num">'+st.days+'</span> j</div>';
+  h+='<button onclick="doLogout()" style="padding:8px 14px;border:1.5px solid var(--g200);border-radius:10px;background:var(--paper);font-size:11px;font-weight:700;cursor:pointer;font-family:JetBrains Mono,monospace">Déco</button></div></div>';
 
-  var me = currentUser.fullName;
-  var isSuper = isSuperAdmin(me);
-  var stats = computeStats(me);
-  var myRank = suiviRankings.find(function(r) { return r.expert === me; });
-  var myEntries = suiviEntries.filter(function(e) { return isSuper || e.expert === me; }).sort(function(a,b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+  // 2 Big action cards
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">';
+  // Card 1: New entry
+  h+='<div onclick="switchView(\'form\')" style="cursor:pointer;padding:32px 24px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-red)" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
+  h+='<div style="font-size:48px;margin-bottom:12px">📝</div>';
+  h+='<div style="font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-bottom:6px">Nouvelle entrée</div>';
+  h+='<div style="font-size:13px;opacity:.85">Prospection ou suivi</div>';
+  h+='<div style="display:flex;justify-content:center;gap:12px;margin-top:14px;font-size:20px">🚶 📞 💬 📱</div></div>';
+  // Card 2: Dashboard
+  h+='<div onclick="switchView(\'dashboard\')" style="cursor:pointer;padding:32px 24px;background:linear-gradient(135deg,var(--ink),var(--g800));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-lg)" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
+  h+='<div style="font-size:48px;margin-bottom:12px">📊</div>';
+  h+='<div style="font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-bottom:6px">Dashboard</div>';
+  h+='<div style="font-size:13px;opacity:.85">Stats, KPIs & classement</div>';
+  h+='<div style="display:flex;justify-content:center;gap:12px;margin-top:14px;font-size:20px">📈 🏆 💼 🧠</div></div>';
+  h+='</div>';
 
-  // All school names for select
-  var schoolSet = new Set();
-  (isSuper ? RAW : RAW.filter(function(r){return r.e===me;})).forEach(function(r){if(r.n) schoolSet.add(r.n);});
-  suiviEntries.forEach(function(e){if(e.school && (isSuper || e.expert===me)) schoolSet.add(e.school);});
-  var schoolList = Array.from(schoolSet).sort();
-  var schoolOpts = schoolList.map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
+  // Quick stats row
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--ink)">'+st.sc+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Score #'+(mr?mr.rank:'-')+'</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--green)">'+st.clC+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Deals fermés</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--red)">'+st.hot+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Chauds ≥60%</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--saffron)">'+st.schs+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Écoles</div></div>';
+  h+='</div>';
 
-  var modeIcon = function(m) { return m==='EN PERSONNE'?'🚶':m==='TELEPHONE'?'📞':m==='WHATSAPP'?'💬':'📱'; };
-  var modeClass = function(m) { return m==='EN PERSONNE'?'type-VISIT':m==='TELEPHONE'?'type-CALL':m==='WHATSAPP'?'type-WHATSAPP':'type-SMS'; };
-  var typeLabel = function(t) { return t==='prospection'?'Nouvelle prospection':'Suivi'; };
-  var fmtD = function(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); };
-
-  var h = '';
-  // Header
-  h += '<div class="page-intro" data-num="8"><h2>Suivi <span class="it">360</span></h2>';
-  h += '<p>' + (isSuper ? '<b>Super Admin</b> — ' : '') + 'Bienvenue <b>' + esc(me) + '</b>. Enregistrez vos prospections et follow-ups, en personne ou par téléphone.</p>';
-  h += '<div class="quick-links" style="margin-top:12px"><a href="https://docs.google.com/forms/d/1PBuLuUl77BLQV2DRzUub7DGrJkkGhtKJDOZygb1f-T4/viewform" target="_blank">📝 Form Prospection</a><a href="https://docs.google.com/forms/d/1_PsQd_S66_2bhNihxmaVgkxM_3XqGSwL8km43D16Fa0/viewform" target="_blank">📞 Form Suivi Tél.</a></div></div>';
-
-  h += '<div class="suivi-header"><div class="suivi-user">';
-  h += '<div class="suivi-avatar">' + me.charAt(0).toUpperCase() + '</div>';
-  h += '<div><div class="suivi-name">' + esc(me) + '</div><div class="suivi-role">' + (isSuper?'SUPER ADMIN':'EXPERT') + ' · ' + esc(currentUser.city) + '</div></div>';
-  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.days + '</span> jours terrain</div>';
-  h += '</div><div class="suivi-actions">';
-  h += '<button class="primary" onclick="showEntryWizard()">+ Nouvelle entrée</button>';
-  if (isSuper) h += '<button onclick="switchTab(\'invite\')">+ Inviter</button>';
-  h += '<button onclick="doLogout()">Déconnexion</button>';
-  h += '</div></div>';
-
-  // KPIs — 2 rows
-  h += '<div class="suivi-kpis">';
-  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🏫</div><div class="sk-val">' + stats.totalSchools + '</div><div class="sk-lbl">Écoles total</div></div>';
-  h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">' + stats.closedCount + '</div><div class="sk-lbl">Deals fermés</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.closeRate + '<small>%</small></div><div class="sk-lbl">Taux de closing</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">⏱️</div><div class="sk-val">' + stats.avgCloseTime + '<small>j</small></div><div class="sk-lbl">Moy. jours pour closer</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain FCFA</div></div>';
-  h += '</div>';
-  h += '<div class="suivi-kpis" style="margin-top:-12px">';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🚶</div><div class="sk-val">' + stats.inPerson + '</div><div class="sk-lbl">En personne</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.byPhone + '</div><div class="sk-lbl">Par téléphone</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">💬</div><div class="sk-val">' + stats.byWhatsApp + '</div><div class="sk-lbl">WhatsApp</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hot + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📈</div><div class="sk-val">' + stats.followups + '</div><div class="sk-lbl">Follow-ups</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🆕</div><div class="sk-val">' + stats.newProsp + '</div><div class="sk-lbl">Nvlles prospections</div></div>';
-  h += '</div>';
-
-  // Tabs — regular users see limited tabs, super admins see all
-  h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab act" data-stab="entry">+ Entrée</button>';
-  h += '<button class="suivi-tab" data-stab="history">Mon journal (' + myEntries.length + ')</button>';
-  h += '<button class="suivi-tab" data-stab="mystats">📊 Mes stats</button>';
-  if (isSuper) {
-    h += '<button class="suivi-tab" data-stab="progress">📈 Progression</button>';
-    h += '<button class="suivi-tab" data-stab="ranking">🏆 Classement</button>';
-    h += '<button class="suivi-tab" data-stab="deals">💼 Deals</button>';
-    h += '<button class="suivi-tab" data-stab="calls">📞 Appels</button>';
-    h += '<button class="suivi-tab" data-stab="nlp">🧠 NLP & Recos</button>';
-    h += '<button class="suivi-tab" data-stab="analytics">📊 Analytics équipe</button>';
-    h += '<button class="suivi-tab" data-stab="overview">🎯 Vue d\'ensemble</button>';
-    h += '<button class="suivi-tab" data-stab="invite">👥 Utilisateurs</button>';
-  }
-  h += '</div>';
-
-  // ====== TAB: ENTRY (mobile-first wizard) ======
-  h += '<div class="suivi-panel act" id="stab-entry">';
-  h += '<div class="form-card" id="entryForm"><h3>Nouvelle <span class="it">entrée 360</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Prospection ou suivi, en personne ou par téléphone — tout se fait ici.</p>';
-
-  // Step 1: Type + Mode (big buttons, mobile-friendly)
-  h += '<div style="margin-bottom:20px"><label class="form-field" style="margin-bottom:10px"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;font-weight:700">1. Que faites-vous?</label></label>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-  h += '<button type="button" class="wiz-btn" data-field="entryType" data-val="prospection" onclick="wizSelect(this)" style="padding:18px;border:2px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-size:14px;font-weight:700;transition:all .2s"><span style="font-size:28px;display:block;margin-bottom:6px">🆕</span>Nouvelle prospection</button>';
-  h += '<button type="button" class="wiz-btn" data-field="entryType" data-val="followup" onclick="wizSelect(this)" style="padding:18px;border:2px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-size:14px;font-weight:700;transition:all .2s"><span style="font-size:28px;display:block;margin-bottom:6px">🔄</span>Suivi / Follow-up</button>';
-  h += '</div></div>';
-
-  h += '<div style="margin-bottom:20px"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;font-weight:700">2. Comment?</label>';
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
-  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="EN PERSONNE" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">🚶</span>En personne</button>';
-  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="TELEPHONE" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">📞</span>Téléphone</button>';
-  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="WHATSAPP" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">💬</span>WhatsApp</button>';
-  h += '<button type="button" class="wiz-btn" data-field="mode" data-val="SMS" onclick="wizSelect(this)" style="padding:14px 8px;border:2px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;text-align:center;font-size:12px;font-weight:700;transition:all .2s"><span style="font-size:22px;display:block;margin-bottom:4px">📱</span>SMS</button>';
-  h += '</div></div>';
-
-  // Step 2: School + basic info
-  h += '<div class="form-grid" style="margin-bottom:16px">';
-  h += '<div class="form-field"><label>3. École *</label><select id="eSchool"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__new__">✏️ Nouvelle école</option></select></div>';
-  h += '<div class="form-field" id="eNewSchoolWrap" style="display:none"><label>Nom nouvelle école</label><input type="text" id="eNewSchool" placeholder="Nom de l\'école"></div>';
-  h += '<div class="form-field"><label>Ville *</label><select id="eCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-  h += '<div class="form-field"><label>Date & Heure (auto)</label><input type="text" id="eDateTime" value="' + new Date().toLocaleString('fr-FR', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) + '" readonly style="background:var(--g100);color:var(--g600);cursor:not-allowed"></div>';
-
-  // Prospection-specific fields
-  h += '<div class="form-field" id="eTypeWrap"><label>Type d\'école</label><select id="eSchoolType"><option value="">--</option><option value="Maternelle">Maternelle</option><option value="Primaire">Primaire</option><option value="Secondaire">Secondaire</option><option value="Bilingue">Bilingue</option><option value="Université">Université / Institut Supérieur</option></select></div>';
-  h += '<div class="form-field" id="eCatWrap"><label>Catégorie</label><select id="eCat"><option value="">--</option><option value="TRES HAUTE STANDING">Très haute standing</option><option value="HAUTE STANDING">Haute standing</option><option value="STANDIG MOYEN">Standing moyen</option><option value="BASSE STANDING">Basse standing</option><option value="TRES BASSE STANDING">Très basse standing</option></select></div>';
-  h += '<div class="form-field" id="eEffWrap"><label>Effectifs élèves</label><input type="text" id="eEffectifs" placeholder="Ex: 250"></div>';
-
-  // Contact
-  h += '<div class="form-field"><label>4. Contact (Nom & Fonction)</label><input type="text" id="eContact" placeholder="M. Agbor - Directeur"></div>';
-  h += '<div class="form-field"><label>Poste</label><select id="eRole"><option value="">--</option><option value="DIRECTEUR (TRICE)">Directeur(trice)</option><option value="PRINCIPAL">Principal</option><option value="PROVISEUR">Proviseur</option><option value="VICE PRINCIPAL">Vice-Principal</option><option value="VICE DIRECTEUR">Vice-Directeur</option><option value="SECRETAIRE">Secrétaire</option><option value="INFORMATICIEN">Informaticien</option><option value="PDG">PDG / Fondateur</option><option value="CENSEUR">Censeur</option><option value="SURVEILLANT">Surveillant</option><option value="RECTEUR">Recteur</option><option value="VICE-RECTEUR">Vice-Recteur</option><option value="DOYEN">Doyen de Faculté</option><option value="VICE-DOYEN">Vice-Doyen</option><option value="CHEF DEPT">Chef de Département</option><option value="DIRECTEUR ACADEMIQUE">Directeur Académique</option><option value="SECRETAIRE GENERAL">Secrétaire Général</option><option value="REGISTRAR">Registrar</option><option value="RESPONSABLE SCOLARITE">Responsable Scolarité</option><option value="CHARGE ADMISSION">Chargé des Admissions</option><option value="COMPTABLE">Comptable</option><option value="PROMOTEUR">Promoteur / Fondateur Université</option><option value="AUTRE">Autre</option></select></div>';
-  h += '<div class="form-field"><label>Tél WhatsApp</label><input type="tel" id="ePhoneWA" placeholder="6XX XXX XXX"></div>';
-  h += '<div class="form-field"><label>Tél non-WhatsApp</label><input type="tel" id="ePhoneOther" placeholder="6XX XXX XXX"></div>';
-
-  // Phone-specific fields
-  h += '<div class="form-field" id="eDurationWrap"><label>Durée appel (min)</label><input type="number" id="eDuration" placeholder="5" min="0"></div>';
-  h += '<div class="form-field" id="eCallCountWrap"><label>Nb fois appelé</label><input type="number" id="eCallCount" value="1" min="1"></div>';
-
-  // Conversation
-  h += '<div class="form-field full"><label>5. Résumé conversation</label><textarea id="eConvo" placeholder="Points discutés, réactions, informations recueillies..." style="min-height:70px"></textarea></div>';
-
-  // Outcome + Rate
-  h += '<div class="form-field"><label>6. Taux de conversion *</label><select id="eRate"><option value="">--</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option></select></div>';
-  h += '<div class="form-field"><label>Évaluation collaboration (1-5)</label><select id="eRating"><option value="">--</option><option value="1">1 - Très faible</option><option value="2">2</option><option value="3">3 - Moyenne</option><option value="4">4</option><option value="5">5 - Excellente</option></select></div>';
-  h += '<div class="form-field"><label>Statut *</label><select id="eStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 DEAL FERMÉ</option><option value="Terminé">⚫ Perdu</option></select></div>';
-  h += '<div class="form-field"><label>💰 Valeur du deal (FCFA)</label>';
-  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">';
-  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="60000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">60 000</button>';
-  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="250000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">250 000</button>';
-  h += '<button type="button" class="wiz-btn" data-field="dealValue" data-val="500000" onclick="wizSelect(this)" style="padding:12px 6px;border:2px solid var(--g200);border-radius:10px;background:var(--paper);cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .2s">500 000+</button>';
-  h += '</div></div>';
-  h += '<div class="form-field" id="eCostWrap"><label>Coût déplacement FCFA</label><input type="number" id="eCost" placeholder="500" min="0" value="0"></div>';
-
-  // Actions
-  h += '<div class="form-field full"><label>7. Prochaines actions</label>';
-  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">';
-  var acts = [['actCall','📞 Rappeler'],['actWA','💬 Envoyer doc WA'],['actSuperior','📤 Transmettre supérieur'],['actVisit','🚶 Planifier visite'],['actDoc','📄 Dossier physique']];
-  acts.forEach(function(a) { h += '<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--g200);border-radius:10px;cursor:pointer;font-size:13px;background:var(--bg);transition:all .2s"><input type="checkbox" id="' + a[0] + '"> ' + a[1] + '</label>'; });
-  h += '<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--g200);border-radius:10px;cursor:pointer;font-size:13px;background:var(--bg)"><input type="checkbox" id="actOther" onchange="document.getElementById(\'actOtherText\').style.display=this.checked?\'\':\'none\'"> ✏️ Autre</label>';
-  h += '</div>';
-  h += '<input type="text" id="actOtherText" style="display:none;margin-top:8px;padding:10px 14px;border:1.5px solid var(--g200);border-radius:10px;font-size:14px;width:100%" placeholder="Précisez l\'action...">';
-  h += '</div>';
-  h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="eNextDate"></div>';
-
-  // Location
-  h += '<div class="form-field"><label>Secteur / Quartier</label><input type="text" id="eSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
-  h += '<div class="form-field full" id="eLocWrap"><label>Localisation exacte</label><input type="text" id="eLoc" placeholder="En face pharmacie, après Nestlé..."></div>';
-  h += '<div class="form-field full"><label>Remarques</label><textarea id="eRemarks" placeholder="Notes supplémentaires..." style="min-height:50px"></textarea></div>';
-
-  h += '</div>'; // close form-grid
-  h += '<div class="form-submit"><button class="btn-save" onclick="submitEntry()" style="width:100%;padding:18px;font-size:16px">✅ Enregistrer</button></div>';
-  h += '</div></div>'; // close form-card, stab-entry
-
-  // ====== TAB: MY STATS (visible to everyone — only own data) ======
-  h += '<div class="suivi-panel" id="stab-mystats"><div class="form-card"><h3>Mes <span class="it">statistiques</span></h3>';
-  var myTime = {};
-  // Rebuild time data for current user only
-  (function() {
-    var ts2 = [];
-    RAW.forEach(function(r) { if (r.e === me && r.t) ts2.push({ time: new Date(r.t), mode: 'EN PERSONNE' }); });
-    suiviEntries.forEach(function(e) { if (e.expert === me) ts2.push({ time: new Date(e.date || e.createdAt), mode: e.mode || '' }); });
-    var wd = new Set(), dh = {}, vis2=0, cal2=0, ph2=0, wa2=0, sm2=0;
-    var f2 = null, l2 = null;
-    ts2.forEach(function(t) {
-      var dk = t.time.toDateString(); wd.add(dk);
-      if (!f2||t.time<f2) f2=t.time; if (!l2||t.time>l2) l2=t.time;
-      if(!dh[dk]) dh[dk]=new Set(); dh[dk].add(t.time.getHours());
-      if(t.mode==='EN PERSONNE')vis2++; else if(t.mode==='TELEPHONE')ph2++; else if(t.mode==='WHATSAPP')wa2++; else if(t.mode==='SMS')sm2++;
-    });
-    var wh2=0; Object.keys(dh).forEach(function(k){wh2+=dh[k].size;});
-    cal2 = f2&&l2 ? Math.max(1,Math.ceil((l2-f2)/86400000)+1) : 0;
-    myTime = { entries:ts2.length, days:wd.size, hours:wh2, perDay:wd.size?(ts2.length/wd.size).toFixed(1):0, rate:cal2?Math.round(wd.size/cal2*100):0, vis:vis2, ph:ph2, wa:wa2, sm:sm2, last:l2?Math.ceil((new Date()-l2)/86400000):999 };
-  })();
-
-  h += '<div class="suivi-kpis">';
-  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Mon score · Rang #' + (myRank?myRank.rank:'—') + ' / ' + suiviRankings.length + '</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📅</div><div class="sk-val">' + myTime.days + '</div><div class="sk-lbl">Jours travaillés</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">⏰</div><div class="sk-val">' + myTime.hours + '<small>h</small></div><div class="sk-lbl">Heures estimées</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📝</div><div class="sk-val">' + myTime.perDay + '</div><div class="sk-lbl">Entrées / jour</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + myTime.rate + '<small>%</small></div><div class="sk-lbl">Taux activité</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🔄</div><div class="sk-val">' + myTime.last + '<small>j</small></div><div class="sk-lbl">Depuis dernier</div></div>';
-  h += '</div>';
-
-  // Personal mode breakdown
-  h += '<div style="margin:20px 0"><h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Mes activités par mode</h4>';
-  var myTotal = myTime.vis + myTime.ph + myTime.wa + myTime.sm;
-  if (myTotal > 0) {
-    h += '<div style="display:flex;height:32px;border-radius:8px;overflow:hidden;margin-bottom:8px">';
-    if (myTime.vis) h += '<div style="width:' + (myTime.vis/myTotal*100) + '%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.vis + ' 🚶</div>';
-    if (myTime.ph) h += '<div style="width:' + (myTime.ph/myTotal*100) + '%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.ph + ' 📞</div>';
-    if (myTime.wa) h += '<div style="width:' + (myTime.wa/myTotal*100) + '%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.wa + ' 💬</div>';
-    if (myTime.sm) h += '<div style="width:' + (myTime.sm/myTotal*100) + '%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--paper);font-weight:700">' + myTime.sm + ' 📱</div>';
-    h += '</div>';
-    h += '<div style="display:flex;gap:16px;font-size:12px;color:var(--g600);flex-wrap:wrap">';
-    h += '<span>🚶 En personne: <b>' + myTime.vis + '</b></span><span>📞 Téléphone: <b>' + myTime.ph + '</b></span><span>💬 WhatsApp: <b>' + myTime.wa + '</b></span><span>📱 SMS: <b>' + myTime.sm + '</b></span>';
-    h += '</div>';
-  } else { h += '<p style="color:var(--g400)">Aucune activité enregistrée.</p>'; }
-  h += '</div>';
-
-  // Personal KPIs: phone vs field comparison
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0">';
-  h += '<div style="padding:20px;background:linear-gradient(135deg,var(--red-soft),var(--paper));border:1.5px solid var(--g200);border-radius:14px;text-align:center"><div style="font-size:28px">🚶</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--red)">' + myTime.vis + '</div><div style="font-size:11px;color:var(--g600);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Terrain</div></div>';
-  h += '<div style="padding:20px;background:linear-gradient(135deg,var(--teal-soft),var(--paper));border:1.5px solid var(--g200);border-radius:14px;text-align:center"><div style="font-size:28px">📞</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--teal)">' + (myTime.ph + myTime.wa + myTime.sm) + '</div><div style="font-size:11px;color:var(--g600);font-weight:700;text-transform:uppercase;letter-spacing:.08em">À distance</div></div>';
-  h += '</div>';
-
-  h += '</div></div>';
-
-  // ====== TAB: HISTORY ======
-  h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Journal des <span class="it">entrées</span>' + (isSuper ? ' (équipe)' : '') + '</h3>';
-  if (!myEntries.length) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucune entrée.</p>';
-  myEntries.forEach(function(e) {
-    h += '<div class="fu-item ' + modeClass(e.mode) + '"><div class="fu-head"><span class="fu-school">' + esc(e.school||'') + '</span>';
-    h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
-    if (isSuper) h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(e.expert) + '</span>';
-    h += '<span class="fu-type ' + (e.mode==='EN PERSONNE'?'VISIT':e.mode==='TELEPHONE'?'CALL':e.mode) + '">' + modeIcon(e.mode) + ' ' + (e.mode||'') + '</span>';
-    h += '<span style="font-size:10px;padding:3px 8px;border-radius:6px;background:' + (e.entryType==='prospection'?'var(--saffron-soft)':'var(--teal-soft)') + ';color:' + (e.entryType==='prospection'?'var(--saffron-deep)':'var(--teal)') + ';font-weight:700">' + typeLabel(e.entryType) + '</span>';
-    h += '</div></div>';
-    h += '<div class="fu-body">' + (esc(e.convo) || esc(e.remarks) || '<i style="color:var(--g400)">—</i>') + '</div>';
-    h += '<div class="fu-footer">';
-    h += '<span>' + fmtD(e.date||e.createdAt) + '</span>';
-    if (e.contact) h += '<span>Contact: <b>' + esc(e.contact) + '</b></span>';
-    if (e.rate) h += '<span>Taux: ' + pct(Number(e.rate)) + '</span>';
-    if (e.status) h += '<span>Statut: <b>' + esc(e.status) + '</b></span>';
-    if (e.dealValue) h += '<span style="color:var(--green);font-weight:700">💰 ' + fmt(e.dealValue) + ' F</span>';
-    if (Number(e.cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(e.cost) + ' F</span>';
-    if (e.duration) h += '<span>' + e.duration + ' min</span>';
-    h += '</div></div>';
+  // Recent activity (last 5)
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-family:Fraunces,serif;font-size:18px;font-weight:600">Activité récente</span><button onclick="switchView(\'dashboard\');switchTab(\'history\')" style="font-size:11px;color:var(--red);font-weight:700;background:none;border:none;cursor:pointer;font-family:JetBrains Mono,monospace">Voir tout →</button></div>';
+  if(!myE.length)h+='<p style="color:var(--g400);text-align:center;padding:20px">Aucune entrée. Commencez!</p>';
+  myE.slice(0,5).forEach(function(e){
+    h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--g100)">';
+    h+='<span style="font-size:20px">'+mI(e.mode)+'</span>';
+    h+='<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.school||'')+'</div>';
+    h+='<div style="font-size:11px;color:var(--g500)">'+fD(e.date||e.createdAt)+'</div></div>';
+    if(e.rate)h+='<span>'+pct(Number(e.rate))+'</span>';
+    h+='</div>';
   });
-  h += '</div></div>';
+  h+='</div></div>';
 
-  // ====== TAB: PROGRESSION ======
-  h += '<div class="suivi-panel" id="stab-progress"><div class="form-card"><h3>Progression des <span class="it">taux</span></h3>';
-  // Build rate history per school
-  var rateHist = {};
-  (isSuper ? RAW : RAW.filter(function(r){return r.e===me;})).forEach(function(r) {
-    var k = (r.n||'').toUpperCase(); if (!k) return;
-    if (!rateHist[k]) rateHist[k] = { name:r.n, points:[], expert:r.e };
-    rateHist[k].points.push({ date:r.t?new Date(r.t):new Date(), rate:r.r||0, label:'Initial', mode:'Prospection' });
+  // ======== FORM VIEW (hidden by default) ========
+  h+='<div id="suiviForm" style="display:none;padding:20px 0">';
+  h+='<button onclick="switchView(\'home\')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--red);font-weight:700;cursor:pointer;font-size:14px;margin-bottom:20px;font-family:DM Sans,sans-serif">← Retour</button>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:20px;padding:28px 24px">';
+  h+='<h3 style="font-family:Fraunces,serif;font-size:24px;font-weight:600;margin-bottom:24px">Nouvelle <span style="color:var(--red);font-style:italic">entrée</span></h3>';
+
+  // Step 1: What + How (big buttons)
+  h+='<div style="margin-bottom:24px"><div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">1. Que faites-vous?</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<button type="button" class="wiz-btn" data-field="entryType" data-val="prospection" onclick="wizSelect(this)" style="padding:20px;border:2.5px solid var(--g200);border-radius:16px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;transition:all .2s;font-size:14px"><span style="font-size:32px;display:block;margin-bottom:8px">🆕</span>Prospection</button>';
+  h+='<button type="button" class="wiz-btn" data-field="entryType" data-val="followup" onclick="wizSelect(this)" style="padding:20px;border:2.5px solid var(--g200);border-radius:16px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;transition:all .2s;font-size:14px"><span style="font-size:32px;display:block;margin-bottom:8px">🔄</span>Suivi</button>';
+  h+='</div></div>';
+
+  h+='<div style="margin-bottom:24px"><div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">2. Comment?</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
+  h+='<button type="button" class="wiz-btn" data-field="mode" data-val="EN PERSONNE" onclick="wizSelect(this)" style="padding:14px 6px;border:2.5px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;font-size:11px;transition:all .2s"><span style="font-size:24px;display:block;margin-bottom:4px">🚶</span>Terrain</button>';
+  h+='<button type="button" class="wiz-btn" data-field="mode" data-val="TELEPHONE" onclick="wizSelect(this)" style="padding:14px 6px;border:2.5px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;font-size:11px;transition:all .2s"><span style="font-size:24px;display:block;margin-bottom:4px">📞</span>Tél</button>';
+  h+='<button type="button" class="wiz-btn" data-field="mode" data-val="WHATSAPP" onclick="wizSelect(this)" style="padding:14px 6px;border:2.5px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;font-size:11px;transition:all .2s"><span style="font-size:24px;display:block;margin-bottom:4px">💬</span>WA</button>';
+  h+='<button type="button" class="wiz-btn" data-field="mode" data-val="SMS" onclick="wizSelect(this)" style="padding:14px 6px;border:2.5px solid var(--g200);border-radius:14px;background:var(--paper);cursor:pointer;text-align:center;font-weight:700;font-size:11px;transition:all .2s"><span style="font-size:24px;display:block;margin-bottom:4px">📱</span>SMS</button>';
+  h+='</div></div>';
+
+  // Step 2: School + details (clean single-column for mobile)
+  h+='<div style="display:flex;flex-direction:column;gap:14px">';
+  h+='<div class="form-field"><label>3. École *</label><select id="eSchool" onchange="prefillSch()" style="font-size:16px;padding:14px"><option value="">-- Choisir --</option>'+scOpts+'<option value="__new__">✏️ Nouvelle école</option></select></div>';
+  h+='<div class="form-field" id="eNewWrap" style="display:none"><label>Nom</label><input type="text" id="eNewSchool" placeholder="Nom de l\'ecole" style="font-size:16px"></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<div class="form-field"><label>Ville</label><select id="eCity" style="font-size:16px;padding:14px"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h+='<div class="form-field"><label>Type école</label><select id="eSchoolType" style="font-size:16px;padding:14px"><option value="">--</option><option>Maternelle</option><option>Primaire</option><option>Secondaire</option><option>Bilingue</option><option value="Universite">Université</option></select></div></div>';
+  h+='<div class="form-field"><label>4. Contact (Nom & Fonction)</label><input type="text" id="eContact" placeholder="M. Agbor - Directeur" style="font-size:16px"></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<div class="form-field"><label>Poste</label><select id="eRole" style="font-size:16px;padding:14px"><option value="">--</option><option value="DIRECTEUR (TRICE)">Directeur</option><option value="PRINCIPAL">Principal</option><option value="PROVISEUR">Proviseur</option><option value="VICE PRINCIPAL">Vice-Principal</option><option value="SECRETAIRE">Secrétaire</option><option value="INFORMATICIEN">Informaticien</option><option value="PDG">Fondateur/PDG</option><option value="CENSEUR">Censeur</option><option value="RECTEUR">Recteur</option><option value="DOYEN">Doyen</option><option value="AUTRE">Autre</option></select></div>';
+  h+='<div class="form-field"><label>Tél WhatsApp</label><input type="tel" id="ePhoneWA" placeholder="6XX XXX XXX" style="font-size:16px"></div></div>';
+
+  h+='<div class="form-field"><label>5. Résumé conversation</label><textarea id="eConvo" placeholder="Points discutés..." style="font-size:16px;min-height:80px"></textarea></div>';
+
+  // Rate + Status + Deal value (clean row)
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
+  h+='<div class="form-field"><label>Taux *</label><select id="eRate" style="font-size:16px;padding:14px"><option value="">--</option><option>10</option><option>20</option><option>30</option><option>40</option><option>50</option><option>60</option><option>70</option><option>80</option><option>90</option><option>100</option></select></div>';
+  h+='<div class="form-field"><label>Statut *</label><select id="eStatus" style="font-size:16px;padding:14px"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 Fermé</option><option value="Termine">⚫ Perdu</option></select></div>';
+  h+='<div class="form-field"><label>Collaboration</label><select id="eRating" style="font-size:16px;padding:14px"><option value="">--</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div></div>';
+
+  // Deal value
+  h+='<div style="margin:10px 0"><div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">💰 Valeur du deal (FCFA)</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  h+='<button type="button" class="wiz-btn" data-field="dealValue" data-val="60000" onclick="wizSelect(this)" style="padding:14px;border:2.5px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;font-weight:700;font-size:14px;transition:all .2s">60K</button>';
+  h+='<button type="button" class="wiz-btn" data-field="dealValue" data-val="250000" onclick="wizSelect(this)" style="padding:14px;border:2.5px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;font-weight:700;font-size:14px;transition:all .2s">250K</button>';
+  h+='<button type="button" class="wiz-btn" data-field="dealValue" data-val="500000" onclick="wizSelect(this)" style="padding:14px;border:2.5px solid var(--g200);border-radius:12px;background:var(--paper);cursor:pointer;font-weight:700;font-size:14px;transition:all .2s">500K+</button>';
+  h+='</div></div>';
+
+  h+='<div id="eCostWrap" style="display:none" class="form-field"><label>Coût déplacement FCFA</label><input type="number" id="eCost" value="0" min="0" style="font-size:16px"></div>';
+  h+='<div class="form-field"><label>Prochaine action</label><input type="text" id="eNextAction" placeholder="Rappeler, déposer dossier..." style="font-size:16px"></div>';
+  h+='<div class="form-field"><label>Secteur</label><input type="text" id="eSector" placeholder="BONABERIE, MIMBOMAN..." style="font-size:16px"></div>';
+  h+='<div class="form-field"><label>Remarques</label><textarea id="eRemarks" placeholder="Notes..." style="font-size:16px;min-height:50px"></textarea></div>';
+  h+='</div>'; // close flex column
+  h+='<button onclick="submitEntry()" style="width:100%;margin-top:20px;padding:20px;background:linear-gradient(135deg,var(--green),var(--green-bright));color:var(--paper);border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 8px 24px rgba(5,150,105,.3)">✅ Enregistrer</button>';
+  h+='</div></div>';
+
+  // ======== DASHBOARD VIEW (hidden by default) ========
+  h+='<div id="suiviDash" style="display:none;padding:20px 0">';
+  h+='<button onclick="switchView(\'home\')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--red);font-weight:700;cursor:pointer;font-size:14px;margin-bottom:16px;font-family:DM Sans,sans-serif">← Retour</button>';
+
+  // Dashboard tabs
+  h+='<div class="suivi-tabs">';
+  h+='<button class="suivi-tab act" data-stab="combined">📊 Combiné</button>';
+  h+='<button class="suivi-tab" data-stab="history">📋 Journal</button>';
+  h+='<button class="suivi-tab" data-stab="ranking">🏆 Rang</button>';
+  if(sa){
+    h+='<button class="suivi-tab" data-stab="phone">📞 Appels</button>';
+    h+='<button class="suivi-tab" data-stab="nlp">🧠 NLP</button>';
+    h+='<button class="suivi-tab" data-stab="team">👥 Équipe</button>';
+    h+='<button class="suivi-tab" data-stab="invite">⚙️ Users</button>';
+  }
+  h+='</div>';
+
+  // === TAB: COMBINED KPIs ===
+  h+='<div class="suivi-panel act" id="stab-combined">';
+  // Top KPIs
+  h+='<div class="suivi-kpis">';
+  h+='<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">'+st.sc+'</div><div class="sk-lbl">Score #'+(mr?mr.rank:'-')+'</div></div>';
+  h+='<div class="suivi-kpi"><div class="sk-icon">🏫</div><div class="sk-val">'+st.schs+'</div><div class="sk-lbl">Écoles</div></div>';
+  h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">'+st.clC+'</div><div class="sk-lbl">Fermés</div></div>';
+  h+='<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">'+st.cr+'<small>%</small></div><div class="sk-lbl">Closing</div></div>';
+  h+='<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">'+fmt(st.rev)+'</div><div class="sk-lbl">Revenu FCFA</div></div>';
+  h+='<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">'+st.hot+'</div><div class="sk-lbl">Chauds</div></div>';
+  h+='</div>';
+
+  // Field vs Remote cards
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0">';
+  h+='<div style="padding:20px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:16px;text-align:center"><div style="font-size:28px">🚶</div><div style="font-family:Fraunces,serif;font-size:36px;font-weight:600;margin:6px 0">'+(st.prosp+st.vis)+'</div><div style="font-size:12px;opacity:.85">Terrain</div></div>';
+  h+='<div style="padding:20px;background:linear-gradient(135deg,var(--teal),var(--teal-deep));color:var(--paper);border-radius:16px;text-align:center"><div style="font-size:28px">📞</div><div style="font-family:Fraunces,serif;font-size:36px;font-weight:600;margin:6px 0">'+(st.ph+st.wa+st.sm)+'</div><div style="font-size:12px;opacity:.85">À distance</div></div></div>';
+
+  // Activity breakdown
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px">🚶</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.vis+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">VISITES</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px">📞</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.ph+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">APPELS</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px">💬</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.wa+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">WHATSAPP</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px">📱</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.sm+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">SMS</div></div>';
+  h+='</div>';
+
+  // Cost summary
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;display:flex;justify-content:space-around;text-align:center">';
+  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600;color:var(--red)">'+fmt(st.cost)+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">COÛT TOTAL</div></div>';
+  h+='<div style="width:1px;background:var(--g200)"></div>';
+  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.days+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">JOURS</div></div>';
+  h+='<div style="width:1px;background:var(--g200)"></div>';
+  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+(st.days>0?(st.tot/st.days).toFixed(1):'0')+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">PAR JOUR</div></div>';
+  h+='</div></div>';
+
+  // === TAB: HISTORY ===
+  h+='<div class="suivi-panel" id="stab-history"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+  h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Journal'+(sa?' (équipe)':'')+'</h3>';
+  if(!myE.length)h+='<p style="color:var(--g400);text-align:center;padding:30px">Aucune entrée.</p>';
+  myE.forEach(function(e){
+    h+='<div class="fu-item '+mC(e.mode)+'" style="margin-bottom:8px"><div class="fu-head"><span class="fu-school">'+esc(e.school||'')+'</span>';
+    h+='<span class="fu-type '+(e.mode==='EN PERSONNE'?'VISIT':e.mode==='TELEPHONE'?'CALL':e.mode)+'">'+mI(e.mode)+' '+(e.mode||'')+'</span></div>';
+    h+='<div class="fu-body">'+(esc(e.convo)||esc(e.remarks)||'<i style="color:var(--g400)">-</i>')+'</div>';
+    h+='<div class="fu-footer"><span>'+fD(e.date||e.createdAt)+'</span>';
+    if(sa&&e.expert)h+='<span>'+esc(e.expert)+'</span>';
+    if(e.rate)h+='<span>'+pct(Number(e.rate))+'</span>';
+    if(e.status)h+='<span>'+esc(e.status)+'</span>';
+    if(e.dealValue)h+='<span style="color:var(--green);font-weight:700">'+fmt(e.dealValue)+' F</span>';
+    if(Number(e.cost)>0)h+='<span class="fu-cost">'+fmt(e.cost)+' F</span>';
+    h+='</div></div>';
   });
-  (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).forEach(function(e) {
-    if (!e.rate || !e.school) return;
-    var k = e.school.toUpperCase();
-    if (!rateHist[k]) rateHist[k] = { name:e.school, points:[], expert:e.expert };
-    rateHist[k].points.push({ date:new Date(e.date||e.createdAt), rate:Number(e.rate), label:(e.entryType==='followup'?'Suivi':'Prosp.'), mode:e.mode||'' });
+  h+='</div></div>';
+
+  // === TAB: RANKING ===
+  h+='<div class="suivi-panel" id="stab-ranking"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+  h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Classement</h3>';
+  suiviRankings.forEach(function(r){
+    var isMe=r.expert===me;
+    h+='<div class="rank-card '+(isMe?'me':'')+'"><div class="rank-pos">'+r.rank+'</div>';
+    h+='<div class="rank-info"><div class="rk-name">'+esc(r.expert)+(isMe?' (vous)':'')+'</div>';
+    if(sa)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.clC+' fermés</span><span>'+r.cr+'% closing</span><span>'+r.days+'j</span></div>';
+    else if(isMe)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.clC+' fermés</span><span>'+r.days+'j</span></div>';
+    h+='</div><div class="rank-score">'+r.sc+'<small>pts</small></div></div>';
   });
-  var withChanges = Object.keys(rateHist).filter(function(k){return rateHist[k].points.length>1;}).map(function(k){return rateHist[k];});
-  withChanges.sort(function(a,b){return b.points[b.points.length-1].rate - a.points[a.points.length-1].rate;});
+  h+='</div></div>';
 
-  if (!withChanges.length) {
-    h += '<div class="note" style="text-align:center;padding:30px">Enregistrez des suivis avec un taux pour voir la progression ici.</div>';
-  } else {
-    var up=0,dn=0; withChanges.forEach(function(s){var d=s.points[s.points.length-1].rate-s.points[0].rate; if(d>0)up++; else if(d<0)dn++;});
-    h += '<div class="suivi-kpis" style="margin-bottom:20px"><div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">'+up+'</div><div class="sk-lbl">En hausse</div></div><div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val" style="color:var(--red)">'+dn+'</div><div class="sk-lbl">En baisse</div></div><div class="suivi-kpi"><div class="sk-val">'+withChanges.length+'</div><div class="sk-lbl">Écoles suivies</div></div></div>';
-    withChanges.forEach(function(s) {
-      var first=s.points[0].rate, last=s.points[s.points.length-1].rate, diff=last-first;
-      var col = diff>0?'var(--green)':diff<0?'var(--red)':'var(--g500)';
-      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:12px;border-left:5px solid '+col+'">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b>'+esc(s.name)+'</b>';
-      h += '<span style="font-family:\'Fraunces\',serif;font-size:24px;font-weight:600;color:'+col+'">'+(diff>0?'+':'')+diff+'%</span></div>';
-      h += '<div style="display:flex;align-items:flex-end;gap:4px;height:80px">';
-      s.points.forEach(function(p) {
-        var bH = Math.max(6,p.rate*0.75);
-        var bC = p.rate>=60?'var(--green)':p.rate>=40?'var(--saffron)':'var(--g300)';
-        h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:10px;font-weight:700">'+p.rate+'%</div><div style="width:100%;height:'+bH+'px;background:'+bC+';border-radius:4px 4px 0 0"></div><div style="font-size:8px;color:var(--g400)">'+p.label+'</div></div>';
-      });
-      h += '</div></div>';
-    });
+  // === SUPER ADMIN TABS ===
+  if(sa){
+    // PHONE STATS
+    h+='<div class="suivi-panel" id="stab-phone"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+    h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Appels Téléphoniques</h3>';
+    var tC=CALLS.length,ans=CALLS.filter(function(c){return c.st==="Repondu"}).length,noA=CALLS.filter(function(c){return c.st==="Pas de reponse"}).length;
+    var aR=tC>0?Math.round(ans/tC*100):0,tDur=CALLS.reduce(function(s,c){return s+(c.du||0)},0),avgD=ans>0?(tDur/ans).toFixed(1):0;
+    var nRC=CALLS.filter(function(c){return c.a1==="Oui"}).length,nWA=CALLS.filter(function(c){return c.a2==="Oui"}).length,nVis=CALLS.filter(function(c){return c.a4==="Oui"}).length;
+    h+='<div class="suivi-kpis">';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-val">'+tC+'</div><div class="sk-lbl">Total appels</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">'+ans+'</div><div class="sk-lbl">Répondu ('+aR+'%)</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val" style="color:var(--red)">'+noA+'</div><div class="sk-lbl">Sans réponse</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+avgD+'<small>m</small></div><div class="sk-lbl">Durée moy.</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+nRC+'</div><div class="sk-lbl">📞 À rappeler</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+nWA+'</div><div class="sk-lbl">💬 Doc WA</div></div>';
+    h+='</div>';
+    // Per expert
+    var cByE={};CALLS.forEach(function(c){if(!cByE[c.e])cByE[c.e]={t:0,a:0,d:0};cByE[c.e].t++;if(c.st==='Repondu'){cByE[c.e].a++;cByE[c.e].d+=c.du||0}});
+    h+='<table class="tbl" style="margin-top:14px"><thead><tr><th>Expert</th><th>Appels</th><th>Répondu</th><th>Taux</th><th>Durée</th></tr></thead><tbody>';
+    Object.keys(cByE).forEach(function(e){var c=cByE[e];h+='<tr><td><b>'+esc(e)+'</b></td><td class="num">'+c.t+'</td><td class="num">'+c.a+'</td><td>'+pct(c.t>0?Math.round(c.a/c.t*100):0)+'</td><td class="num">'+c.d.toFixed(1)+'m</td></tr>'});
+    h+='</tbody></table></div></div>';
+
+    // NLP
+    h+='<div class="suivi-panel" id="stab-nlp"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+    h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">NLP & Recommandations</h3>';
+    var nlp={bh:[],amb:[],pr:[],doc:[],sys:[],int:[]};
+    RAW.forEach(function(r){var t=((r.co||'')+(r.re||'')).toLowerCase();if(t.match(/fondateur|fondation|hierarch|supérieur|soumettre|acheminer/))nlp.bh.push(r);if(t.match(/ambassadeur/))nlp.amb.push(r);if(t.match(/prix|cher|budget/))nlp.pr.push(r);if(t.match(/document|dossier|physique/))nlp.doc.push(r);if(t.match(/déjà.*logiciel|simpala|fedena|seku|informaticien/))nlp.sys.push(r);if(t.match(/intéress|aimé|promet/))nlp.int.push(r)});
+    h+='<div class="suivi-kpis">';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-val">'+nlp.bh.length+'</div><div class="sk-lbl">🏛️ Bloqués</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val">'+nlp.amb.length+'</div><div class="sk-lbl">🤝 Ambassadeurs</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val">'+nlp.int.length+'</div><div class="sk-lbl">😍 Intéressés</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val">'+nlp.pr.length+'</div><div class="sk-lbl">💰 Prix</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+nlp.doc.length+'</div><div class="sk-lbl">📄 Docs</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+nlp.sys.length+'</div><div class="sk-lbl">🛡️ Déjà équipé</div></div></div>';
+    // Reco lists
+    var recs=[{t:'🔥 Deals chauds ≥70%',c:'var(--red)',i:RAW.filter(function(r){return r.r>=70}).map(function(r){return r.n+' ('+r.e+') '+r.r+'%'})},{t:'📄 Docs physiques demandés',c:'var(--saffron)',i:nlp.doc.map(function(r){return r.n+' ('+r.e+')'})},{t:'🤝 Ambassadeurs potentiels',c:'var(--green)',i:nlp.amb.map(function(r){return r.n+' - '+(r.rn||r.e)})},{t:'🏛️ Bloqués hiérarchie (≥30%)',c:'var(--purple)',i:nlp.bh.filter(function(r){return r.r>=30}).map(function(r){return r.n+' ('+r.e+') '+r.r+'%'})}];
+    recs.forEach(function(rc){if(!rc.i.length)return;h+='<div style="border-left:4px solid '+rc.c+';padding:14px 18px;margin:10px 0;border-radius:10px;background:var(--bg)"><div style="font-size:11px;font-weight:700;color:'+rc.c+';text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">'+rc.t+' ('+rc.i.length+')</div>';rc.i.slice(0,10).forEach(function(i){h+='<div style="font-size:12px;color:var(--g700);padding:3px 0">'+esc(i)+'</div>'});if(rc.i.length>10)h+='<div style="font-size:11px;color:var(--g400)">+ '+(rc.i.length-10)+' autres</div>';h+='</div>'});
+    // Phone recos
+    var pR=CALLS.filter(function(c){return c.a1==='Oui'});
+    if(pR.length){h+='<div style="border-left:4px solid var(--teal);padding:14px 18px;margin:10px 0;border-radius:10px;background:var(--bg)"><div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">📞 À rappeler ('+pR.length+')</div>';var sn2=new Set();pR.forEach(function(c){if(!sn2.has(c.n)){sn2.add(c.n);h+='<div style="font-size:12px;color:var(--g700);padding:3px 0">'+esc(c.n)+' ('+esc(c.e)+') - '+esc(c.cn||'')+'</div>'}});h+='</div>'}
+    h+='</div></div>';
+
+    // TEAM (analytics + overview combined)
+    h+='<div class="suivi-panel" id="stab-team"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+    h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Vue équipe</h3>';
+    // Team totals
+    var tSchs=new Set();RAW.forEach(function(r){if(r.n)tSchs.add(r.n.toUpperCase())});suiviEntries.forEach(function(e){if(e.school)tSchs.add(e.school.toUpperCase())});
+    var tCl=suiviEntries.filter(function(e){return e.status==='Converti'}).length;
+    var tRev=suiviEntries.filter(function(e){return e.status==='Converti'}).reduce(function(s,e){return s+(Number(e.dealValue)||60000)},0);
+    var tCost=suiviEntries.reduce(function(s,e){return s+(Number(e.cost)||0)},0);
+    h+='<div class="suivi-kpis">';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val">'+(RAW.length+suiviEntries.length)+'</div><div class="sk-lbl">Total contacts</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+tSchs.size+'</div><div class="sk-lbl">Écoles</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">'+tCl+'</div><div class="sk-lbl">Fermés</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+fmt(tRev)+'</div><div class="sk-lbl">Revenu FCFA</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+fmt(tCost)+'</div><div class="sk-lbl">Coûts</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+(tCl>0?fmt(Math.round(tCost/tCl)):'-')+'</div><div class="sk-lbl">Coût/acq.</div></div></div>';
+    // Expert table
+    h+='<div style="overflow-x:auto;margin-top:14px"><table class="tbl"><thead><tr><th>#</th><th>Expert</th><th>🚶</th><th>📞</th><th>💬</th><th>🔥</th><th>✅</th><th>💰</th><th>Score</th></tr></thead><tbody>';
+    suiviRankings.forEach(function(r){
+      h+='<tr><td class="num">'+r.rank+'</td><td><b>'+esc(r.expert)+'</b></td><td class="num">'+(r.prosp+r.vis)+'</td><td class="num">'+r.ph+'</td><td class="num">'+r.wa+'</td>';
+      h+='<td class="num" style="color:var(--saffron)">'+r.hot+'</td><td class="num" style="color:var(--green)">'+r.clC+'</td><td class="num" style="color:var(--red)">'+fmt(r.cost)+'</td><td class="num" style="font-weight:700">'+r.sc+'</td></tr>'});
+    h+='</tbody></table></div></div></div>';
+
+    // INVITE
+    h+='<div class="suivi-panel" id="stab-invite"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
+    h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Utilisateurs</h3>';
+    h+='<div style="display:flex;flex-direction:column;gap:10px">';
+    h+='<div class="form-field"><label>Nom</label><input type="text" id="invName" placeholder="Kamga Jean" style="font-size:16px"></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="form-field"><label>ID</label><input type="text" id="invUser" placeholder="jean" style="font-size:16px"></div>';
+    h+='<div class="form-field"><label>Mot de passe</label><input type="text" id="invPass" placeholder="jean123" style="font-size:16px"></div></div>';
+    h+='<div class="form-field"><label>Ville</label><select id="invCity" style="font-size:16px;padding:14px"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+    h+='<button onclick="submitInvite()" style="padding:16px;background:var(--ink);color:var(--paper);border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Ajouter</button></div>';
+    h+='<table class="tbl" style="margin-top:16px"><thead><tr><th>ID</th><th>Nom</th><th>Rôle</th></tr></thead><tbody>';
+    getAllUsers().forEach(function(u){h+='<tr><td class="mono">'+esc(u.username)+'</td><td><b>'+esc(u.fullName)+'</b></td><td>'+(isSA(u.fullName)?'<span style="color:var(--red);font-weight:700">ADMIN</span>':'Expert')+'</td></tr>'});
+    h+='</tbody></table></div></div>';
   }
-  h += '</div></div>';
+  h+='</div>'; // close suiviDash
 
-  // ====== TAB: RANKING ======
-  h += '<div class="suivi-panel" id="stab-ranking"><div class="form-card"><h3>Classement <span class="it">équipe</span></h3>';
-  suiviRankings.forEach(function(r) {
-    h += '<div class="rank-card '+(r.expert===me?'me':'')+'"><div class="rank-pos">'+r.rank+'</div><div class="rank-info"><div class="rk-name">'+esc(r.expert)+(r.expert===me?' (vous)':'')+'</div>';
-    h += '<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.totalEntries+' entrées</span><span>'+r.closedCount+' fermés</span><span>'+r.closeRate+'% closing</span><span>'+r.days+'j</span></div>';
-    h += '</div><div class="rank-score">'+r.score+'<small>points</small></div></div>';
-  });
-  h += '</div></div>';
+  el.innerHTML=h;
 
-  // ====== TAB: DEALS ======
-  h += '<div class="suivi-panel" id="stab-deals"><div class="form-card"><h3>Deals <span class="it">fermés</span></h3>';
-  var closedDeals = (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).filter(function(e){return e.status==='Converti';});
-  if (!closedDeals.length) {
-    h += '<div class="note green" style="text-align:center;padding:30px">Aucun deal fermé pour le moment. Quand vous changez le statut à "🟢 DEAL FERMÉ", il apparaît ici.</div>';
-  } else {
-    h += '<div class="suivi-kpis" style="margin-bottom:20px">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">' + closedDeals.length + '</div><div class="sk-lbl">Deals fermés</div></div>';
-    var revenue = closedDeals.reduce(function(s,e){return s+(Number(e.dealValue)||60000);},0);
-    h += '<div class="suivi-kpi"><div class="sk-val">' + fmt(revenue) + '</div><div class="sk-lbl">Revenu potentiel FCFA</div></div>';
-    var totalCostAll = (isSuper ? suiviEntries : suiviEntries.filter(function(e){return e.expert===me;})).reduce(function(s,e){return s+(Number(e.cost)||0);},0);
-    h += '<div class="suivi-kpi"><div class="sk-val">' + (closedDeals.length>0?fmt(Math.round(totalCostAll/closedDeals.length)):'—') + '</div><div class="sk-lbl">Coût / acquisition</div></div>';
-    h += '</div>';
-    closedDeals.forEach(function(e) {
-      h += '<div class="fu-item type-VISIT" style="border-left-color:var(--green)"><div class="fu-head"><span class="fu-school">' + esc(e.school) + '</span>';
-      h += '<span style="color:var(--green);font-weight:700;font-size:16px">💰 ' + fmt(Number(e.dealValue)||60000) + ' F</span></div>';
-      h += '<div class="fu-footer"><span>' + fmtD(e.date||e.createdAt) + '</span>';
-      if (isSuper && e.expert) h += '<span>' + esc(e.expert) + '</span>';
-      if (e.contact) h += '<span>' + esc(e.contact) + '</span>';
-      h += '<span style="color:var(--green);font-weight:700">🟢 FERMÉ</span>';
-      h += '</div></div>';
-    });
-  }
-  h += '</div></div>';
-
-  // ====== TAB: ANALYTICS — Time & Performance ======
-  // ====== TAB: APPELS (phone call stats from CALLS data) ======
-  if (isSuper) {
-    var totalCalls2 = CALLS.length;
-    var answered = CALLS.filter(function(c){return c.st==='Répondu';}).length;
-    var noAnswer = CALLS.filter(function(c){return c.st==='Pas de réponse';}).length;
-    var msgLeft = CALLS.filter(function(c){return c.st==='Message laissé';}).length;
-    var unreachable = CALLS.filter(function(c){return c.st==='Injoignable';}).length;
-    var answerRate = totalCalls2>0?Math.round(answered/totalCalls2*100):0;
-    var totalDur = CALLS.reduce(function(s,c){return s+(Number(c.du)||0);},0);
-    var avgDur = answered>0?(totalDur/answered).toFixed(1):0;
-    var callsByExpert = {};
-    CALLS.forEach(function(c){ if(!callsByExpert[c.e]) callsByExpert[c.e]={total:0,answered:0,noAnswer:0,dur:0,schools:new Set()}; callsByExpert[c.e].total++; if(c.st==='Répondu'){callsByExpert[c.e].answered++;callsByExpert[c.e].dur+=Number(c.du)||0;} else callsByExpert[c.e].noAnswer++; callsByExpert[c.e].schools.add(c.n); });
-    var needSecondCall = CALLS.filter(function(c){return c.a1==='Oui';}).length;
-    var needWA = CALLS.filter(function(c){return c.a2==='Oui';}).length;
-    var needVisit = CALLS.filter(function(c){return c.a4==='Oui';}).length;
-    var needSuperior = CALLS.filter(function(c){return c.a3==='Oui';}).length;
-
-    h += '<div class="suivi-panel" id="stab-calls"><div class="form-card"><h3>Stats <span class="it">Appels Téléphoniques</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">' + totalCalls2 + ' appels enregistrés depuis le formulaire de suivi téléphonique.</p>';
-
-    h += '<div class="suivi-kpis">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-icon">📞</div><div class="sk-val">' + totalCalls2 + '</div><div class="sk-lbl">Appels total</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">' + answered + '</div><div class="sk-lbl">Répondu (' + answerRate + '%)</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">❌</div><div class="sk-val" style="color:var(--red)">' + noAnswer + '</div><div class="sk-lbl">Pas de réponse</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">⏱️</div><div class="sk-val">' + avgDur + '<small>m</small></div><div class="sk-lbl">Durée moy. (min)</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🔄</div><div class="sk-val">' + needSecondCall + '</div><div class="sk-lbl">2nd appel prévu</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">💬</div><div class="sk-val">' + needWA + '</div><div class="sk-lbl">Doc WA à envoyer</div></div>';
-    h += '</div>';
-
-    // Actions pipeline
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0">';
-    h += '<div style="padding:16px;background:var(--teal-soft);border-radius:12px;text-align:center;border-left:4px solid var(--teal)"><div style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:var(--teal)">' + needSecondCall + '</div><div style="font-size:10px;color:var(--g600);font-weight:700;margin-top:4px">📞 Rappeler</div></div>';
-    h += '<div style="padding:16px;background:var(--green-soft);border-radius:12px;text-align:center;border-left:4px solid var(--green)"><div style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:var(--green)">' + needWA + '</div><div style="font-size:10px;color:var(--g600);font-weight:700;margin-top:4px">💬 Envoyer WA</div></div>';
-    h += '<div style="padding:16px;background:var(--saffron-soft);border-radius:12px;text-align:center;border-left:4px solid var(--saffron)"><div style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:var(--saffron)">' + needSuperior + '</div><div style="font-size:10px;color:var(--g600);font-weight:700;margin-top:4px">📤 Supérieur</div></div>';
-    h += '<div style="padding:16px;background:var(--red-soft);border-radius:12px;text-align:center;border-left:4px solid var(--red)"><div style="font-family:\'Fraunces\',serif;font-size:28px;font-weight:600;color:var(--red)">' + needVisit + '</div><div style="font-size:10px;color:var(--g600);font-weight:700;margin-top:4px">🚶 Planifier visite</div></div>';
-    h += '</div>';
-
-    // Per expert breakdown
-    h += '<table class="tbl"><thead><tr><th>Expert</th><th>Appels</th><th>Répondu</th><th>Sans rép.</th><th>Taux rép.</th><th>Durée tot.</th><th>Moy/appel</th><th>Écoles</th></tr></thead><tbody>';
-    Object.keys(callsByExpert).forEach(function(exp) {
-      var ce = callsByExpert[exp];
-      var ar = ce.total>0?Math.round(ce.answered/ce.total*100):0;
-      h += '<tr><td><b>' + esc(exp) + '</b></td><td class="num">' + ce.total + '</td><td class="num" style="color:var(--green)">' + ce.answered + '</td><td class="num" style="color:var(--red)">' + ce.noAnswer + '</td>';
-      h += '<td>' + pct(ar) + '</td><td class="num">' + ce.dur.toFixed(1) + 'm</td><td class="num">' + (ce.answered>0?(ce.dur/ce.answered).toFixed(1):'0') + 'm</td><td class="num">' + ce.schools.size + '</td></tr>';
-    });
-    h += '</tbody></table>';
-
-    // List of schools needing action
-    var actionSchools = CALLS.filter(function(c){return c.a1==='Oui'||c.a2==='Oui'||c.a4==='Oui';});
-    if (actionSchools.length > 0) {
-      h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin:24px 0 12px">Écoles nécessitant une action</h4>';
-      var seenAct = new Set();
-      actionSchools.forEach(function(c) {
-        if (seenAct.has(c.n)) return; seenAct.add(c.n);
-        var actions2 = [];
-        if (c.a1==='Oui') actions2.push('📞 Rappeler');
-        if (c.a2==='Oui') actions2.push('💬 WA');
-        if (c.a4==='Oui') actions2.push('🚶 Visite');
-        if (c.a3==='Oui') actions2.push('📤 Supérieur');
-        h += '<div class="fu-item type-CALL" style="padding:10px 14px"><div class="fu-head"><span class="fu-school" style="font-size:13px">' + esc(c.n) + '</span><span style="font-size:10px;color:var(--g500)">' + esc(c.e) + '</span></div>';
-        h += '<div class="fu-footer"><span>' + actions2.join(' · ') + '</span>';
-        if (c.cn) h += '<span>' + esc(c.cn) + '</span>';
-        if (c.ph && c.ph !== '0') h += '<span>Tél: <b>' + esc(c.ph) + '</b></span>';
-        h += '</div></div>';
-      });
-    }
-    h += '</div></div>';
-  }
-
-  // ====== TAB: NLP & RECOMMENDATIONS ======
-  if (isSuper) {
-    h += '<div class="suivi-panel" id="stab-nlp"><div class="form-card"><h3>NLP & <span class="it">Recommandations</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Analyse automatique des conversations terrain et téléphoniques. Détection de patterns et recommandations d\'action.</p>';
-
-    // NLP patterns from RAW prospection data
-    var nlpPatterns = {
-      blockedHierarchy: [], ambassador: [], priceObjection: [], needDocs: [],
-      alreadyHasSystem: [], closedSchool: [], interested: [], examPeriod: [], religious: []
-    };
-    RAW.forEach(function(r) {
-      var txt = ((r.co||'')+(r.re||'')).toLowerCase();
-      if (txt.match(/fondateur|fondation|hierarch|supérieur|soumettre|acheminer|transf/)) nlpPatterns.blockedHierarchy.push(r);
-      if (txt.match(/ambassadeur/)) nlpPatterns.ambassador.push(r);
-      if (txt.match(/prix|cher|budget|payer|standing ne permet/)) nlpPatterns.priceObjection.push(r);
-      if (txt.match(/document|dossier|physique|papier/)) nlpPatterns.needDocs.push(r);
-      if (txt.match(/déjà.*logiciel|déjà.*système|informaticien|simpala|fedena|seku/)) nlpPatterns.alreadyHasSystem.push(r);
-      if (txt.match(/fermé|personne.*disponible|pas.*là|absent|rentré/)) nlpPatterns.closedSchool.push(r);
-      if (txt.match(/intéress|aimé|promet|favorable/)) nlpPatterns.interested.push(r);
-      if (txt.match(/examen|évaluation|bulletin|bac|cep|bepc/)) nlpPatterns.examPeriod.push(r);
-      if (txt.match(/église|pasteur|prêtre|sœur|père|congrégation|presbyt/)) nlpPatterns.religious.push(r);
-    });
-
-    // NLP KPIs
-    h += '<div class="suivi-kpis">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">🏛️</div><div class="sk-val">' + nlpPatterns.blockedHierarchy.length + '</div><div class="sk-lbl">Bloqués hiérarchie</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">🤝</div><div class="sk-val">' + nlpPatterns.ambassador.length + '</div><div class="sk-lbl">Veulent être ambassadeur</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">😍</div><div class="sk-val">' + nlpPatterns.interested.length + '</div><div class="sk-lbl">Intéressés (détecté)</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">💰</div><div class="sk-val">' + nlpPatterns.priceObjection.length + '</div><div class="sk-lbl">Objection prix</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📄</div><div class="sk-val">' + nlpPatterns.needDocs.length + '</div><div class="sk-lbl">Demandent docs physiques</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🛡️</div><div class="sk-val">' + nlpPatterns.alreadyHasSystem.length + '</div><div class="sk-lbl">Ont déjà un système</div></div>';
-    h += '</div>';
-
-    // Recommendations
-    h += '<div style="margin:20px 0">';
-    var recos = [
-      { icon:'🔥', title:'Actions immédiates — Deals chauds', color:'var(--red)', items:[] },
-      { icon:'📄', title:'Dossiers physiques à déposer', color:'var(--saffron)', items:[] },
-      { icon:'🤝', title:'Ambassadeurs potentiels à activer', color:'var(--green)', items:[] },
-      { icon:'📞', title:'Rappeler après examens (juillet/août)', color:'var(--teal)', items:[] },
-      { icon:'🏛️', title:'Bloqués hiérarchie — Besoin kit fondateur', color:'var(--purple)', items:[] }
-    ];
-
-    // Populate recommendations
-    RAW.forEach(function(r) {
-      if (r.r >= 70) recos[0].items.push(r.n + ' (' + r.e + ') — ' + r.r + '%');
-      var txt = ((r.co||'')+(r.re||'')).toLowerCase();
-      if (txt.match(/document|dossier|physique/)) recos[1].items.push(r.n + ' (' + r.e + ')');
-      if (txt.match(/ambassadeur/)) recos[2].items.push(r.n + ' — ' + (r.rn||r.e));
-      if (txt.match(/examen|août|rentrée|congé/)) recos[3].items.push(r.n + ' (' + r.e + ')');
-      if (txt.match(/fondateur|fondation|hierarch|supérieur/) && r.r >= 30) recos[4].items.push(r.n + ' (' + r.e + ') — ' + (r.r||0) + '%');
-    });
-
-    recos.forEach(function(rc) {
-      if (rc.items.length === 0) return;
-      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:12px;border-left:5px solid ' + rc.color + '">';
-      h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:' + rc.color + ';text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">' + rc.icon + ' ' + rc.title + ' (' + rc.items.length + ')</h4>';
-      h += '<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">';
-      rc.items.slice(0, 15).forEach(function(item) {
-        h += '<div style="font-size:12px;color:var(--g700);padding:4px 0;border-bottom:1px solid var(--g100)">' + esc(item) + '</div>';
-      });
-      if (rc.items.length > 15) h += '<div style="font-size:11px;color:var(--g400);padding:4px 0">+ ' + (rc.items.length - 15) + ' autres...</div>';
-      h += '</div></div>';
-    });
-
-    h += '</div>';
-
-    // Phone call NLP
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.1em;margin:24px 0 12px">📞 Insights appels téléphoniques</h4>';
-    var callInsights = { needRecall: [], sendDocs: [], planVisit: [], noAnswer3plus: [] };
-    var callCountBySchool = {};
-    CALLS.forEach(function(c) {
-      if (c.a1==='Oui') callInsights.needRecall.push(c.n + ' (' + c.e + ') — ' + (c.cn||''));
-      if (c.a2==='Oui') callInsights.sendDocs.push(c.n + ' (' + c.e + ')');
-      if (c.a4==='Oui') callInsights.planVisit.push(c.n + ' (' + c.e + ')');
-      if (!callCountBySchool[c.n]) callCountBySchool[c.n] = {noAns:0,total:0,expert:c.e};
-      callCountBySchool[c.n].total++;
-      if (c.st==='Pas de réponse') callCountBySchool[c.n].noAns++;
-    });
-    Object.keys(callCountBySchool).forEach(function(s) { if (callCountBySchool[s].noAns >= 2) callInsights.noAnswer3plus.push(s + ' (' + callCountBySchool[s].noAns + '/' + callCountBySchool[s].total + ' sans rép.)'); });
-
-    var callRecos = [
-      { icon:'📞', title:'À rappeler (demandé)', color:'var(--teal)', items: callInsights.needRecall },
-      { icon:'💬', title:'Documents WA à envoyer', color:'var(--green)', items: callInsights.sendDocs },
-      { icon:'🚶', title:'Visites sur site à planifier', color:'var(--red)', items: callInsights.planVisit },
-      { icon:'⚠️', title:'Écoles injoignables (2+ tentatives)', color:'var(--saffron)', items: callInsights.noAnswer3plus }
-    ];
-    callRecos.forEach(function(rc) {
-      if (!rc.items.length) return;
-      h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:12px;border-left:5px solid ' + rc.color + '">';
-      h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:' + rc.color + ';text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">' + rc.icon + ' ' + rc.title + ' (' + rc.items.length + ')</h4>';
-      h += '<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">';
-      rc.items.forEach(function(item) { h += '<div style="font-size:12px;color:var(--g700);padding:4px 0;border-bottom:1px solid var(--g100)">' + esc(item) + '</div>'; });
-      h += '</div></div>';
-    });
-
-    h += '</div></div>';
-  }
-
-  h += '<div class="suivi-panel" id="stab-analytics"><div class="form-card"><h3>Analytics <span class="it">Performance</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">Analyse du temps de travail, fréquence des activités et comparaison d\'équipe. Basé sur les timestamps automatiques de chaque entrée.</p>';
-
-  // Build time analytics per expert
-  var timeData = {};
-  var allExperts = [];
-  var seenExp = {};
-  RAW.forEach(function(r) { if (r.e && !seenExp[r.e]) { seenExp[r.e] = true; allExperts.push(r.e); } });
-  suiviEntries.forEach(function(e) { if (e.expert && !seenExp[e.expert]) { seenExp[e.expert] = true; allExperts.push(e.expert); } });
-
-  allExperts.forEach(function(exp) {
-    var timestamps = [];
-    // From RAW prospections
-    RAW.forEach(function(r) { if (r.e === exp && r.t) timestamps.push({ time: new Date(r.t), type: 'prospection', mode: 'EN PERSONNE' }); });
-    // From entries
-    suiviEntries.forEach(function(e) { if (e.expert === exp) timestamps.push({ time: new Date(e.date || e.createdAt), type: e.entryType || 'followup', mode: e.mode || '' }); });
-
-    timestamps.sort(function(a, b) { return a.time - b.time; });
-
-    // Calculate work days, hours per day, entries per day
-    var workDays = new Set();
-    var hourBuckets = {};
-    var dayActivity = {};
-    var weekdays = {};
-    var totalVisits = 0, totalCalls = 0, totalWA = 0, totalSMS = 0;
-    var firstDate = null, lastDate = null;
-
-    timestamps.forEach(function(ts) {
-      var dayKey = ts.time.toDateString();
-      workDays.add(dayKey);
-      if (!firstDate || ts.time < firstDate) firstDate = ts.time;
-      if (!lastDate || ts.time > lastDate) lastDate = ts.time;
-
-      // Hour distribution
-      var hour = ts.time.getHours();
-      hourBuckets[hour] = (hourBuckets[hour] || 0) + 1;
-
-      // Day of week
-      var dow = ts.time.getDay();
-      weekdays[dow] = (weekdays[dow] || 0) + 1;
-
-      // Daily count
-      dayActivity[dayKey] = (dayActivity[dayKey] || 0) + 1;
-
-      // Mode breakdown
-      if (ts.mode === 'EN PERSONNE') totalVisits++;
-      else if (ts.mode === 'TELEPHONE') totalCalls++;
-      else if (ts.mode === 'WHATSAPP') totalWA++;
-      else if (ts.mode === 'SMS') totalSMS++;
-    });
-
-    var totalEntries = timestamps.length;
-    var numWorkDays = workDays.size;
-    var calendarDays = firstDate && lastDate ? Math.max(1, Math.ceil((lastDate - firstDate) / 86400000) + 1) : 0;
-    var entriesPerWorkDay = numWorkDays > 0 ? (totalEntries / numWorkDays).toFixed(1) : 0;
-    var workRate = calendarDays > 0 ? Math.round(numWorkDays / calendarDays * 100) : 0;
-
-    // Estimate work hours: count distinct hours with activity per day, sum them
-    var workHours = 0;
-    var dayHours = {};
-    timestamps.forEach(function(ts) {
-      var dk = ts.time.toDateString();
-      if (!dayHours[dk]) dayHours[dk] = new Set();
-      dayHours[dk].add(ts.time.getHours());
-    });
-    Object.keys(dayHours).forEach(function(dk) { workHours += dayHours[dk].size; });
-
-    // Peak hour
-    var peakHour = 0, peakCount = 0;
-    Object.keys(hourBuckets).forEach(function(h2) { if (hourBuckets[h2] > peakCount) { peakCount = hourBuckets[h2]; peakHour = h2; } });
-
-    // Peak day
-    var dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    var peakDay = 0, peakDayCount = 0;
-    Object.keys(weekdays).forEach(function(d) { if (weekdays[d] > peakDayCount) { peakDayCount = weekdays[d]; peakDay = d; } });
-
-    // Longest streak (consecutive calendar days with activity)
-    var sortedDays = Array.from(workDays).map(function(d) { return new Date(d); }).sort(function(a,b) { return a-b; });
-    var streak = 0, maxStreak = 0, prevDay = null;
-    sortedDays.forEach(function(d) {
-      if (prevDay && (d - prevDay) <= 86400000 * 1.5) { streak++; } else { streak = 1; }
-      if (streak > maxStreak) maxStreak = streak;
-      prevDay = d;
-    });
-
-    // Days since last activity
-    var daysSinceLast = lastDate ? Math.ceil((new Date() - lastDate) / 86400000) : 999;
-
-    timeData[exp] = {
-      totalEntries: totalEntries, numWorkDays: numWorkDays, calendarDays: calendarDays,
-      entriesPerWorkDay: entriesPerWorkDay, workRate: workRate, workHours: workHours,
-      avgHoursPerDay: numWorkDays > 0 ? (workHours / numWorkDays).toFixed(1) : 0,
-      peakHour: peakHour, peakDay: dayNames[peakDay] || '—',
-      maxStreak: maxStreak, daysSinceLast: daysSinceLast,
-      totalVisits: totalVisits, totalCalls: totalCalls, totalWA: totalWA, totalSMS: totalSMS,
-      hourBuckets: hourBuckets, weekdays: weekdays
-    };
-  });
-
-  // Team averages
-  var teamAvgEntries = 0, teamAvgDays = 0, teamAvgHours = 0, teamAvgRate = 0;
-  var activeExperts = allExperts.filter(function(e) { return timeData[e].totalEntries > 0; });
-  if (activeExperts.length > 0) {
-    teamAvgEntries = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].totalEntries; }, 0) / activeExperts.length);
-    teamAvgDays = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].numWorkDays; }, 0) / activeExperts.length);
-    teamAvgHours = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].workHours; }, 0) / activeExperts.length);
-    teamAvgRate = Math.round(activeExperts.reduce(function(s,e) { return s + timeData[e].workRate; }, 0) / activeExperts.length);
-  }
-
-  // Show own stats first (or team if super admin)
-  var myTime = timeData[me] || { totalEntries:0, numWorkDays:0, workHours:0, entriesPerWorkDay:0, workRate:0, avgHoursPerDay:0, peakHour:0, peakDay:'—', maxStreak:0, daysSinceLast:999 };
-
-  h += '<div class="suivi-kpis">';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📅</div><div class="sk-val">' + myTime.numWorkDays + '</div><div class="sk-lbl">Jours travaillés</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">⏰</div><div class="sk-val">' + myTime.workHours + '<small>h</small></div><div class="sk-lbl">Heures estimées</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📝</div><div class="sk-val">' + myTime.entriesPerWorkDay + '</div><div class="sk-lbl">Entrées / jour travaillé</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + myTime.maxStreak + '<small>j</small></div><div class="sk-lbl">Plus longue série</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + myTime.workRate + '<small>%</small></div><div class="sk-lbl">Taux d\'activité</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🕐</div><div class="sk-val">' + myTime.peakHour + '<small>h</small></div><div class="sk-lbl">Heure de pointe</div></div>';
-  h += '</div>';
-
-  // Hour distribution bar chart
-  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
-  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Distribution horaire ' + (isSuper ? '(équipe)' : '') + '</h4>';
-  h += '<div style="display:flex;align-items:flex-end;gap:2px;height:80px">';
-  var maxHourVal = 1;
-  var hourData = isSuper ? {} : (myTime.hourBuckets || {});
-  if (isSuper) { allExperts.forEach(function(e) { var hb = timeData[e].hourBuckets || {}; Object.keys(hb).forEach(function(hh) { hourData[hh] = (hourData[hh]||0) + hb[hh]; }); }); }
-  for (var hh = 6; hh <= 20; hh++) { if ((hourData[hh]||0) > maxHourVal) maxHourVal = hourData[hh]; }
-  for (var hh2 = 6; hh2 <= 20; hh2++) {
-    var hv = hourData[hh2] || 0;
-    var barH2 = Math.max(2, Math.round(hv / maxHourVal * 70));
-    var barC2 = hh2 >= 8 && hh2 <= 12 ? 'var(--red)' : hh2 >= 13 && hh2 <= 17 ? 'var(--saffron)' : 'var(--g300)';
-    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
-    h += '<div style="font-size:8px;color:var(--g500);font-weight:700">' + hv + '</div>';
-    h += '<div style="width:100%;height:' + barH2 + 'px;background:' + barC2 + ';border-radius:3px 3px 0 0"></div>';
-    h += '<div style="font-size:8px;color:var(--g400)">' + hh2 + 'h</div></div>';
-  }
-  h += '</div></div>';
-
-  // ====== TEAM COMPARISON TABLE (visible to all, super admin sees details) ======
-  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
-  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Comparaison équipe — Temps de travail</h4>';
-  h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Expert</th><th>Entrées</th><th>Jours</th><th>Heures</th><th>Moy/jour</th><th>Taux activité</th><th>Série max</th><th>Dernier actif</th><th>Statut</th></tr></thead><tbody>';
-
-  // Sort by work hours descending
-  var sortedExperts = allExperts.slice().sort(function(a,b) { return timeData[b].workHours - timeData[a].workHours; });
-  sortedExperts.forEach(function(exp) {
-    var td = timeData[exp];
-    var isMe = exp === me;
-    // Determine status
-    var statusLabel, statusColor;
-    if (td.daysSinceLast > 7) { statusLabel = '🔴 INACTIF ' + td.daysSinceLast + 'j'; statusColor = 'var(--red)'; }
-    else if (td.totalEntries < teamAvgEntries * 0.5 && teamAvgEntries > 0) { statusLabel = '🟠 SOUS-PERFORMANT'; statusColor = 'var(--saffron)'; }
-    else if (td.workRate < teamAvgRate * 0.5 && teamAvgRate > 0) { statusLabel = '🟠 IRRÉGULIER'; statusColor = 'var(--saffron)'; }
-    else if (td.totalEntries >= teamAvgEntries * 1.2) { statusLabel = '🟢 TOP'; statusColor = 'var(--green)'; }
-    else { statusLabel = '🟡 OK'; statusColor = 'var(--g600)'; }
-
-    h += '<tr style="' + (isMe ? 'background:var(--bg-warm)' : '') + '">';
-    h += '<td><b>' + esc(exp) + '</b>' + (isMe ? ' (vous)' : '') + '</td>';
-    h += '<td class="num">' + td.totalEntries + '</td>';
-    h += '<td class="num">' + td.numWorkDays + '</td>';
-    h += '<td class="num">' + td.workHours + 'h</td>';
-    h += '<td class="num">' + td.entriesPerWorkDay + '</td>';
-    // Activity rate with color bar
-    h += '<td><div style="display:flex;align-items:center;gap:6px"><div style="width:50px;height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + Math.min(100, td.workRate) + '%;background:' + (td.workRate >= 60 ? 'var(--green)' : td.workRate >= 30 ? 'var(--saffron)' : 'var(--red)') + ';border-radius:4px"></div></div><span class="num">' + td.workRate + '%</span></div></td>';
-    h += '<td class="num">' + td.maxStreak + 'j</td>';
-    h += '<td class="num">' + (td.daysSinceLast < 999 ? td.daysSinceLast + 'j' : '—') + '</td>';
-    h += '<td style="color:' + statusColor + ';font-weight:700;font-size:11px">' + statusLabel + '</td>';
-    h += '</tr>';
-  });
-  h += '</tbody></table></div>';
-
-  // Team averages footer
-  h += '<div style="margin-top:12px;padding:12px 16px;background:var(--g100);border-radius:10px;font-size:12px;color:var(--g600);font-family:\'JetBrains Mono\',monospace">';
-  h += 'MOY. ÉQUIPE: ' + teamAvgEntries + ' entrées · ' + teamAvgDays + ' jours · ' + teamAvgHours + 'h · ' + teamAvgRate + '% activité</div>';
-  h += '</div>';
-
-  // ====== ALERTS — People not pulling their weight ======
-  var alerts = [];
-  sortedExperts.forEach(function(exp) {
-    var td = timeData[exp];
-    if (td.daysSinceLast > 7) alerts.push({ expert: exp, type: 'INACTIF', msg: 'Aucune activité depuis ' + td.daysSinceLast + ' jours', severity: 'red' });
-    else if (td.daysSinceLast > 3) alerts.push({ expert: exp, type: 'RALENTI', msg: 'Dernière activité il y a ' + td.daysSinceLast + ' jours', severity: 'saffron' });
-    if (teamAvgEntries > 0 && td.totalEntries < teamAvgEntries * 0.4) alerts.push({ expert: exp, type: 'SOUS-PERFORMANT', msg: td.totalEntries + ' entrées vs ' + teamAvgEntries + ' moyenne équipe (' + Math.round(td.totalEntries/teamAvgEntries*100) + '%)', severity: 'red' });
-    if (teamAvgHours > 0 && td.workHours < teamAvgHours * 0.4) alerts.push({ expert: exp, type: 'PEU D\'HEURES', msg: td.workHours + 'h vs ' + teamAvgHours + 'h moyenne (' + Math.round(td.workHours/teamAvgHours*100) + '%)', severity: 'saffron' });
-    if (td.workRate < 20 && td.calendarDays > 7) alerts.push({ expert: exp, type: 'IRRÉGULIER', msg: 'Actif seulement ' + td.workRate + '% des jours calendaires', severity: 'saffron' });
-  });
-
-  if (alerts.length > 0) {
-    h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px;margin-bottom:16px">';
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">⚠️ Alertes performance</h4>';
-    alerts.forEach(function(a) {
-      h += '<div style="padding:10px 16px;margin-bottom:8px;border-left:4px solid var(--' + a.severity + ');background:var(--' + a.severity + '-soft);border-radius:8px;display:flex;justify-content:space-between;align-items:center">';
-      h += '<div><b style="color:var(--ink)">' + esc(a.expert) + '</b> <span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--' + a.severity + ');font-weight:700;margin-left:8px">' + a.type + '</span></div>';
-      h += '<div style="font-size:12px;color:var(--g700)">' + a.msg + '</div></div>';
-    });
-    h += '</div>';
-  }
-
-  // Mode breakdown chart per expert
-  h += '<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:22px">';
-  h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Répartition par mode de contact</h4>';
-  sortedExperts.forEach(function(exp) {
-    var td = timeData[exp];
-    var total = td.totalVisits + td.totalCalls + td.totalWA + td.totalSMS;
-    if (total === 0) return;
-    h += '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><b style="font-size:13px">' + esc(exp) + '</b><span style="font-size:12px;color:var(--g500)">' + total + ' total</span></div>';
-    h += '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden">';
-    if (td.totalVisits) h += '<div style="width:' + (td.totalVisits/total*100) + '%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalVisits + ' 🚶</div>';
-    if (td.totalCalls) h += '<div style="width:' + (td.totalCalls/total*100) + '%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalCalls + ' 📞</div>';
-    if (td.totalWA) h += '<div style="width:' + (td.totalWA/total*100) + '%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalWA + ' 💬</div>';
-    if (td.totalSMS) h += '<div style="width:' + (td.totalSMS/total*100) + '%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--paper);font-weight:700">' + td.totalSMS + ' 📱</div>';
-    h += '</div></div>';
-  });
-  h += '</div>';
-
-  h += '</div></div>';
-
-  // ====== TAB: VUE D'ENSEMBLE (super admin — unified phone + field KPIs) ======
-  if (isSuper) {
-    h += '<div class="suivi-panel" id="stab-overview"><div class="form-card"><h3>Vue d\'ensemble <span class="it">Noah</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:20px">KPIs unifiés terrain + téléphone pour l\'ensemble de l\'équipe. Avantage compétitif et métriques de performance globale.</p>';
-
-    // Aggregate all team data
-    var teamTotalEntries = suiviEntries.length;
-    var teamTotalRAW = RAW.length;
-    var teamVisits = suiviEntries.filter(function(e){return e.mode==='EN PERSONNE';}).length + teamTotalRAW;
-    var teamCalls = suiviEntries.filter(function(e){return e.mode==='TELEPHONE';}).length;
-    var teamWA = suiviEntries.filter(function(e){return e.mode==='WHATSAPP';}).length;
-    var teamSMS = suiviEntries.filter(function(e){return e.mode==='SMS';}).length;
-    var teamAllContacts = teamVisits + teamCalls + teamWA + teamSMS;
-    var teamClosed = suiviEntries.filter(function(e){return e.status==='Converti';}).length;
-    var teamHot = RAW.filter(function(r){return r.r>=60;}).length;
-    var teamSchools = new Set(); RAW.forEach(function(r){if(r.n) teamSchools.add(r.n.toUpperCase());}); suiviEntries.forEach(function(e){if(e.school) teamSchools.add(e.school.toUpperCase());});
-    var teamCost = suiviEntries.reduce(function(s,e){return s+(Number(e.cost)||0);},0);
-    var teamRevenue = suiviEntries.filter(function(e){return e.status==='Converti';}).reduce(function(s,e){return s+(Number(e.dealValue)||60000);},0);
-    var teamCloseRate = teamSchools.size > 0 ? Math.round(teamClosed / teamSchools.size * 100) : 0;
-
-    // Douala vs Yaoundé split
-    var dlaEntries = RAW.filter(function(r){return r.v==='DOUALA';}).length + suiviEntries.filter(function(e){return e.city==='DOUALA';}).length;
-    var ydeEntries = RAW.filter(function(r){return r.v==='YAOUNDE';}).length + suiviEntries.filter(function(e){return e.city==='YAOUNDE';}).length;
-
-    // KPI cards — row 1: volume
-    h += '<div class="suivi-kpis">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">📊</div><div class="sk-val">' + (teamTotalRAW + teamTotalEntries) + '</div><div class="sk-lbl">Total contacts (RAW + Suivi)</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🏫</div><div class="sk-val">' + teamSchools.size + '</div><div class="sk-lbl">Écoles uniques</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val" style="color:var(--green)">' + teamClosed + '</div><div class="sk-lbl">Deals fermés</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(teamRevenue) + '</div><div class="sk-lbl">Revenu potentiel FCFA</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📈</div><div class="sk-val">' + teamCloseRate + '<small>%</small></div><div class="sk-lbl">Taux de closing</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + teamHot + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-    h += '</div>';
-
-    // KPI cards — row 2: channels
-    h += '<div class="suivi-kpis" style="margin-top:-12px">';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-icon">🚶</div><div class="sk-val">' + teamVisits + '</div><div class="sk-lbl">Visites terrain</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-icon">📞</div><div class="sk-val">' + teamCalls + '</div><div class="sk-lbl">Appels tél.</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">💬</div><div class="sk-val">' + teamWA + '</div><div class="sk-lbl">WhatsApp</div></div>';
-    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">📱</div><div class="sk-val">' + teamSMS + '</div><div class="sk-lbl">SMS</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">💵</div><div class="sk-val">' + fmt(teamCost) + '</div><div class="sk-lbl">Coûts terrain total</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">💵</div><div class="sk-val">' + (teamClosed>0?fmt(Math.round(teamCost/teamClosed)):'—') + '</div><div class="sk-lbl">Coût / acquisition</div></div>';
-    h += '</div>';
-
-    // Channel efficiency — terrain vs distance
-    var fieldTotal = teamVisits;
-    var remoteTotal = teamCalls + teamWA + teamSMS;
-    var fieldPct = teamAllContacts > 0 ? Math.round(fieldTotal / teamAllContacts * 100) : 0;
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">';
-    h += '<div style="padding:24px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:14px;text-align:center"><div style="font-size:36px">🚶</div><div style="font-family:\'Fraunces\',serif;font-size:42px;font-weight:600;margin:8px 0">' + fieldTotal + '</div><div style="font-size:13px;opacity:.9">Terrain (' + fieldPct + '%)</div><div style="font-size:11px;opacity:.7;margin-top:4px">Coût: ' + fmt(teamCost) + ' FCFA</div></div>';
-    h += '<div style="padding:24px;background:linear-gradient(135deg,var(--teal),var(--teal-deep));color:var(--paper);border-radius:14px;text-align:center"><div style="font-size:36px">📞</div><div style="font-family:\'Fraunces\',serif;font-size:42px;font-weight:600;margin:8px 0">' + remoteTotal + '</div><div style="font-size:13px;opacity:.9">À distance (' + (100-fieldPct) + '%)</div><div style="font-size:11px;opacity:.7;margin-top:4px">Tél: ' + teamCalls + ' · WA: ' + teamWA + ' · SMS: ' + teamSMS + '</div></div>';
-    h += '</div>';
-
-    // Douala vs Yaoundé
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-    h += '<div style="padding:20px;background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;border-left:5px solid var(--saffron);text-align:center"><div style="font-size:24px">🏙️</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--saffron)">' + dlaEntries + '</div><div style="font-size:12px;color:var(--g600);font-weight:700">DOUALA</div></div>';
-    h += '<div style="padding:20px;background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;border-left:5px solid var(--purple);text-align:center"><div style="font-size:24px">🏙️</div><div style="font-family:\'Fraunces\',serif;font-size:32px;font-weight:600;color:var(--purple)">' + ydeEntries + '</div><div style="font-size:12px;color:var(--g600);font-weight:700">YAOUNDÉ</div></div>';
-    h += '</div>';
-
-    // Expert performance table (all-in-one)
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">Performance par expert — Terrain + Téléphone</h4>';
-    h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Expert</th><th>🚶 Terrain</th><th>📞 Tél</th><th>💬 WA</th><th>📱 SMS</th><th>Total</th><th>🔥 Chauds</th><th>✅ Fermés</th><th>💰 Coûts</th><th>Jours</th><th>Score</th></tr></thead><tbody>';
-    suiviRankings.forEach(function(r) {
-      var ed2 = suiviEntries.filter(function(e){return e.expert===r.expert;});
-      var vis3 = r.prosp + ed2.filter(function(e){return e.mode==='EN PERSONNE';}).length;
-      var ph3 = ed2.filter(function(e){return e.mode==='TELEPHONE';}).length;
-      var wa3 = ed2.filter(function(e){return e.mode==='WHATSAPP';}).length;
-      var sm3 = ed2.filter(function(e){return e.mode==='SMS';}).length;
-      var tot3 = vis3 + ph3 + wa3 + sm3;
-      h += '<tr><td><b>' + esc(r.expert) + '</b></td>';
-      h += '<td class="num">' + vis3 + '</td><td class="num">' + ph3 + '</td><td class="num">' + wa3 + '</td><td class="num">' + sm3 + '</td>';
-      h += '<td class="num" style="font-weight:700">' + tot3 + '</td>';
-      h += '<td class="num" style="color:var(--saffron)">' + r.hot + '</td>';
-      h += '<td class="num" style="color:var(--green)">' + r.closedCount + '</td>';
-      h += '<td class="num" style="color:var(--red)">' + fmt(r.totalCost) + '</td>';
-      h += '<td class="num">' + r.days + '</td>';
-      h += '<td class="num" style="font-weight:700">' + r.score + '</td></tr>';
-    });
-    h += '</tbody></table></div>';
-
-    // Competitive advantage metrics
-    h += '<div style="margin-top:20px;padding:20px;background:linear-gradient(135deg,var(--ink),var(--g800));border-radius:14px;color:var(--paper)">';
-    h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--saffron-bright);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Avantage compétitif NATEIVA</h4>';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">';
-    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + teamSchools.size + '</div><div style="font-size:11px;color:var(--g400)">Écoles contactées</div></div>';
-    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + allExperts.length + '</div><div style="font-size:11px;color:var(--g400)">Experts actifs</div></div>';
-    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + (teamAllContacts) + '</div><div style="font-size:11px;color:var(--g400)">Points de contact total</div></div>';
-    var avgPerSchool = teamSchools.size > 0 ? (teamAllContacts / teamSchools.size).toFixed(1) : 0;
-    h += '<div style="text-align:center"><div style="font-family:\'Fraunces\',serif;font-size:36px;font-weight:600;color:var(--saffron-bright)">' + avgPerSchool + '</div><div style="font-size:11px;color:var(--g400)">Contacts moy / école</div></div>';
-    h += '</div></div>';
-
-    h += '</div></div>';
-  }
-
-  // ====== TAB: INVITE (super admin) ======
-  if (isSuper) {
-    h += '<div class="suivi-panel" id="stab-invite"><div class="form-card"><h3>Gestion <span class="it">utilisateurs</span></h3>';
-    h += '<div class="form-grid">';
-    h += '<div class="form-field"><label>Nom complet</label><input type="text" id="invName" placeholder="Kamga Jean"></div>';
-    h += '<div class="form-field"><label>Identifiant</label><input type="text" id="invUser" placeholder="jean"></div>';
-    h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPass" placeholder="jean123"></div>';
-    h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-    h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter</button></div>';
-    h += '<table class="tbl" style="margin-top:20px"><thead><tr><th>ID</th><th>Nom</th><th>Rôle</th><th>Ville</th></tr></thead><tbody>';
-    getAllUsers().forEach(function(u) { h += '<tr><td class="mono">'+esc(u.username)+'</td><td><b>'+esc(u.fullName)+'</b></td><td>'+(isSuperAdmin(u.fullName)?'<span style="color:var(--red);font-weight:700">SUPER ADMIN</span>':'Expert')+'</td><td>'+esc(u.city)+'</td></tr>'; });
-    h += '</tbody></table></div></div>';
-  }
-
-  el.innerHTML = h;
-
-  // Bind tabs
-  el.querySelectorAll('.suivi-tab').forEach(function(tab) {
-    tab.onclick = function() { switchTab(tab.dataset.stab); };
-  });
-
-  // School select change
-  var eSel = document.getElementById('eSchool');
-  if (eSel) eSel.onchange = function() {
-    document.getElementById('eNewSchoolWrap').style.display = eSel.value === '__new__' ? '' : 'none';
-    if (eSel.value && eSel.value !== '__new__') {
-      var r = RAW.find(function(x){return x.n===eSel.value;});
-      if (r) {
-        if (document.getElementById('eContact')) document.getElementById('eContact').value = r.rn || '';
-        if (document.getElementById('ePhoneWA')) document.getElementById('ePhoneWA').value = r.pw || '';
-        if (document.getElementById('ePhoneOther')) document.getElementById('ePhoneOther').value = r.pn || '';
-        if (document.getElementById('eCity')) document.getElementById('eCity').value = r.v || 'DOUALA';
-        if (document.getElementById('eSector')) document.getElementById('eSector').value = (r.v==='YAOUNDE'?r.sy:r.sd) || '';
-        if (document.getElementById('eLoc')) document.getElementById('eLoc').value = r.lo || '';
-        if (document.getElementById('eRole')) document.getElementById('eRole').value = r.rp || '';
-        if (document.getElementById('eCat')) document.getElementById('eCat').value = r.ca || '';
-        if (r.r && document.getElementById('eRate')) document.getElementById('eRate').value = r.r;
-      }
-    }
-  };
+  // Bind dashboard tabs
+  el.querySelectorAll('.suivi-tab').forEach(function(tab){tab.onclick=function(){switchTab(tab.dataset.stab)}});
+  // School prefill
+  var eSel=document.getElementById('eSchool');
+  if(eSel)eSel.onchange=function(){document.getElementById('eNewWrap').style.display=eSel.value==='__new__'?'':'none';if(eSel.value&&eSel.value!=='__new__'){var r=RAW.find(function(x){return x.n===eSel.value});if(r){if(document.getElementById('eContact'))document.getElementById('eContact').value=r.rn||'';if(document.getElementById('ePhoneWA'))document.getElementById('ePhoneWA').value=r.pw||'';if(document.getElementById('eCity'))document.getElementById('eCity').value=r.v||'DOUALA';if(document.getElementById('eSector'))document.getElementById('eSector').value=(r.v==='YAOUNDE'?r.sy:r.sd)||'';if(document.getElementById('eRole'))document.getElementById('eRole').value=r.rp||'';if(r.r&&document.getElementById('eRate'))document.getElementById('eRate').value=r.r}}};
 }
-
-// --- Wizard button select ---
-var wizState = { entryType: '', mode: '', dealValue: '' };
-function wizSelect(btn) {
-  var field = btn.dataset.field;
-  var val = btn.dataset.val;
-  wizState[field] = val;
-  // Highlight
-  btn.parentElement.querySelectorAll('.wiz-btn[data-field="'+field+'"]').forEach(function(b) {
-    b.style.borderColor = 'var(--g200)'; b.style.background = 'var(--paper)'; b.style.color = 'var(--ink)';
-  });
-  btn.style.borderColor = 'var(--red)'; btn.style.background = 'linear-gradient(135deg, var(--red), var(--red-deep))'; btn.style.color = 'var(--paper)';
-
-  // Show/hide fields based on mode
-  var costWrap = document.getElementById('eCostWrap');
-  var durWrap = document.getElementById('eDurationWrap');
-  var ccWrap = document.getElementById('eCallCountWrap');
-  var locWrap = document.getElementById('eLocWrap');
-  if (costWrap) costWrap.style.display = wizState.mode === 'EN PERSONNE' ? '' : 'none';
-  if (durWrap) durWrap.style.display = (wizState.mode === 'TELEPHONE') ? '' : 'none';
-  if (ccWrap) ccWrap.style.display = (wizState.mode === 'TELEPHONE') ? '' : 'none';
+function prefillSch(){var s=document.getElementById('eSchool');if(s)s.dispatchEvent(new Event('change'))}
+function wizSelect(btn){var f=btn.dataset.field,v=btn.dataset.val;wizState[f]=v;btn.parentElement.querySelectorAll('.wiz-btn[data-field="'+f+'"]').forEach(function(b){b.style.borderColor='var(--g200)';b.style.background='var(--paper)';b.style.color='var(--ink)'});btn.style.borderColor='var(--red)';btn.style.background='linear-gradient(135deg,var(--red),var(--red-deep))';btn.style.color='var(--paper)';var cw=document.getElementById('eCostWrap');if(cw)cw.style.display=wizState.mode==='EN PERSONNE'?'':'none'}
+function switchView(v){document.getElementById('suiviHome').style.display=v==='home'?'':'none';document.getElementById('suiviForm').style.display=v==='form'?'':'none';document.getElementById('suiviDash').style.display=v==='dashboard'?'':'none';wizState={entryType:'',mode:'',dealValue:''}}
+function switchTab(n){var el=document.getElementById('p-suivi');el.querySelectorAll('.suivi-tab').forEach(function(t){t.classList.remove('act')});el.querySelectorAll('.suivi-panel').forEach(function(p){p.classList.remove('act')});var tab=el.querySelector('.suivi-tab[data-stab="'+n+'"]');var pan=el.querySelector('#stab-'+n);if(tab)tab.classList.add('act');if(pan)pan.classList.add('act')}
+async function submitEntry(){
+  if(!currentUser){showToast('Connectez-vous',true);return}
+  if(!wizState.entryType){showToast('Choisissez: Prospection ou Suivi',true);return}
+  if(!wizState.mode){showToast('Choisissez le mode',true);return}
+  var ss=document.getElementById('eSchool').value,school=ss==='__new__'?(document.getElementById('eNewSchool').value||'').trim():ss;
+  if(!school){showToast('Choisissez une école',true);return}
+  var d={action:'addEntry',expert:currentUser.fullName,entryType:wizState.entryType,mode:wizState.mode,school:school,schoolType:(document.getElementById('eSchoolType')||{}).value||'',city:document.getElementById('eCity').value,date:new Date().toISOString(),contact:(document.getElementById('eContact')||{}).value||'',role:(document.getElementById('eRole')||{}).value||'',phoneWA:(document.getElementById('ePhoneWA')||{}).value||'',convo:(document.getElementById('eConvo')||{}).value||'',rate:(document.getElementById('eRate')||{}).value||'',rating:(document.getElementById('eRating')||{}).value||'',status:document.getElementById('eStatus').value,dealValue:wizState.dealValue||'',cost:wizState.mode==='EN PERSONNE'?(Number((document.getElementById('eCost')||{}).value)||0):0,nextAction:(document.getElementById('eNextAction')||{}).value||'',sector:(document.getElementById('eSector')||{}).value||'',remarks:(document.getElementById('eRemarks')||{}).value||''};
+  var r=await apiPost(d);if(r.success){showToast('✅ '+(r.message||'Enregistré!'));switchView('home');rSuivi()}else{showToast(r.error||'Erreur',true)}
 }
-
-function switchTab(name) {
-  var el = document.getElementById('p-suivi');
-  el.querySelectorAll('.suivi-tab').forEach(function(t){t.classList.remove('act');});
-  el.querySelectorAll('.suivi-panel').forEach(function(p){p.classList.remove('act');});
-  var tab = el.querySelector('.suivi-tab[data-stab="'+name+'"]');
-  var panel = el.querySelector('#stab-'+name);
-  if (tab) tab.classList.add('act');
-  if (panel) panel.classList.add('act');
+async function submitInvite(){
+  var fn=(document.getElementById('invName')||{}).value||'',un=((document.getElementById('invUser')||{}).value||'').trim().toLowerCase(),pw=(document.getElementById('invPass')||{}).value||'',city=(document.getElementById('invCity')||{}).value||'DOUALA';
+  if(!fn||!un||!pw){showToast('Remplissez tout',true);return}
+  var r=await apiPost({action:'addUser',fullName:fn,username:un,password:pw,city:city,role:'Expert'});if(r.success){showToast(r.message);rSuivi()}else{showToast(r.error,true)}
 }
+// Auto-login
+if(currentUser){document.getElementById('loginOverlay').style.display='none';document.getElementById('mainApp').classList.remove('locked')}
 
-function showEntryWizard() { switchTab('entry'); var f = document.getElementById('entryForm'); if(f) f.scrollIntoView({behavior:'smooth'}); }
-
-// --- Submit entry ---
-async function submitEntry() {
-  if (!currentUser) { showToast('Connectez-vous', true); return; }
-  if (!wizState.entryType) { showToast('Choisissez: Prospection ou Suivi', true); return; }
-  if (!wizState.mode) { showToast('Choisissez le mode: En personne, Téléphone...', true); return; }
-  var schoolSel = document.getElementById('eSchool').value;
-  var school = schoolSel === '__new__' ? (document.getElementById('eNewSchool').value||'').trim() : schoolSel;
-  if (!school) { showToast('Sélectionnez une école', true); return; }
-
-  var data = {
-    action: 'addEntry',
-    expert: currentUser.fullName,
-    entryType: wizState.entryType,
-    mode: wizState.mode,
-    school: school,
-    schoolType: document.getElementById('eSchoolType') ? document.getElementById('eSchoolType').value : '',
-    category: document.getElementById('eCat') ? document.getElementById('eCat').value : '',
-    effectifs: document.getElementById('eEffectifs') ? document.getElementById('eEffectifs').value : '',
-    city: document.getElementById('eCity').value,
-    date: new Date().toISOString(),
-    contact: document.getElementById('eContact').value.trim(),
-    role: document.getElementById('eRole') ? document.getElementById('eRole').value : '',
-    phoneWA: document.getElementById('ePhoneWA') ? document.getElementById('ePhoneWA').value.trim() : '',
-    phoneOther: document.getElementById('ePhoneOther') ? document.getElementById('ePhoneOther').value.trim() : '',
-    duration: document.getElementById('eDuration') ? document.getElementById('eDuration').value : '',
-    callCount: document.getElementById('eCallCount') ? document.getElementById('eCallCount').value : '',
-    convo: document.getElementById('eConvo').value.trim(),
-    rate: document.getElementById('eRate') ? document.getElementById('eRate').value : '',
-    rating: document.getElementById('eRating') ? document.getElementById('eRating').value : '',
-    status: document.getElementById('eStatus').value,
-    dealValue: wizState.dealValue || '',
-    cost: wizState.mode === 'EN PERSONNE' ? (Number(document.getElementById('eCost').value)||0) : 0,
-    actCall: document.getElementById('actCall') && document.getElementById('actCall').checked ? 'Oui' : '',
-    actWA: document.getElementById('actWA') && document.getElementById('actWA').checked ? 'Oui' : '',
-    actSuperior: document.getElementById('actSuperior') && document.getElementById('actSuperior').checked ? 'Oui' : '',
-    actVisit: document.getElementById('actVisit') && document.getElementById('actVisit').checked ? 'Oui' : '',
-    actDoc: document.getElementById('actDoc') && document.getElementById('actDoc').checked ? 'Oui' : '',
-    actOther: document.getElementById('actOther') && document.getElementById('actOther').checked ? (document.getElementById('actOtherText').value.trim() || 'Oui') : '',
-    nextDate: document.getElementById('eNextDate').value,
-    sector: document.getElementById('eSector').value.trim(),
-    location: document.getElementById('eLoc') ? document.getElementById('eLoc').value.trim() : '',
-    remarks: document.getElementById('eRemarks') ? document.getElementById('eRemarks').value.trim() : ''
-  };
-
-  var res = await apiPost(data);
-  if (res.success) { showToast('✅ ' + (res.message||'Enregistré!')); rSuivi(); }
-  else { showToast(res.error || 'Erreur', true); }
-}
-
-async function submitInvite() {
-  var fn = document.getElementById('invName').value.trim();
-  var un = document.getElementById('invUser').value.trim().toLowerCase();
-  var pw = document.getElementById('invPass').value;
-  var city = document.getElementById('invCity').value;
-  if (!fn || !un || !pw) { showToast('Remplissez tout', true); return; }
-  var res = await apiPost({ action:'addUser', fullName:fn, username:un, password:pw, city:city, role:'Expert' });
-  if (res.success) { showToast(res.message); rSuivi(); } else { showToast(res.error, true); }
-}
-
-// Auto-login if session exists, otherwise show login
-if (currentUser) {
-  document.getElementById('loginOverlay').style.display = 'none';
-  document.getElementById('mainApp').classList.remove('locked');
-}
 rSuivi();
 renderAll();
 </script>
