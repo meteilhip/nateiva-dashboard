@@ -3633,7 +3633,21 @@ function isSA(n){return n&&SUPER_ADMINS.some(function(a){return a.toLowerCase()=
 var wizState={entryType:'',mode:'',dealValue:''};
 
 // === HELPERS ===
-function getDaysOnField(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
+function getFieldDays(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode==='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
+function getCallDays(e){var s=new Set();CALLS.forEach(function(c){if(c.e===e&&c.t)s.add(new Date(c.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode!=='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
+function getAllDays(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});CALLS.forEach(function(c){if(c.e===e&&c.t)s.add(new Date(c.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
+function getProgression(ef){
+  var byDay={},byMonth={};
+  var add=function(ds,tp){var d=new Date(ds);if(isNaN(d))return;var dk=d.toISOString().split('T')[0];var mk=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1);if(!byDay[dk])byDay[dk]={field:0,call:0,total:0,date:d};if(!byMonth[mk])byMonth[mk]={field:0,call:0,total:0,label:mk};byDay[dk][tp]++;byDay[dk].total++;byMonth[mk][tp]++;byMonth[mk].total++};
+  RAW.forEach(function(r){if((!ef||r.e===ef)&&r.t)add(r.t,'field')});
+  CALLS.forEach(function(c){if((!ef||c.e===ef)&&c.t)add(c.t,'call')});
+  suiviEntries.forEach(function(e){if((!ef||e.expert===ef)&&e.date)add(e.date,e.mode==='EN PERSONNE'?'field':'call')});
+  var days=Object.keys(byDay).sort().map(function(k){return byDay[k]});
+  var months=Object.keys(byMonth).sort().map(function(k){return byMonth[k]});
+  var cum=0;days.forEach(function(d){cum+=d.total;d.cum=cum});
+  var tF=days.reduce(function(s,d){return s+d.field},0),tC=days.reduce(function(s,d){return s+d.call},0);
+  return{days:days,months:months,nDays:days.length,nEntries:cum,avg:days.length?(cum/days.length).toFixed(1):0,tF:tF,tC:tC}
+}
 function localFB(a,p){
   if(a==='login'){var u=getAllUsers().find(function(x){return x.username===p.user&&x.password===p.pass});return u?{success:true,user:{username:u.username,fullName:u.fullName,role:u.role,city:u.city}}:{success:false,error:'Identifiants incorrects'}}
   if(a==='addEntry'){var e=Object.assign({id:'E-'+Date.now(),createdAt:new Date().toISOString()},p);delete e.action;suiviEntries.push(e);localStorage.setItem('nateiva_entries',JSON.stringify(suiviEntries));return{success:true,message:'Enregistre!'}}
@@ -3660,7 +3674,8 @@ function showToast(m,e){var t=document.getElementById('toastMsg');t.textContent=
 
 // === STATS ===
 function computeStats(name){
-  var rd=RAW.filter(function(r){return r.e===name}),ed=suiviEntries.filter(function(e){return e.expert===name}),days=getDaysOnField(name);
+  var rd=RAW.filter(function(r){return r.e===name}),ed=suiviEntries.filter(function(e){return e.expert===name});
+  var fDays=getFieldDays(name),cDays=getCallDays(name),days=getAllDays(name);
   var prosp=rd.length,hot=rd.filter(function(r){return r.r>=60}).length,avgR=rd.length?Math.round(rd.reduce(function(s,r){return s+(r.r||0)},0)/rd.length):0;
   var nP=ed.filter(function(e){return e.entryType==='prospection'}).length,fu=ed.filter(function(e){return e.entryType==='followup'}).length;
   var vis=ed.filter(function(e){return e.mode==='EN PERSONNE'}).length,ph=ed.filter(function(e){return e.mode==='TELEPHONE'}).length;
@@ -3671,7 +3686,11 @@ function computeStats(name){
   var schs=new Set();rd.forEach(function(r){if(r.n)schs.add(r.n.toUpperCase())});ed.forEach(function(e){if(e.school)schs.add(e.school.toUpperCase())});
   var cr=schs.size>0?Math.round(clC/schs.size*100):0;
   var sc=(clC*50)+(hot*15)+(fu*5)+(nP*8)+(vis*8)+(ph*5)+(wa*3)+(sm*2)+Math.round(avgR/5)-Math.floor(cost/1000)*2;
-  return{days:days,prosp:prosp,hot:hot,avgR:avgR,nP:nP,fu:fu,vis:vis,ph:ph,wa:wa,sm:sm,cost:cost,clC:clC,rev:rev,schs:schs.size,cr:cr,sc:Math.max(0,sc),tot:ed.length}
+  // Count calls from CALLS data for this expert
+  var callData=CALLS.filter(function(c){return c.e===name});
+  var callsTotal=callData.length;
+  var callsAnswered=callData.filter(function(c){return c.st==='Repondu'||c.st==='Contact etabli'}).length;
+  return{days:days,fDays:fDays,cDays:cDays,prosp:prosp,hot:hot,avgR:avgR,nP:nP,fu:fu,vis:vis,ph:ph+callsTotal,wa:wa,sm:sm,cost:cost,clC:clC,rev:rev,schs:schs.size,cr:cr,sc:Math.max(0,sc),tot:ed.length,callsTotal:callsTotal,callsAnswered:callsAnswered}
 }
 function buildRankings(){
   var seen={},ex=[];RAW.forEach(function(r){if(r.e&&!seen[r.e]){seen[r.e]=true;ex.push(r.e)}});
@@ -3701,7 +3720,7 @@ function rSuivi(){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;flex-wrap:wrap;gap:12px">';
   h+='<div style="display:flex;align-items:center;gap:14px"><div class="suivi-avatar">'+me.charAt(0).toUpperCase()+'</div>';
   h+='<div><div style="font-size:13px;color:var(--g500)">Bonjour</div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600">'+esc(me)+'</div></div></div>';
-  h+='<div style="display:flex;gap:8px;align-items:center"><div class="days-badge"><span class="days-num">'+st.days+'</span> j</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center"><div class="days-badge"><span class="days-num">'+st.fDays+'</span>🚶 <span class="days-num">'+st.cDays+'</span>📞</div>';
   h+='<button onclick="doLogout()" style="padding:8px 14px;border:1.5px solid var(--g200);border-radius:10px;background:var(--paper);font-size:11px;font-weight:700;cursor:pointer;font-family:JetBrains Mono,monospace">Déco</button></div></div>';
 
   // 2 Big action cards
@@ -3841,14 +3860,70 @@ function rSuivi(){
   h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px">📱</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.sm+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">SMS</div></div>';
   h+='</div>';
 
-  // Cost summary
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;display:flex;justify-content:space-around;text-align:center">';
-  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600;color:var(--red)">'+fmt(st.cost)+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">COÛT TOTAL</div></div>';
-  h+='<div style="width:1px;background:var(--g200)"></div>';
-  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+st.days+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">JOURS</div></div>';
-  h+='<div style="width:1px;background:var(--g200)"></div>';
-  h+='<div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+(st.days>0?(st.tot/st.days).toFixed(1):'0')+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">PAR JOUR</div></div>';
-  h+='</div></div>';
+  // Days breakdown: field vs call
+  h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center;border-top:3px solid var(--red)"><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:var(--red)">'+st.fDays+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">JOURS DESCENTE</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center;border-top:3px solid var(--teal)"><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:var(--teal)">'+st.cDays+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">JOURS APPELS</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600">'+st.days+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">JOURS TOTAL</div></div>';
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:var(--red)">'+fmt(st.cost)+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">COÛT FCFA</div></div>';
+  var prog=getProgression(sa?null:me);
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:12px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600">'+prog.avg+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">MOY/JOUR</div></div>';
+  h+='</div>';
+
+  // Progression chart by day (bar chart)
+  if(prog.days.length>1){
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:14px">';
+    h+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">📈 Progression par jour'+(sa?' (équipe)':'')+'</div>';
+    var maxD=1;prog.days.forEach(function(d){if(d.total>maxD)maxD=d.total});
+    h+='<div style="display:flex;align-items:flex-end;gap:2px;height:100px;overflow-x:auto">';
+    prog.days.forEach(function(d,i){
+      var fH=Math.max(1,Math.round(d.field/maxD*80));
+      var cH=Math.max(0,Math.round(d.call/maxD*80));
+      var dt=d.date;var lbl=(dt.getDate())+'/'+(dt.getMonth()+1);
+      h+='<div style="flex:0 0 '+(prog.days.length>20?'14px':'24px')+';display:flex;flex-direction:column;align-items:center;gap:1px">';
+      h+='<div style="font-size:7px;color:var(--g500);font-weight:700">'+d.total+'</div>';
+      if(cH>0)h+='<div style="width:100%;height:'+cH+'px;background:var(--teal);border-radius:2px 2px 0 0"></div>';
+      if(fH>0)h+='<div style="width:100%;height:'+fH+'px;background:var(--red);border-radius:'+(cH>0?'0':'2px 2px')+' 0 0"></div>';
+      h+='<div style="font-size:6px;color:var(--g400);white-space:nowrap">'+lbl+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+    h+='<div style="display:flex;gap:14px;margin-top:8px;font-size:10px;color:var(--g500)"><span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Terrain ('+prog.tF+')</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Appels ('+prog.tC+')</span></div>';
+    h+='</div>';
+  }
+
+  // Monthly progression
+  if(prog.months.length>0){
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:18px;margin-bottom:14px">';
+    h+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">📊 Progression par mois</div>';
+    var maxM=1;prog.months.forEach(function(m){if(m.total>maxM)maxM=m.total});
+    h+='<div style="display:flex;gap:10px;align-items:flex-end;height:100px">';
+    prog.months.forEach(function(m){
+      var mNames=['','Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'];
+      var parts=m.label.split('-');var mLbl=mNames[parseInt(parts[1])]||parts[1];
+      var fH2=Math.max(1,Math.round(m.field/maxM*80));
+      var cH2=Math.max(0,Math.round(m.call/maxM*80));
+      h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
+      h+='<div style="font-size:10px;font-weight:700;color:var(--ink)">'+m.total+'</div>';
+      h+='<div style="width:100%;display:flex;flex-direction:column">';
+      if(cH2>0)h+='<div style="height:'+cH2+'px;background:var(--teal);border-radius:4px 4px 0 0"></div>';
+      h+='<div style="height:'+fH2+'px;background:var(--red);border-radius:'+(cH2>0?'0':'4px 4px')+' 0 0"></div>';
+      h+='</div>';
+      h+='<div style="font-size:10px;color:var(--g500);font-weight:600">'+mLbl+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+
+    // Monthly averages
+    var avgField=prog.months.length>0?Math.round(prog.tF/prog.months.length):0;
+    var avgCall=prog.months.length>0?Math.round(prog.tC/prog.months.length):0;
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px">';
+    h+='<div style="text-align:center"><div style="font-family:Fraunces,serif;font-size:20px;font-weight:600">'+prog.avg+'</div><div style="font-size:8px;color:var(--g500);font-weight:700">MOY/JOUR ACTIF</div></div>';
+    h+='<div style="text-align:center"><div style="font-family:Fraunces,serif;font-size:20px;font-weight:600;color:var(--red)">'+avgField+'</div><div style="font-size:8px;color:var(--g500);font-weight:700">TERRAIN/MOIS</div></div>';
+    h+='<div style="text-align:center"><div style="font-family:Fraunces,serif;font-size:20px;font-weight:600;color:var(--teal)">'+avgCall+'</div><div style="font-size:8px;color:var(--g500);font-weight:700">APPELS/MOIS</div></div>';
+    h+='<div style="text-align:center"><div style="font-family:Fraunces,serif;font-size:20px;font-weight:600">'+prog.nEntries+'</div><div style="font-size:8px;color:var(--g500);font-weight:700">TOTAL ENTRÉES</div></div>';
+    h+='</div></div>';
+  }
 
   // === TAB: HISTORY ===
   h+='<div class="suivi-panel" id="stab-history"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
@@ -3875,8 +3950,8 @@ function rSuivi(){
     var isMe=r.expert===me;
     h+='<div class="rank-card '+(isMe?'me':'')+'"><div class="rank-pos">'+r.rank+'</div>';
     h+='<div class="rank-info"><div class="rk-name">'+esc(r.expert)+(isMe?' (vous)':'')+'</div>';
-    if(sa)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.clC+' fermés</span><span>'+r.cr+'% closing</span><span>'+r.days+'j</span></div>';
-    else if(isMe)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.clC+' fermés</span><span>'+r.days+'j</span></div>';
+    if(sa)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.callsTotal+' appels</span><span>'+r.clC+' fermés</span><span>'+r.fDays+'j🚶</span><span>'+r.cDays+'j📞</span></div>';
+    else if(isMe)h+='<div class="rk-meta"><span>'+r.prosp+' prosp</span><span>'+r.callsTotal+' appels</span><span>'+r.fDays+'j🚶 '+r.cDays+'j📞</span></div>';
     h+='</div><div class="rank-score">'+r.sc+'<small>pts</small></div></div>';
   });
   h+='</div></div>';
