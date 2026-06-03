@@ -3478,25 +3478,87 @@ function rSuivi(){
 
   // === SUPER ADMIN TABS ===
   if(sa){
-    // PHONE STATS
+    // PHONE STATS — detailed
     h+='<div class="suivi-panel" id="stab-phone"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
     h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Appels Téléphoniques</h3>';
-    var tC=CALLS.length,ans=CALLS.filter(function(c){return c.st==="Repondu"}).length,noA=CALLS.filter(function(c){return c.st==="Pas de reponse"}).length;
-    var aR=tC>0?Math.round(ans/tC*100):0,tDur=CALLS.reduce(function(s,c){return s+(c.du||0)},0),avgD=ans>0?(tDur/ans).toFixed(1):0;
-    var nRC=CALLS.filter(function(c){return c.a1==="Oui"}).length,nWA=CALLS.filter(function(c){return c.a2==="Oui"}).length,nVis=CALLS.filter(function(c){return c.a4==="Oui"}).length;
+    var tC=CALLS.length;
+    var ans=CALLS.filter(function(c){return c.st==='Repondu'}).length;
+    var noA=CALLS.filter(function(c){return c.st==='Pas de reponse'}).length;
+    var msgL=CALLS.filter(function(c){return c.st==='Message laisse'}).length;
+    var inj=CALLS.filter(function(c){return c.st==='Injoignable'}).length;
+    var aR=tC>0?Math.round(ans/tC*100):0;
+    var tDur=CALLS.reduce(function(s,c){return s+(c.du||0)},0);
+    var avgD=ans>0?(tDur/ans).toFixed(1):0;
+    var nRC=CALLS.filter(function(c){return c.a1==='Oui'}).length;
+    var nWA=CALLS.filter(function(c){return c.a2==='Oui'}).length;
+    var nVis=CALLS.filter(function(c){return c.a4==='Oui'}).length;
+    var nSup=CALLS.filter(function(c){return c.a3==='Oui'}).length;
+    var uniqueSchools=new Set();CALLS.forEach(function(c){uniqueSchools.add(c.n)});
+    var uniqueContacts=CALLS.filter(function(c){return c.cn}).length;
+    var avgRating=0;var ratedCalls=CALLS.filter(function(c){return c.ra>0});if(ratedCalls.length)avgRating=(ratedCalls.reduce(function(s,c){return s+c.ra},0)/ratedCalls.length).toFixed(1);
+
+    // KPI Row 1: Call outcomes
+    h+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Résultats des appels</div>';
     h+='<div class="suivi-kpis">';
     h+='<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-val">'+tC+'</div><div class="sk-lbl">Total appels</div></div>';
     h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val" style="color:var(--green)">'+ans+'</div><div class="sk-lbl">Répondu ('+aR+'%)</div></div>';
     h+='<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val" style="color:var(--red)">'+noA+'</div><div class="sk-lbl">Sans réponse</div></div>';
-    h+='<div class="suivi-kpi"><div class="sk-val">'+avgD+'<small>m</small></div><div class="sk-lbl">Durée moy.</div></div>';
-    h+='<div class="suivi-kpi"><div class="sk-val">'+nRC+'</div><div class="sk-lbl">📞 À rappeler</div></div>';
-    h+='<div class="suivi-kpi"><div class="sk-val">'+nWA+'</div><div class="sk-lbl">💬 Doc WA</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+msgL+'</div><div class="sk-lbl">Message laissé</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+inj+'</div><div class="sk-lbl">Injoignable</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+uniqueSchools.size+'</div><div class="sk-lbl">Écoles contactées</div></div>';
     h+='</div>';
-    // Per expert
-    var cByE={};CALLS.forEach(function(c){if(!cByE[c.e])cByE[c.e]={t:0,a:0,d:0};cByE[c.e].t++;if(c.st==='Repondu'){cByE[c.e].a++;cByE[c.e].d+=c.du||0}});
-    h+='<table class="tbl" style="margin-top:14px"><thead><tr><th>Expert</th><th>Appels</th><th>Répondu</th><th>Taux</th><th>Durée</th></tr></thead><tbody>';
-    Object.keys(cByE).forEach(function(e){var c=cByE[e];h+='<tr><td><b>'+esc(e)+'</b></td><td class="num">'+c.t+'</td><td class="num">'+c.a+'</td><td>'+pct(c.t>0?Math.round(c.a/c.t*100):0)+'</td><td class="num">'+c.d.toFixed(1)+'m</td></tr>'});
-    h+='</tbody></table></div></div>';
+
+    // KPI Row 2: Qualité & Actions
+    h+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px">Qualité & actions demandées</div>';
+    h+='<div class="suivi-kpis">';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+avgD+'<small>m</small></div><div class="sk-lbl">Durée moy. appel</div></div>';
+    h+='<div class="suivi-kpi"><div class="sk-val">'+avgRating+'<small>/5</small></div><div class="sk-lbl">Note collaboration</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--teal)"><div class="sk-val">'+nRC+'</div><div class="sk-lbl">📞 2nd appel</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-val">'+nWA+'</div><div class="sk-lbl">💬 Doc WhatsApp</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-val">'+nSup+'</div><div class="sk-lbl">📤 Transmettre sup.</div></div>';
+    h+='<div class="suivi-kpi" style="border-top:3px solid var(--red)"><div class="sk-val">'+nVis+'</div><div class="sk-lbl">🚶 Visite demandée</div></div>';
+    h+='</div>';
+
+    // Contact type breakdown — who did they talk to?
+    var contactRoles={};CALLS.forEach(function(c){if(c.cn){var role=c.cn.toLowerCase();if(role.match(/direct/))contactRoles['Directeur']=(contactRoles['Directeur']||0)+1;else if(role.match(/princ/))contactRoles['Principal']=(contactRoles['Principal']||0)+1;else if(role.match(/fond/))contactRoles['Fondateur']=(contactRoles['Fondateur']||0)+1;else if(role.match(/secret/))contactRoles['Secrétaire']=(contactRoles['Secrétaire']||0)+1;else contactRoles['Autre']=(contactRoles['Autre']||0)+1}});
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0">';
+    // Left: Who they talked to
+    h+='<div style="background:var(--bg);border-radius:14px;padding:18px"><div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">Contacts joints par rôle</div>';
+    Object.keys(contactRoles).sort(function(a,b){return contactRoles[b]-contactRoles[a]}).forEach(function(role){
+      var pctW=Math.round(contactRoles[role]/uniqueContacts*100);
+      h+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+esc(role)+'</span><b>'+contactRoles[role]+'</b></div>';
+      h+='<div style="height:6px;background:var(--g200);border-radius:3px"><div style="height:100%;width:'+pctW+'%;background:var(--teal);border-radius:3px"></div></div></div>';
+    });
+    h+='</div>';
+    // Right: Outcome funnel
+    h+='<div style="background:var(--bg);border-radius:14px;padding:18px"><div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">Entonnoir de conversion</div>';
+    var funnel=[{n:'Appels passés',v:tC,c:'var(--ink)'},{n:'Répondu',v:ans,c:'var(--teal)'},{n:'2nd appel prévu',v:nRC,c:'var(--saffron)'},{n:'Doc WA envoyé',v:nWA,c:'var(--green)'},{n:'Visite planifiée',v:nVis,c:'var(--red)'}];
+    funnel.forEach(function(f){
+      var w=tC>0?Math.max(15,Math.round(f.v/tC*100)):0;
+      h+='<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px"><div style="width:'+w+'%;min-width:40px;padding:6px 10px;background:'+f.c+';color:var(--paper);border-radius:6px;font-size:11px;font-weight:700;text-align:center">'+f.v+'</div><span style="font-size:11px;color:var(--g600)">'+f.n+'</span></div>';
+    });
+    h+='</div></div>';
+
+    // Per expert table — detailed
+    h+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px">Performance par expert</div>';
+    var cByE={};CALLS.forEach(function(c){if(!cByE[c.e])cByE[c.e]={t:0,a:0,na:0,d:0,rc:0,wa:0,vis:0,schs:new Set()};cByE[c.e].t++;cByE[c.e].schs.add(c.n);if(c.st==='Repondu'){cByE[c.e].a++;cByE[c.e].d+=c.du||0}else{cByE[c.e].na++}if(c.a1==='Oui')cByE[c.e].rc++;if(c.a2==='Oui')cByE[c.e].wa++;if(c.a4==='Oui')cByE[c.e].vis++});
+    h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Expert</th><th>Appels</th><th>✅ Rép.</th><th>❌ Non</th><th>Taux</th><th>⏱️ Durée</th><th>📞 Rappel</th><th>💬 WA</th><th>🚶 Visite</th><th>🏫 Écoles</th></tr></thead><tbody>';
+    Object.keys(cByE).sort(function(a,b){return cByE[b].t-cByE[a].t}).forEach(function(e){var c=cByE[e];var ar2=c.t>0?Math.round(c.a/c.t*100):0;
+      h+='<tr><td><b>'+esc(e)+'</b></td><td class="num">'+c.t+'</td><td class="num" style="color:var(--green)">'+c.a+'</td><td class="num" style="color:var(--red)">'+c.na+'</td><td>'+pct(ar2)+'</td>';
+      h+='<td class="num">'+c.d.toFixed(1)+'m</td><td class="num">'+c.rc+'</td><td class="num">'+c.wa+'</td><td class="num">'+c.vis+'</td><td class="num">'+c.schs.size+'</td></tr>'});
+    h+='</tbody></table></div>';
+
+    // Schools needing action — grouped
+    h+='<div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px">⚠️ Écoles nécessitant une action</div>';
+    var actSchools={};CALLS.forEach(function(c){var acts=[];if(c.a1==='Oui')acts.push('📞');if(c.a2==='Oui')acts.push('💬');if(c.a3==='Oui')acts.push('📤');if(c.a4==='Oui')acts.push('🚶');if(acts.length&&!actSchools[c.n])actSchools[c.n]={expert:c.e,contact:c.cn||'',phone:c.ph,acts:acts}});
+    Object.keys(actSchools).forEach(function(s){var a=actSchools[s];
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--g100)">';
+      h+='<span style="font-size:16px">'+a.acts.join('')+'</span>';
+      h+='<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s)+'</div>';
+      h+='<div style="font-size:10px;color:var(--g500)">'+esc(a.expert)+' · '+esc(a.contact)+'</div></div>';
+      if(a.phone&&a.phone!=='0')h+='<a href="tel:'+a.phone+'" style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--teal);font-weight:700;text-decoration:none">'+esc(a.phone)+'</a>';
+      h+='</div>'});
+    h+='</div></div>';
 
     // NLP
     h+='<div class="suivi-panel" id="stab-nlp"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
