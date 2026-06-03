@@ -1159,8 +1159,9 @@ body{
   cursor:pointer;box-shadow:var(--shadow-red);transition:all .25s;
 }
 .not-logged-in button:hover{transform:translateY(-2px)}
-.app.locked{filter:blur(12px);pointer-events:none;user-select:none}
+.app.locked .hero,.app.locked .nav-main,.app.locked .filters,.app.locked .pane,.app.locked .footer{filter:blur(12px);pointer-events:none;user-select:none}
 .login-overlay .login-close{display:none}
+.login-overlay{z-index:9999}
 
 /* MOBILE-FIRST UX */
 @media(max-width:600px){
