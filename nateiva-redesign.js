@@ -21,6 +21,7 @@
     prospectionSheet: IMPORTED_DATA.sources?.prospectionSheet || "https://docs.google.com/spreadsheets/d/1Ng5N2LhCA6_4AScc9HmJASMsd3Br1siPwPX6spgJMu0/edit?resourcekey=&gid=1811644632#gid=1811644632",
     callsSheet: IMPORTED_DATA.sources?.callsSheet || "https://docs.google.com/spreadsheets/d/1SuXKmpD6I8XOUqi1sw8SD_osBT0zPjGTyLVux5DNOMI/edit?resourcekey=&gid=559073092#gid=559073092"
   };
+  const PUBLIC_DASHBOARD_URL = "https://meteilhip.github.io/nateiva-dashboard/";
   const SOURCE_COUNTS = {
     prospection: Number(IMPORTED_DATA.prospectionCount) || (Array.isArray(IMPORTED_DATA.prospection) ? IMPORTED_DATA.prospection.length : 0),
     calls: Number(IMPORTED_DATA.callCount) || (Array.isArray(IMPORTED_DATA.calls) ? IMPORTED_DATA.calls.length : 0)
@@ -206,6 +207,10 @@
   function phoneHref(phone) {
     const digits = String(phone || "").replace(/[^\d+]/g, "");
     return digits ? `tel:${digits}` : "";
+  }
+
+  function hasSharedBackend() {
+    return typeof window.APPS_SCRIPT_URL === "string" && window.APPS_SCRIPT_URL !== "YOUR_APPS_SCRIPT_URL_HERE";
   }
 
   function activeDayKey(value) {
@@ -799,6 +804,8 @@
         callInputs: SOURCE_COUNTS.calls || followups.filter((item) => item.FollowupType === "CALL").length,
         sourceLinks: SOURCE_LINKS
       },
+      backendShared: hasSharedBackend(),
+      publicUrl: PUBLIC_DASHBOARD_URL,
       expertVelocity,
       agentProgress: scope === "combined" ? buildAgentProgress(rawRows, followups) : [],
       glossary: GLOSSARY_ITEMS,
@@ -1208,6 +1215,13 @@
             <article class="ntv-stat-card"><strong>${num(COMPETITOR_DATA.length)}</strong><span>Competiteurs traces</span></article>
           </div>
           <div class="ntv-login-note">Vue combinee reservee a Noah, Guy et Mbeuka. Tous les autres experts voient uniquement leurs propres donnees.</div>
+          <div class="ntv-user-card" style="margin-top:18px">
+            <span class="ntv-kicker">Lien de connexion en ligne</span>
+            <strong>Acces public experts</strong>
+            <p>Tous les experts presents et futurs se connecteront ici pour ouvrir leur compte en ligne.</p>
+            <a class="ntv-link-pill" href="${attr(PUBLIC_DASHBOARD_URL)}" target="_blank" rel="noreferrer">${escapeHtml(PUBLIC_DASHBOARD_URL)} ↗</a>
+            <small>${hasSharedBackend() ? "Backend partage actif: les comptes et suivis peuvent etre centralises." : "Backend partage non branche: le lien public existe, mais les nouveaux comptes centralises demandent encore la liaison Apps Script."}</small>
+          </div>
         </div>
         <form class="ntv-login-card" id="ntv-login-form">
           <div class="ntv-card-top">
@@ -1836,6 +1850,12 @@
             <div class="ntv-allowed-list">
               ${allowed.map((name) => `<span>${escapeHtml(name)}</span>`).join("")}
             </div>
+          </article>
+          <article class="ntv-user-card">
+            <span class="ntv-kicker">Acces en ligne</span>
+            <strong>URL de connexion unique</strong>
+            <p>${dashboard.backendShared ? "Le backend partage est actif: les comptes peuvent etre centralises pour tous les experts." : "Le site est en ligne, mais il faut brancher l'Apps Script partage pour que les futurs comptes soient centralises entre appareils."}</p>
+            <a class="ntv-link-pill" href="${attr(dashboard.publicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(dashboard.publicUrl)} ↗</a>
           </article>
         </div>
       </section>
