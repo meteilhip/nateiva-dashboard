@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NATEIVA · Sales Intelligence · v8.0</title>
+<title>Nateiva Sale Analytic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Fraunces:opsz,wght,SOFT@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1159,6 +1159,116 @@ body{
   cursor:pointer;box-shadow:var(--shadow-red);transition:all .25s;
 }
 .not-logged-in button:hover{transform:translateY(-2px)}
+.analytics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px}
+.stage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+.stage-card{
+  background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:18px 18px 16px;
+  box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden
+}
+.stage-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.stage-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--red),var(--saffron))}
+.stage-card.green::before{background:linear-gradient(180deg,var(--green),var(--green-bright))}
+.stage-card.teal::before{background:linear-gradient(180deg,var(--teal-deep),var(--teal-bright))}
+.stage-card.saffron::before{background:linear-gradient(180deg,var(--saffron-deep),var(--saffron))}
+.stage-card.dark::before{background:linear-gradient(180deg,var(--ink),var(--g700))}
+.stage-card.gray::before{background:linear-gradient(180deg,var(--g500),var(--g300))}
+.stage-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.stage-top .name{font-size:13px;font-weight:700;color:var(--ink)}
+.stage-top .name small{display:block;margin-top:4px;font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace;font-weight:500}
+.stage-top .ct{font-family:'Fraunces',serif;font-size:34px;line-height:1;color:var(--ink)}
+.stage-track{height:10px;border-radius:999px;background:var(--g100);overflow:hidden;margin:14px 0 10px}
+.stage-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--red),var(--saffron))}
+.stage-card.green .stage-track span{background:linear-gradient(90deg,var(--green),var(--green-bright))}
+.stage-card.teal .stage-track span{background:linear-gradient(90deg,var(--teal-deep),var(--teal-bright))}
+.stage-card.saffron .stage-track span{background:linear-gradient(90deg,var(--saffron-deep),var(--saffron))}
+.stage-card.dark .stage-track span{background:linear-gradient(90deg,var(--ink),var(--g700))}
+.stage-card.gray .stage-track span{background:linear-gradient(90deg,var(--g500),var(--g300))}
+.stage-foot{display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g600);font-weight:700}
+.revenue-card{min-height:210px}
+.legend-row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 18px}
+.legend-pill{
+  display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
+  background:var(--paper);border:1px solid var(--g200);font-size:12px;font-weight:700;color:var(--g700)
+}
+.legend-pill i{width:10px;height:10px;border-radius:999px;display:inline-block}
+.legend-pill .terrain{background:var(--red)}
+.legend-pill .calls{background:var(--teal)}
+.legend-pill .hot{background:var(--green)}
+.week-chart{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:12px;align-items:end;
+  min-height:260px;padding:18px;border-radius:18px;background:linear-gradient(180deg,var(--bg-warm),var(--paper));
+  border:1px solid var(--g200)
+}
+.week-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-height:224px}
+.week-delta{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700}
+.week-delta.up{color:var(--green)}
+.week-delta.down{color:var(--red)}
+.week-stack{
+  width:38px;height:170px;border-radius:14px;background:var(--g100);position:relative;overflow:hidden;
+  display:flex;align-items:flex-end;justify-content:center;box-shadow:inset 0 0 0 1px rgba(27,30,36,.04)
+}
+.week-stack .terrain{
+  position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,var(--red),var(--red-deep));border-radius:14px 14px 0 0
+}
+.week-stack .calls{
+  position:absolute;left:0;right:0;background:linear-gradient(180deg,var(--teal),var(--teal-deep))
+}
+.week-meta{text-align:center}
+.week-meta strong{display:block;font-family:'Fraunces',serif;font-size:24px;color:var(--ink);line-height:1.1}
+.week-meta span{display:block;margin-top:4px;font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace}
+.compare-card{
+  border-radius:18px;padding:20px 22px;color:var(--paper);box-shadow:var(--shadow);margin-top:16px
+}
+.compare-card.up{background:linear-gradient(135deg,var(--green),var(--green-bright))}
+.compare-card.down{background:linear-gradient(135deg,var(--red),var(--red-deep))}
+.compare-card .top{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.compare-card .badge{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+.compare-card .value{font-family:'Fraunces',serif;font-size:48px;line-height:1}
+.compare-card .meta{margin-top:10px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.94)}
+.school-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.school-stage{
+  background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm)
+}
+.school-stage h3{font-family:'Fraunces',serif;font-size:24px;color:var(--ink);margin-bottom:6px}
+.school-stage .sub{font-size:12px;color:var(--g500);font-family:'JetBrains Mono',monospace;margin-bottom:16px}
+.school-list{display:flex;flex-direction:column;gap:10px}
+.school-item{
+  border:1px solid var(--g100);border-radius:14px;padding:14px;background:linear-gradient(180deg,var(--paper),var(--bg-warm))
+}
+.school-item-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+.school-item-head strong{font-size:14px;color:var(--ink)}
+.school-item-meta{font-size:12px;color:var(--g600);line-height:1.65}
+.school-item-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px}
+.school-item-actions a,.source-link{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border-radius:999px;text-decoration:none;
+  color:var(--paper);background:linear-gradient(135deg,var(--teal),var(--teal-deep));font-size:12px;font-weight:700
+}
+.school-item-actions .expert{font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace}
+.empty-mini{
+  padding:14px;border:1px dashed var(--g300);border-radius:12px;background:var(--bg-warm);font-size:12px;color:var(--g500)
+}
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.agent-card{
+  background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm)
+}
+.agent-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}
+.agent-head strong{font-size:15px;color:var(--ink)}
+.trend-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700
+}
+.trend-chip.up{background:var(--green-soft);color:var(--green)}
+.trend-chip.down{background:var(--red-soft);color:var(--red)}
+.trend-chip.flat{background:var(--bg-warm);color:var(--g600)}
+.mini-chart{display:flex;align-items:flex-end;gap:6px;height:84px;margin-bottom:14px}
+.mini-chart span{flex:1;border-radius:999px 999px 0 0;background:linear-gradient(180deg,var(--red),var(--saffron));min-height:12px}
+.agent-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;font-size:12px;color:var(--g600)}
+.agent-meta b{display:block;color:var(--ink);font-size:16px;font-family:'Fraunces',serif}
+.summary-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.summary-tags span{
+  display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:var(--paper);
+  border:1px solid var(--g200);font-size:12px;font-weight:700;color:var(--g700)
+}
 </style>
 </head>
 <body>
@@ -1168,13 +1278,13 @@ body{
 <header class="hero">
   <div class="hero-content">
     <div class="brand">
-      <span class="eyebrow">🇨🇲 Sales Intelligence Platform · v9.0</span>
+      <span class="eyebrow">🇨🇲 Nateiva Sale Analytic · v9.1</span>
       <h1>NATEIVA<span class="accent">.</span></h1>
-      <div class="sub">Plateforme d'intelligence commerciale pour <b>NATEIVA SCHOOL</b> · Build · Learn · Earn — Prospection des écoles privées du Cameroun. Bureaux <b>Yaoundé (Mimboman)</b> et <b>Douala (Bonabéri, face Saker)</b>.</div>
+      <div class="sub"><b>Nateiva Sale Analytic</b> centralise le tracking commercial NATEIVA SCHOOL: prospection, appels, pipeline, KPI, BI, NLP, concurrents, playbook et progression par zone, ville et expert.</div>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v9.0 · MARKET INTEL</span>
-      <span class="meta-pill saffron">30 MAI 2026</span>
+      <span class="meta-pill red">v9.1 · KPI + BI</span>
+      <span class="meta-pill saffron">04 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
       <span style="margin-top:8px;font-weight:600">408 prospections · 105 appels · 8 sections</span>
     </div>
@@ -1185,13 +1295,13 @@ body{
 <nav class="nav-main">
   <button class="nav-btn act" data-pane="home">
     <span class="nav-icon">🏠</span>
-    <span class="nav-label">Accueil</span>
-    <span class="nav-desc">Vue rapide</span>
+    <span class="nav-label">Dashboard</span>
+    <span class="nav-desc">KPI & Progression</span>
   </button>
   <button class="nav-btn" data-pane="metrics">
     <span class="nav-icon">📊</span>
-    <span class="nav-label">Métriques</span>
-    <span class="nav-desc">Tout comprendre</span>
+    <span class="nav-label">BI & KPI</span>
+    <span class="nav-desc">Formules & Sources</span>
   </button>
   <button class="nav-btn" data-pane="team">
     <span class="nav-icon">👥</span>
@@ -1210,8 +1320,8 @@ body{
   </button>
   <button class="nav-btn" data-pane="intel">
     <span class="nav-icon">🧠</span>
-    <span class="nav-label">Intelligence</span>
-    <span class="nav-desc">Signaux & Contacts</span>
+    <span class="nav-label">NLP</span>
+    <span class="nav-desc">Insights & Contacts</span>
   </button>
   <button class="nav-btn" data-pane="glossary">
     <span class="nav-icon">📖</span>
@@ -1220,8 +1330,8 @@ body{
   </button>
   <button class="nav-btn" data-pane="suivi">
     <span class="nav-icon">📋</span>
-    <span class="nav-label">Suivi</span>
-    <span class="nav-desc">Follow-up & Login</span>
+    <span class="nav-label">Workspace</span>
+    <span class="nav-desc">New Entry · Follow Up</span>
   </button>
 </nav>
 
@@ -1286,7 +1396,7 @@ body{
 <div id="toastMsg" class="toast"></div>
 
 <footer class="footer">
-  <span>NATEIVA · Sales Intelligence v9 · Build · Learn · Earn · 2026</span>
+  <span>NATEIVA · Nateiva Sale Analytic · Build · Learn · Earn · 2026</span>
   <span>Conçu pour le Cameroun, avec respect</span>
 </footer>
 </div>
@@ -1338,6 +1448,462 @@ function countDistinctDays(rows,key){
     if(day)days.add(day);
   });
   return days.size;
+}
+
+function attrEsc(value){
+  return esc(String(value||'')).replace(/'/g,'&#39;');
+}
+function schoolKey(value){ return normalizeText(value); }
+function phoneHref(value){
+  const clean=digitsOnly(value);
+  return clean ? 'tel:'+clean : '';
+}
+function moneyFCFA(value){
+  return fmt(Math.round(Number(value)||0))+' FCFA';
+}
+function moneyCompact(value){
+  const amount=Math.round(Number(value)||0);
+  if(amount>=1000000)return (amount/1000000).toFixed(2).replace(/\.00$/,'')+'M FCFA';
+  if(amount>=1000)return fmt(Math.round(amount/1000))+'k FCFA';
+  return fmt(amount)+' FCFA';
+}
+function weekStartDate(value){
+  const base=value instanceof Date ? new Date(value) : parseEntryDate(value);
+  if(!base || Number.isNaN(base.getTime())) return null;
+  const d=new Date(base);
+  d.setHours(0,0,0,0);
+  const day=d.getDay();
+  const diff=day===0?-6:1-day;
+  d.setDate(d.getDate()+diff);
+  return d;
+}
+function weekKey(value){
+  const d=weekStartDate(value);
+  if(!d)return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function weekLabel(value){
+  const d=weekStartDate(value);
+  if(!d)return '—';
+  return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+}
+
+const DASHBOARD_STAGES=[
+  {key:'gagne',label:'🏆 Gagnés',desc:'Deals signés',color:'green'},
+  {key:'chaud',label:'🔥 Chauds',desc:'Prêts à closer',color:'red'},
+  {key:'tiede',label:'🟠 Tièdes',desc:'À relancer',color:'saffron'},
+  {key:'froid',label:'🔵 Froids',desc:'À réchauffer',color:'teal'},
+  {key:'nouveau',label:'🆕 Nouveau',desc:'À qualifier',color:'dark'},
+  {key:'perdu',label:'⛔ Perdus',desc:'Refus ou abandon',color:'gray'}
+];
+
+function getDashboardScope(){
+  const rawRows=gF();
+  const allowed=new Set(rawRows.map(r=>schoolKey(r.n)).filter(Boolean));
+  const followups=getVisibleFollowups().filter(function(item){
+    if(!allowed.size) return false;
+    if(ST.city && item.City && item.City!==ST.city) return false;
+    if(ST.expert && item.Expert && !samePerson(item.Expert,ST.expert)) return false;
+    const key=schoolKey(item.SchoolName);
+    return key ? allowed.has(key) : false;
+  });
+  return {rawRows,followups};
+}
+
+function buildSchoolRecords(rawRows, followups){
+  const map=new Map();
+  function ensure(name){
+    const key=schoolKey(name);
+    if(!key)return null;
+    if(!map.has(key)){
+      map.set(key,{
+        key,
+        schoolName:name||'Sans nom',
+        city:'',
+        zone:'',
+        standing:'',
+        type:'',
+        expert:'',
+        contactName:'',
+        phone:'',
+        rate:null,
+        effectif:0,
+        rawCount:0,
+        visitCount:0,
+        callCount:0,
+        followupCount:0,
+        lastTouch:null,
+        won:false,
+        lost:false,
+        closedAt:null,
+        closedBy:'',
+        closeContact:'',
+        closeStatus:'',
+        notes:'',
+        _phones:new Set(),
+        _contacts:new Set(),
+        _experts:new Set()
+      });
+    }
+    return map.get(key);
+  }
+
+  rawRows.forEach(function(r){
+    const rec=ensure(r.n);
+    if(!rec)return;
+    rec.rawCount++;
+    rec.schoolName=r.n||rec.schoolName;
+    rec.city=r.v||rec.city;
+    rec.zone=zoneLabel(r)||rec.zone;
+    rec.standing=r.ca||rec.standing;
+    rec.type=r.ty||rec.type;
+    if(r.e){rec.expert=rec.expert||r.e;rec._experts.add(r.e);}
+    if(r.rn){rec.contactName=rec.contactName||r.rn;rec._contacts.add(r.rn);}
+    [r.pw,r.pn].forEach(function(phone){
+      const clean=digitsOnly(phone);
+      if(clean){rec.phone=rec.phone||clean;rec._phones.add(clean);}
+    });
+    const effectif=parseInt(String(r.ef||'').replace(/\D/g,''),10);
+    if(Number.isFinite(effectif))rec.effectif=Math.max(rec.effectif,effectif);
+    const dt=parseEntryDate(r.t);
+    if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
+      rec.lastTouch=dt;
+      if(typeof r.r==='number')rec.rate=r.r;
+      if(r.rn)rec.contactName=r.rn;
+      if(r.e)rec.expert=r.e;
+      rec.notes=[r.co||'',r.re||''].filter(Boolean).join(' · ');
+    }else if(rec.rate==null && typeof r.r==='number'){
+      rec.rate=r.r;
+    }
+    const note=normalizeText((r.co||'')+' '+(r.re||''));
+    if(/pas interesse|pas interresse|refus|abandon|perdu/.test(note))rec.lost=true;
+  });
+
+  followups.forEach(function(item){
+    const rec=ensure(item.SchoolName);
+    if(!rec)return;
+    rec.followupCount++;
+    rec.schoolName=item.SchoolName||rec.schoolName;
+    rec.city=item.City||rec.city;
+    rec.zone=item.Sector||rec.zone;
+    if(item.Expert){rec.expert=rec.expert||item.Expert;rec._experts.add(item.Expert);}
+    if(item.ContactName){rec.contactName=rec.contactName||item.ContactName;rec._contacts.add(item.ContactName);}
+    const cleanPhone=digitsOnly(item.ContactPhone);
+    if(cleanPhone){rec.phone=rec.phone||cleanPhone;rec._phones.add(cleanPhone);}
+    if(item.FollowupType==='CALL')rec.callCount++;
+    if(item.FollowupType==='VISIT')rec.visitCount++;
+    const dt=parseEntryDate(item.Timestamp);
+    if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
+      rec.lastTouch=dt;
+      rec.notes=[item.Outcome||'',item.Status||'',item.Notes||'',item.NextAction||''].filter(Boolean).join(' · ');
+    }
+    const note=normalizeText([item.Outcome,item.Status,item.Notes,item.NextAction].join(' '));
+    if(/clos|closed|converti|gagn|signe|sign|paid|paye/.test(note)){
+      rec.won=true;
+      if(dt && (!rec.closedAt || dt>rec.closedAt))rec.closedAt=dt;
+      rec.closedBy=item.Expert || rec.closedBy || rec.expert;
+      rec.closeContact=item.ContactName || rec.closeContact || rec.contactName;
+      rec.closeStatus=[item.Status||item.Outcome||'Deal clos', item.Notes||item.NextAction||''].filter(Boolean).join(' · ');
+    }
+    if(/pas interesse|pas interresse|refus|abandon|perdu/.test(note))rec.lost=true;
+  });
+
+  return Array.from(map.values()).map(function(rec){
+    if(!rec.contactName && rec._contacts.size)rec.contactName=Array.from(rec._contacts)[0];
+    if(!rec.phone && rec._phones.size)rec.phone=Array.from(rec._phones)[0];
+    if(!rec.expert && rec._experts.size)rec.expert=Array.from(rec._experts)[0];
+    if(!rec.closeContact)rec.closeContact=rec.contactName;
+    if(!rec.closedBy)rec.closedBy=rec.expert;
+    if(!rec.closeStatus && rec.won)rec.closeStatus='Deal clos dans les suivis';
+    if(rec.won)rec.stage='gagne';
+    else if(rec.lost)rec.stage='perdu';
+    else if(rec.rate==null)rec.stage='nouveau';
+    else if(rec.rate>=60)rec.stage='chaud';
+    else if(rec.rate>=40)rec.stage='tiede';
+    else rec.stage='froid';
+    rec.amount=rec.stage==='gagne' ? 60000 : (rec.rate!=null ? Math.round(60000*(rec.rate/100)) : 0);
+    return rec;
+  }).sort(function(a,b){
+    const timeA=a.lastTouch ? a.lastTouch.getTime() : 0;
+    const timeB=b.lastTouch ? b.lastTouch.getTime() : 0;
+    if(timeB!==timeA)return timeB-timeA;
+    return (b.rate||0)-(a.rate||0);
+  });
+}
+
+function buildStageTotals(records){
+  const total=records.length||1;
+  return DASHBOARD_STAGES.map(function(stage){
+    const schools=records.filter(function(record){ return record.stage===stage.key; });
+    const amount=schools.reduce(function(sum,record){ return sum+(record.amount||0); },0);
+    return Object.assign({},stage,{
+      schools,
+      count:schools.length,
+      percent:schools.length ? Math.round((schools.length/total)*100) : 0,
+      amount
+    });
+  });
+}
+
+function buildWeeklySeries(rawRows, followups, weeksBack){
+  const currentWeek=weekStartDate(new Date());
+  const weeks=[];
+  for(let i=weeksBack-1;i>=0;i--){
+    const start=new Date(currentWeek);
+    start.setDate(start.getDate()-(i*7));
+    weeks.push({
+      key:weekKey(start),
+      label:weekLabel(start),
+      terrain:0,
+      calls:0,
+      hotKeys:new Set(),
+      schoolKeys:new Set(),
+      activeDays:new Set(),
+      total:0,
+      delta:0,
+      hot:0,
+      schools:0,
+      velocity:0
+    });
+  }
+  const weekMap=new Map(weeks.map(function(week){ return [week.key,week]; }));
+
+  rawRows.forEach(function(row){
+    const key=weekKey(row.t);
+    const bucket=weekMap.get(key);
+    if(!bucket)return;
+    bucket.terrain++;
+    const day=activeDayKey(row.t);
+    if(day)bucket.activeDays.add(day);
+    const school=schoolKey(row.n);
+    if(school)bucket.schoolKeys.add(school);
+    if(typeof row.r==='number' && row.r>=60 && school)bucket.hotKeys.add(school);
+  });
+
+  followups.forEach(function(item){
+    const key=weekKey(item.Timestamp);
+    const bucket=weekMap.get(key);
+    if(!bucket)return;
+    const day=activeDayKey(item.Timestamp);
+    if(day)bucket.activeDays.add(day);
+    if(item.FollowupType==='CALL')bucket.calls++;
+    if(item.FollowupType==='VISIT')bucket.terrain++;
+    const school=schoolKey(item.SchoolName);
+    if(school)bucket.schoolKeys.add(school);
+  });
+
+  return weeks.map(function(week,index){
+    const total=week.terrain+week.calls;
+    const previous=index>0 ? weeks[index-1].terrain+weeks[index-1].calls : 0;
+    const active=week.activeDays.size;
+    return {
+      key:week.key,
+      label:week.label,
+      terrain:week.terrain,
+      calls:week.calls,
+      total,
+      delta:total-previous,
+      hot:week.hotKeys.size,
+      schools:week.schoolKeys.size,
+      activeDays:active,
+      velocity:active ? total/active : 0
+    };
+  });
+}
+
+function buildAreaLayers(records){
+  const cities=new Map();
+  const zones=new Map();
+  records.forEach(function(record){
+    const city=record.city||'NON DEFINI';
+    const zone=record.zone||'Sans zone';
+    const cityRef=cities.get(city)||{city,count:0,hot:0,won:0,zones:new Map()};
+    cityRef.count++;
+    cityRef.zones.set(zone,(cityRef.zones.get(zone)||0)+1);
+    if(record.stage==='chaud' || record.stage==='gagne')cityRef.hot++;
+    if(record.stage==='gagne')cityRef.won++;
+    cities.set(city,cityRef);
+
+    const zoneKey=city+'__'+zone;
+    const zoneRef=zones.get(zoneKey)||{city,zone,count:0,hot:0,warm:0,won:0,experts:new Set()};
+    zoneRef.count++;
+    if(record.expert)zoneRef.experts.add(record.expert);
+    if(record.stage==='chaud')zoneRef.hot++;
+    if(record.stage==='tiede')zoneRef.warm++;
+    if(record.stage==='gagne')zoneRef.won++;
+    zones.set(zoneKey,zoneRef);
+  });
+
+  return {
+    cities:Array.from(cities.values()).map(function(city){
+      const topZone=Array.from(city.zones.entries()).sort(function(a,b){ return b[1]-a[1]; })[0];
+      return {
+        city:city.city,
+        count:city.count,
+        hot:city.hot,
+        won:city.won,
+        hotRate:city.count ? Math.round((city.hot/city.count)*100) : 0,
+        topZone:topZone ? topZone[0] : '—'
+      };
+    }).sort(function(a,b){ return b.count-a.count; }),
+    zones:Array.from(zones.values()).map(function(zone){
+      return {
+        city:zone.city,
+        zone:zone.zone,
+        count:zone.count,
+        hot:zone.hot,
+        warm:zone.warm,
+        won:zone.won,
+        expertCount:zone.experts.size,
+        hotRate:zone.count ? Math.round(((zone.hot+zone.won)/zone.count)*100) : 0
+      };
+    }).sort(function(a,b){ return b.count-a.count; })
+  };
+}
+
+function buildAgentProgress(rawRows, followups){
+  const experts=[...new Set(rawRows.map(r=>r.e).concat(followups.map(f=>f.Expert)).filter(Boolean))];
+  return experts.map(function(expert){
+    const expertRows=rawRows.filter(function(row){ return samePerson(row.e,expert); });
+    const expertFollowups=followups.filter(function(item){ return samePerson(item.Expert,expert); });
+    const weekly=buildWeeklySeries(expertRows,expertFollowups,4);
+    const current=weekly[weekly.length-1]||{terrain:0,calls:0,total:0};
+    const previous=weekly[weekly.length-2]||{total:0};
+    return {
+      expert,
+      series:weekly,
+      current,
+      trend:current.total-(previous.total||0),
+      schools:new Set(expertRows.map(function(row){ return schoolKey(row.n); }).filter(Boolean)).size
+    };
+  }).sort(function(a,b){ return b.current.total-a.current.total; });
+}
+
+function buildDashboardModel(){
+  const scope=getDashboardScope();
+  const records=buildSchoolRecords(scope.rawRows,scope.followups);
+  const pipeline=buildStageTotals(records);
+  const weekly=buildWeeklySeries(scope.rawRows,scope.followups,8);
+  const layers=buildAreaLayers(records);
+  const hotStage=pipeline.find(function(stage){ return stage.key==='chaud'; }) || {count:0,amount:0};
+  const warmStage=pipeline.find(function(stage){ return stage.key==='tiede'; }) || {count:0,amount:0};
+  const wonStage=pipeline.find(function(stage){ return stage.key==='gagne'; }) || {count:0,amount:0};
+  const totalInputs=scope.rawRows.length+scope.followups.length;
+  const callInputs=scope.followups.filter(function(item){ return item.FollowupType==='CALL'; }).length;
+  const terrainInputs=scope.rawRows.length+scope.followups.filter(function(item){ return item.FollowupType==='VISIT'; }).length;
+  const activeDays=new Set(scope.rawRows.map(function(row){ return activeDayKey(row.t); }).concat(scope.followups.map(function(item){ return activeDayKey(item.Timestamp); })).filter(Boolean)).size;
+  const hotRate=records.length ? Math.round((((hotStage.count||0)+(wonStage.count||0))/records.length)*100) : 0;
+  return {
+    rawRows:scope.rawRows,
+    followups:scope.followups,
+    records,
+    pipeline,
+    weekly,
+    layers,
+    wonDeals:records.filter(function(record){ return record.stage==='gagne'; }),
+    wonRevenue:wonStage.amount||0,
+    hotRevenue:hotStage.amount||0,
+    warmRevenue:warmStage.amount||0,
+    totalInputs,
+    callInputs,
+    terrainInputs,
+    activeDays,
+    velocity:activeDays ? totalInputs/activeDays : 0,
+    hotRate,
+    currentWeek:weekly[weekly.length-1]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
+    previousWeek:weekly[weekly.length-2]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
+    agentProgress:canSeeAllData(currentUser) ? buildAgentProgress(scope.rawRows,scope.followups) : [],
+    sourceProspectionCount:(LIVE_DATA && LIVE_DATA.prospectionCount) || getAllRawRows().length,
+    sourceCallCount:(LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length,
+    sources:(LIVE_DATA && LIVE_DATA.sources) || {}
+  };
+}
+
+function renderStageMetric(stage){
+  return `<article class="stage-card ${stage.color}">
+    <div class="stage-top">
+      <div class="name">${stage.label}<small>${stage.desc}</small></div>
+      <div class="ct">${stage.count}</div>
+    </div>
+    <div class="stage-track"><span style="width:${Math.min(stage.percent,100)}%"></span></div>
+    <div class="stage-foot"><span>${stage.percent}%</span><span>${moneyCompact(stage.amount)}</span></div>
+  </article>`;
+}
+
+function renderRevenueCard(title,value,copy,colorClass){
+  return `<div class="chart revenue-card ${colorClass||''}">
+    <h3>${title}</h3>
+    <div class="desc">Montant cumulé en FCFA</div>
+    <div style="font-family:'Fraunces',serif;font-size:54px;font-weight:600;color:var(--red);line-height:1;letter-spacing:-.04em;margin:6px 0 10px">${moneyCompact(value)}</div>
+    <div style="font-size:13px;color:var(--g600);line-height:1.7">${copy}</div>
+  </div>`;
+}
+
+function renderWeeklyChart(series){
+  const max=Math.max(...series.map(function(item){ return item.total; }),1);
+  return `<div class="week-chart">
+    ${series.map(function(week){
+      const terrain=Math.round((week.terrain/max)*100);
+      const calls=Math.round((week.calls/max)*100);
+      const trendClass=week.delta>0?'up':(week.delta<0?'down':'');
+      return `<div class="week-col">
+        <div class="week-delta ${trendClass}">${week.delta>0?'+':''}${week.delta}</div>
+        <div class="week-stack">
+          <span class="terrain" style="height:${terrain}%"></span>
+          <span class="calls" style="height:${calls}%;bottom:${terrain}%"></span>
+        </div>
+        <div class="week-meta"><strong>${week.total}</strong><span>${week.label}</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderCompareCard(current, previous){
+  const delta=(current.total||0)-(previous.total||0);
+  const klass=delta>=0 ? 'up' : 'down';
+  return `<div class="compare-card ${klass}">
+    <div class="top">
+      <span class="badge">${delta>=0?'📈 croissance':'📉 baisse'} vs semaine précédente</span>
+      <span class="value">${delta>=0?'+':''}${delta}</span>
+    </div>
+    <div class="meta">Total <b>${current.total||0}</b> · Terrain <b>${current.terrain||0}</b> · Appels <b>${current.calls||0}</b> · ${Number(current.velocity||0).toFixed(1)}/jour sur <b>${current.activeDays||0}</b> jours actifs distincts.</div>
+  </div>`;
+}
+
+function renderSchoolItem(record, showExpert){
+  const phone=phoneHref(record.phone);
+  return `<div class="school-item">
+    <div class="school-item-head">
+      <strong>${esc(record.schoolName)}</strong>
+      ${pct(record.rate)}
+    </div>
+    <div class="school-item-meta">
+      ${esc(record.city||'—')} · ${esc(record.zone||'—')} · ${esc(record.standing||'Sans catégorie')}<br>
+      Contact: <b>${esc(record.contactName||'À préciser')}</b> · Appels: <b>${record.callCount}</b> · Suivis: <b>${record.followupCount}</b> · Effectif: <b>${record.effectif||0}</b>
+    </div>
+    <div class="school-item-actions">
+      ${phone ? `<a href="${attrEsc(phone)}">📞 Appeler</a>` : `<span class="expert">📞 Numéro manquant</span>`}
+      <span class="expert">${showExpert ? 'Expert: '+esc(record.expert||'—') : esc(record.type||'—')}</span>
+    </div>
+  </div>`;
+}
+
+function renderStageSchoolCard(stage, showExpert){
+  return `<div class="school-stage">
+    <h3>${stage.label}</h3>
+    <div class="sub">${stage.count} écoles · ${stage.percent}% du pipeline · ${moneyCompact(stage.amount)}</div>
+    <div class="school-list">
+      ${stage.schools.length ? stage.schools.slice(0,6).map(function(record){ return renderSchoolItem(record,showExpert); }).join('') : '<div class="empty-mini">Aucune école dans cette étape pour ce filtre.</div>'}
+    </div>
+  </div>`;
+}
+
+function renderMiniChart(series){
+  const max=Math.max(...series.map(function(item){ return item.total; }),1);
+  return `<div class="mini-chart">${series.map(function(item){
+    const h=Math.max(12,Math.round((item.total/max)*100));
+    return `<span style="height:${h}%"></span>`;
+  }).join('')}</div>`;
 }
 
 const ST={city:'',expert:'',sec:'',cat:'',rate:0};
@@ -1461,184 +2027,277 @@ document.addEventListener('click',e=>{
 // HOME — Welcome dashboard with 10/day target highlighted
 // =============================================================
 function rHome(){
-  const f=gF();
-  const visibleRows=getVisibleRaw();
-  const tot=f.length;
-  const withRate=f.filter(r=>r.r!=null);
-  const avgRate=withRate.length?withRate.reduce((s,r)=>s+r.r,0)/withRate.length:0;
-  const hot=f.filter(r=>r.r!=null && r.r>=60).length;
-  const closeable=f.filter(r=>r.r>=80).length;
-  const ambassadeurs=f.filter(r=>/ambassad/i.test((r.co||'')+(r.re||''))).length;
-  const blocked=f.filter(r=>/fondateur|absent|hi[ée]rarchie|d[ée]cision/i.test((r.co||'')+(r.re||''))).length;
-  const revEstimate=f.reduce((sum,r)=>{
-    if(r.r==null||r.r<60)return sum;
-    return sum + (60000 * (r.r/100));
-  },0);
-  
-  const expSet=[...new Set(visibleRows.map(r=>r.e).filter(Boolean))];
-  const dailyRates=[];
-  expSet.forEach(e=>{
-    const ef=visibleRows.filter(r=>r.e===e&&activeDayKey(r.t));
-    if(ef.length<1)return;
-    const days=Math.max(1,countDistinctDays(ef,'t'));
-    dailyRates.push({e,vel:ef.length/days,count:ef.length});
-  });
-  const teamAvg=dailyRates.length?dailyRates.reduce((s,x)=>s+x.vel,0)/dailyRates.length:0;
-  
+  const dashboard=buildDashboardModel();
+  const uniqueSchools=dashboard.records.length;
+  const totalProspections=dashboard.rawRows.length;
+  const hotStage=dashboard.pipeline.find(stage=>stage.key==='chaud') || {count:0};
+  const wonStage=dashboard.pipeline.find(stage=>stage.key==='gagne') || {count:0};
+  const showAll=!!(currentUser && canSeeAllData(currentUser));
+  const scopeCopy=showAll
+    ? 'Vue combinée active: Noah, Mbeuka et Guy peuvent voir la progression de toute l’équipe.'
+    : 'Vue personnelle active: cet expert ne voit que ses propres écoles, appels, KPI et progression.';
+  const cityRows=dashboard.layers.cities.slice(0,6);
+  const zoneRows=dashboard.layers.zones.slice(0,8);
+
   let h=`
   <div class="page-intro" data-num="01">
-    <h2>Bienvenue sur <span class="it">NATEIVA Intelligence</span></h2>
-    <p>Plateforme d'<b>intelligence commerciale</b> pour ${tot} prospections. <b>Objectif: 10 écoles par jour par expert.</b> Plus on visite, plus on signe. Cette plateforme vous donne les insights par <b>région, par concurrent, par expert</b> pour gagner du terrain face à <b>SIMPALA, LOGESCO, TURBOSCHOOL, Prosoft Africa</b> et tous les autres.</p>
+    <h2>Nateiva <span class="it">Sale Analytic</span></h2>
+    <p>Dashboard premium de prospection pour suivre <b>${totalProspections}</b> prospections terrain, <b>${uniqueSchools}</b> écoles uniques, <b>${dashboard.sourceCallCount}</b> appels, la vélocité sur <b>jours actifs distincts</b>, le pipeline, les insights concurrents, la BI, le NLP et la progression semaine par semaine.</p>
     <div class="quick-links">
-      <a href="#" data-jump="metrics">📊 Comprendre les chiffres</a>
-      <a href="#" data-jump="market" data-jumpsub="regional">🗺️ Concurrents par Région</a>
-      <a href="#" data-jump="playbook">🎯 Playbook</a>
-      <a href="#" data-jump="team" data-jumpsub="hotdeals">🔥 Hot Deals</a>
+      <a href="#" data-jump="metrics">📊 BI & KPI</a>
+      <a href="#" data-jump="team" data-jumpsub="pipeline">📈 Pipeline</a>
+      <a href="#" data-jump="market" data-jumpsub="regional">🗺️ Concurrents</a>
+      <a href="#" data-jump="intel">🧠 NLP & Insights</a>
+    </div>
+    <div class="summary-tags">
+      <span>🏫 408 écoles source</span>
+      <span>📞 105 appels source</span>
+      <span>📍 Zones & couches terrain</span>
+      <span>👥 Scope expert / admin</span>
+      <span>📅 Semaine vs semaine</span>
+      <span>📘 Playbook + Glossaire</span>
     </div>
   </div>
-  
-  <!-- 10/JOUR HIGHLIGHT BANNER -->
+
   <div class="section">
     <div class="page-intro" style="background:linear-gradient(135deg, var(--red), var(--red-deep));padding:28px 32px" data-num="🎯">
-      <h2 style="font-size:32px">🎯 Objectif <span class="it">10 Écoles / Jour</span></h2>
-      <p style="font-size:14.5px">Plus on visite, plus on signe. Le <b>volume crée la chance</b>. Chaque expert = 10 visites/jour × 22 jours = <b>220 écoles/mois</b>. Avec 30% conversion = <b>66 deals chauds/mois/expert</b>. 5 experts = <b>330 hot deals/mois</b>.</p>
-      <p style="font-size:14px;margin-top:10px;color:rgba(255,255,255,.9)">Rythme actuel équipe: <b style="color:var(--saffron-bright);font-size:18px">${teamAvg.toFixed(1)} écoles/jour</b> en moyenne. Objectif: <b style="color:var(--saffron-bright);font-size:18px">10/jour</b>.</p>
+      <h2 style="font-size:32px">🎯 Tracking <span class="it">Volume + Qualité</span></h2>
+      <p style="font-size:14.5px">Objectif central: <b>10 écoles / jour / expert</b>. La vélocité est calculée sur le <b>nombre de jours actifs distincts</b> où au moins une saisie a été faite. On peut donc voir clairement si le rythme monte, baisse, et si cette baisse est saine ou non.</p>
+      <p style="font-size:14px;margin-top:10px;color:rgba(255,255,255,.92)">${scopeCopy}</p>
     </div>
   </div>
-  
-  <!-- 4 BIG KPIs -->
+
   <div class="section">
     <div class="sec-head">
-      <h2>📌 Les <span class="it">4 Chiffres</span> à retenir</h2>
-      <span class="anno">Le pouls du portefeuille</span>
+      <h2>📌 Dashboard <span class="it">KPI</span></h2>
+      <span class="anno">Prospection · appels · vélocité</span>
     </div>
     <div class="kpis">
       <div class="kpi red">
-        <div class="lbl">Écoles Prospectées</div>
-        <div class="val">${tot}</div>
-        <div class="delta">${f.filter(r=>r.v==='DOUALA').length} DLA · ${f.filter(r=>r.v==='YAOUNDE').length} YDE</div>
+        <div class="lbl">Prospections visibles</div>
+        <div class="val">${totalProspections}</div>
+        <div class="delta">${uniqueSchools} écoles uniques · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} DLA · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} YDE</div>
+      </div>
+      <div class="kpi teal">
+        <div class="lbl">Appels suivis</div>
+        <div class="val">${dashboard.callInputs}</div>
+        <div class="delta">${dashboard.followups.length} follow-ups liés au scope</div>
       </div>
       <div class="kpi dark">
-        <div class="lbl">Taux Moyen Équipe</div>
-        <div class="val">${avgRate.toFixed(1)}<small>%</small></div>
-        <div class="delta">santé globale du pipeline</div>
+        <div class="lbl">Vélocité</div>
+        <div class="val">${dashboard.velocity.toFixed(1)}<small>/jour</small></div>
+        <div class="delta">${dashboard.totalInputs} inputs · ${dashboard.activeDays} jours actifs</div>
       </div>
       <div class="kpi green">
-        <div class="lbl">Hot Deals ≥60%</div>
-        <div class="val">${hot}</div>
-        <div class="delta">à closer dans 90 jours</div>
-      </div>
-      <div class="kpi saffron">
-        <div class="lbl">Revenu Probable</div>
-        <div class="val">${fmt(Math.round(revEstimate/1000))}<small>k FCFA</small></div>
-        <div class="delta">pipeline × 60k FCFA</div>
+        <div class="lbl">Hot Rate</div>
+        <div class="val">${dashboard.hotRate}<small>%</small></div>
+        <div class="delta">${hotStage.count + wonStage.count} chauds/gagnés sur ${uniqueSchools}</div>
       </div>
     </div>
-    <div class="note teal"><b>💡 Comprendre chaque chiffre?</b> Cliquez sur <a href="#" data-jump="metrics" style="color:var(--teal-deep);font-weight:700">📊 Métriques</a> — explications détaillées avec formules + comment utiliser face à la concurrence.</div>
+    <div class="note teal"><b>💡 Ce dashboard répond maintenant aux demandes de tracking:</b> pipeline par étape, revenus en FCFA, progression hebdomadaire, croissance ou baisse, écoles par étape, progression par agent et matrices par ville / zone.</div>
   </div>
-  
-  <!-- ACTIONS PRIORITAIRES -->
+
   <div class="section">
     <div class="sec-head">
-      <h2>🎯 Cette <span class="it">Semaine</span> · 5 actions prioritaires</h2>
-      <span class="anno">Sortie directe de l'analyse</span>
+      <h2>📈 Entonnoir <span class="it">Pipeline</span></h2>
+      <span class="anno">Gagnés → Chauds → Tièdes → Froids → Nouveau → Perdus</span>
     </div>
-    <div class="actions">
-      <div class="action" data-num="1">
-        <div class="imp">VOLUME D'ABORD</div>
-        <h4>Atteindre <span class="it">10 écoles/jour</span></h4>
-        <p>Planifier par CORRIDOR géographique. Visite courte 20-30 min: présentation + démo téléphone + dossier laissé. 5 experts × 10/jour × 5 jours = 250 visites/semaine.</p>
+    <div class="stage-grid">${dashboard.pipeline.map(renderStageMetric).join('')}</div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>💰 Revenus <span class="it">en FCFA</span></h2>
+      <span class="anno">Forecast et valeur pipeline</span>
+    </div>
+    <div class="three">
+      ${renderRevenueCard('🏆 Revenu gagné',dashboard.wonRevenue,'Montant confirmé uniquement quand le deal est clos dans les suivis.','')}
+      ${renderRevenueCard('🔥 Pipeline chaud',dashboard.hotRevenue,'Valeur probable des écoles chaudes prêtes à closer.','')}
+      ${renderRevenueCard('🟠 Pipeline tiède',dashboard.warmRevenue,'Valeur des écoles tièdes à travailler avant rentrée.','')}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>📅 Progression <span class="it">Semaine par Semaine</span></h2>
+      <span class="anno">Rouge = terrain · Teal = appels</span>
+    </div>
+    <div class="two">
+      <div class="chart">
+        <h3>Tracking <span class="it">hebdomadaire</span></h3>
+        <div class="desc">Chaque colonne montre les inputs de la semaine et son delta vs semaine précédente.</div>
+        <div class="legend-row">
+          <span class="legend-pill"><i class="terrain"></i> Terrain</span>
+          <span class="legend-pill"><i class="calls"></i> Appels</span>
+          <span class="legend-pill"><i class="hot"></i> Chauds touchés</span>
+        </div>
+        ${renderWeeklyChart(dashboard.weekly)}
+        ${renderCompareCard(dashboard.currentWeek,dashboard.previousWeek)}
       </div>
-      <div class="action" data-num="2">
-        <div class="imp">ARME UNIQUE</div>
-        <h4>Activer les <span class="it">${ambassadeurs}</span> Ambassadeurs</h4>
-        <p>${ambassadeurs} écoles ont demandé spontanément le programme. AUCUN concurrent ne l'offre. Signature Ambassadeur + SCHOOL en même temps.</p>
-      </div>
-      <div class="action" data-num="3">
-        <div class="imp">RÉSEAU UNIVERSITAIRE</div>
-        <h4>Closer le groupe <span class="it">VISHI</span></h4>
-        <p>Primaire (90%) + Secondaire (70%) + Vishi Higher Institute. Pack famille -25%. Revenu cible: 200-300k FCFA.</p>
-      </div>
-      <div class="action" data-num="4">
-        <div class="imp">PROFITER RÉFORME</div>
-        <h4>Pitch <span class="it">Carte Scolaire MINESEC</span></h4>
-        <p>La réforme MINESEC oblige TOUTES les écoles à se digitaliser pour la rentrée. NATEIVA = compatible matricule national + MTN/Orange Money natif. Argument décisif.</p>
-      </div>
-      <div class="action" data-num="5">
-        <div class="imp">DÉBLOCAGE PIPELINE</div>
-        <h4>Transformer les <span class="it">${blocked}</span> deals "Fondateur"</h4>
-        <p>Dossier physique soigné avec note 1 page + lettre nominative + fiche tarifaire claire. Tournée 'dépôt dossiers' = 1 jour/semaine.</p>
+      <div class="chart">
+        <h3>🗺️ Matrix <span class="it">Zone · Ville · Couches</span></h3>
+        <div class="desc">Navigation rapide par ville et couche terrain pour réorganiser l’effort commercial.</div>
+        <table class="tbl" style="margin-bottom:16px">
+          <thead><tr><th>Ville</th><th>Écoles</th><th>Chauds</th><th>Hot Rate</th><th>Top zone</th></tr></thead>
+          <tbody>
+            ${cityRows.map(row=>`<tr><td><b>${esc(row.city)}</b></td><td class="num">${row.count}</td><td class="num">${row.hot}</td><td class="num">${row.hotRate}%</td><td>${esc(row.topZone)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <table class="tbl">
+          <thead><tr><th>Zone</th><th>Ville</th><th>Écoles</th><th>Chauds</th><th>Tièdes</th><th>Experts</th></tr></thead>
+          <tbody>
+            ${zoneRows.map(row=>`<tr><td><b>${esc(row.zone)}</b></td><td>${esc(row.city)}</td><td class="num">${row.count}</td><td class="num">${row.hot + row.won}</td><td class="num">${row.warm}</td><td class="num">${row.expertCount}</td></tr>`).join('')}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
-  
-  <!-- GUIDE NAVIGATION -->
+
   <div class="section">
     <div class="sec-head">
-      <h2>🗺️ Guide <span class="it">de Navigation</span></h2>
-      <span class="anno">Où aller selon votre besoin</span>
+      <h2>📋 Tableau <span class="it">Hebdomadaire Détaillé</span></h2>
+      <span class="anno">Terrain · appels · total · chauds · écoles · tendance</span>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Semaine</th><th>Terrain</th><th>Appels</th><th>Total</th><th>Chauds</th><th>Écoles</th><th>Jours actifs</th><th>Vélocité</th><th>Tendance</th></tr></thead>
+      <tbody>
+        ${dashboard.weekly.map(week=>`<tr>
+          <td><b>${esc(week.label)}</b></td>
+          <td class="num">${week.terrain}</td>
+          <td class="num">${week.calls}</td>
+          <td class="num">${week.total}</td>
+          <td class="num">${week.hot}</td>
+          <td class="num">${week.schools}</td>
+          <td class="num">${week.activeDays}</td>
+          <td class="num">${week.velocity.toFixed(1)}</td>
+          <td style="font-weight:700;color:${week.delta>0?'var(--green)':(week.delta<0?'var(--red)':'var(--g600)')}">${week.delta>0?'📈 +':''}${week.delta<0?'📉 ':''}${week.delta===0?'➡ 0':Math.abs(week.delta)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>🏫 Écoles <span class="it">par Étape</span></h2>
+      <span class="anno">Taux · contacts · appels · bouton 📞</span>
+    </div>
+    <div class="school-grid">
+      ${dashboard.pipeline.map(stage=>renderStageSchoolCard(stage,showAll)).join('')}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>🏆 Deals <span class="it">Gagnés</span></h2>
+      <span class="anno">Montants confirmés via suivis clos</span>
+    </div>
+    ${dashboard.wonDeals.length ? `
+      <table class="tbl">
+        <thead><tr><th>École</th><th>Ville</th><th>Zone</th><th>Contact confirmé</th><th>Expert</th><th>Clôture suivi</th><th>Date</th><th>Montant</th></tr></thead>
+        <tbody>
+          ${dashboard.wonDeals.map(record=>`<tr><td><b>${esc(record.schoolName)}</b></td><td>${esc(record.city||'—')}</td><td>${esc(record.zone||'—')}</td><td>${esc(record.closeContact||record.contactName||'—')}</td><td>${esc(record.closedBy||record.expert||'—')}</td><td>${esc(record.closeStatus||'Deal clos')}</td><td>${record.closedAt ? record.closedAt.toISOString().slice(0,10) : '—'}</td><td class="num">${moneyFCFA(record.amount)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    ` : `<div class="note red"><b>⏳ Aucun deal gagné confirmé dans les suivis pour ce scope.</b> Le revenu gagné reste à zéro tant qu’un suivi ne ferme pas explicitement le deal.</div>`}
+  </div>
+
+  ${showAll ? `
+  <div class="section">
+    <div class="sec-head">
+      <h2>👥 Progression <span class="it">par Agent</span></h2>
+      <span class="anno">Mini graphique 4 semaines · stats semaine · tendance</span>
+    </div>
+    <div class="agent-grid">
+      ${dashboard.agentProgress.map(agent=>`
+        <div class="agent-card">
+          <div class="agent-head">
+            <strong>${esc(agent.expert)}</strong>
+            <span class="trend-chip ${agent.trend>0?'up':(agent.trend<0?'down':'flat')}">${agent.trend>0?'📈 +':''}${agent.trend<0?'📉 ':''}${agent.trend===0?'➡ ':''}${Math.abs(agent.trend)}</span>
+          </div>
+          ${renderMiniChart(agent.series)}
+          <div class="agent-meta">
+            <div><b>${agent.current.total}</b>Cette semaine</div>
+            <div><b>${agent.current.terrain}</b>Terrain</div>
+            <div><b>${agent.current.calls}</b>Appels</div>
+            <div><b>${agent.schools}</b>Écoles</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  ` : ''}
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>🧭 Guide <span class="it">de Navigation</span></h2>
+      <span class="anno">Tous les tabs historiques sont conservés</span>
     </div>
     <div class="toc-grid">
-      <a href="#" data-jump="metrics" class="toc-item">
-        <div class="toc-num">📊</div>
-        <div class="toc-name">Métriques Expliquées</div>
-        <div class="toc-desc">Formules · importance · comment utiliser</div>
-      </a>
-      <a href="#" data-jump="team" class="toc-item">
-        <div class="toc-num">👥</div>
-        <div class="toc-name">Équipe & Pipeline</div>
-        <div class="toc-desc">Performance · entonnoir · hot deals</div>
-      </a>
-      <a href="#" data-jump="market" class="toc-item">
-        <div class="toc-num">🗺️</div>
-        <div class="toc-name">Marché Cameroun</div>
-        <div class="toc-desc">Géo · 18 concurrents par région · chaînes</div>
-      </a>
-      <a href="#" data-jump="playbook" class="toc-item">
-        <div class="toc-num">🎯</div>
-        <div class="toc-name">Sales Playbook</div>
-        <div class="toc-desc">7 objections · 5 closing · pitches</div>
-      </a>
-      <a href="#" data-jump="intel" class="toc-item">
-        <div class="toc-num">🧠</div>
-        <div class="toc-name">Intelligence 360°</div>
-        <div class="toc-desc">Signaux NLP · contacts décideurs</div>
-      </a>
-      <a href="#" data-jump="glossary" class="toc-item">
-        <div class="toc-num">📖</div>
-        <div class="toc-name">Glossaire</div>
-        <div class="toc-desc">Définitions rapides</div>
-      </a>
+      <a href="#" data-jump="metrics" class="toc-item"><div class="toc-num">📊</div><div class="toc-name">BI & KPI</div><div class="toc-desc">Sources · métriques · formules</div></a>
+      <a href="#" data-jump="team" class="toc-item"><div class="toc-num">👥</div><div class="toc-name">Équipe</div><div class="toc-desc">Experts · pipeline · velocity</div></a>
+      <a href="#" data-jump="market" class="toc-item"><div class="toc-num">🗺️</div><div class="toc-name">Marché</div><div class="toc-desc">Concurrents · régions · chaînes</div></a>
+      <a href="#" data-jump="playbook" class="toc-item"><div class="toc-num">🎯</div><div class="toc-name">Playbook</div><div class="toc-desc">Objections · closing · pitches</div></a>
+      <a href="#" data-jump="intel" class="toc-item"><div class="toc-num">🧠</div><div class="toc-name">NLP</div><div class="toc-desc">Signaux · décideurs · insights</div></a>
+      <a href="#" data-jump="glossary" class="toc-item"><div class="toc-num">📖</div><div class="toc-name">Glossaire</div><div class="toc-desc">Définitions rapides</div></a>
     </div>
   </div>
-  
-  <!-- WHY NATEIVA WINS (revised) -->
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>🔗 Business <span class="it">Intelligence</span></h2>
+      <span class="anno">Sources online, scope, synchronisation</span>
+    </div>
+    <div class="three">
+      <div class="chart">
+        <h3>🏫 Source <span class="it">prospection</span></h3>
+        <div class="desc">${dashboard.sourceProspectionCount} lignes terrain connectées</div>
+        <p style="font-size:13px;line-height:1.7;color:var(--g700)">La feuille terrain reste la source principale pour les 408 écoles prospectées. Elle alimente automatiquement les KPI, l’entonnoir et les matrices par ville / zone.</p>
+        ${dashboard.sources.prospectionSheet ? `<a class="source-link" href="${attrEsc(dashboard.sources.prospectionSheet)}" target="_blank" rel="noreferrer">📎 Ouvrir la feuille prospection</a>` : ''}
+      </div>
+      <div class="chart">
+        <h3>📞 Source <span class="it">appels</span></h3>
+        <div class="desc">${dashboard.sourceCallCount} appels importés</div>
+        <p style="font-size:13px;line-height:1.7;color:var(--g700)">Les appels sont rattachés aux écoles et aux semaines pour montrer la vraie tendance: hausse saine, baisse saine ou baisse dangereuse.</p>
+        ${dashboard.sources.callsSheet ? `<a class="source-link" href="${attrEsc(dashboard.sources.callsSheet)}" target="_blank" rel="noreferrer">📎 Ouvrir la feuille appels</a>` : ''}
+      </div>
+      <div class="chart">
+        <h3>🔐 Scope <span class="it">accès</span></h3>
+        <div class="desc">Règles d’accès combiné</div>
+        <p style="font-size:13px;line-height:1.7;color:var(--g700)"><b>Noah</b>, <b>Mbeuka brice</b> et <b>Ntsa Guy</b> voient toute la donnée. Tous les autres experts voient uniquement leur propre pipeline, leurs propres écoles, leurs propres appels et leur propre progression.</p>
+        <div class="summary-tags">
+          <span>👤 Expert = vue personnelle</span>
+          <span>👥 Admin = vue combinée</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="section">
     <div class="sec-head">
       <h2>🇨🇲 Pourquoi <span class="it">NATEIVA</span> gagne</h2>
-      <span class="anno">Différenciateurs RÉELS (vérifiés)</span>
+      <span class="anno">Compétiteurs, offre et différenciation</span>
     </div>
-    <div class="note red"><b>⚠️ Important:</b> L'offline n'est PAS notre USP — LOGESCO, SYGEST, Prosoft Africa l'ont aussi. Notre vraie force = <b>Programme Ambassadeur 40%</b> (unique au Cameroun) + <b>Mobile-first 2026</b> + <b>focus 100% Cameroun</b>.</div>
+    <div class="note red"><b>⚠️ Angle concurrentiel gardé:</b> l’analyse compétiteurs, le playbook, la BI, le NLP et le glossaire restent présents dans leurs onglets d’origine, avec le même esprit structuré que l’ancienne version.</div>
     <div class="three">
       <div class="strat" style="margin-bottom:0">
         <h4>🤝 Programme <span class="it">Ambassadeur 40%</span></h4>
-        <div class="when"><b>VRAIMENT UNIQUE:</b> aucun concurrent</div>
-        <p style="font-size:13px;color:var(--g700);line-height:1.65">Ni SIMPALA, ni LOGESCO, ni TURBOSCHOOL, ni FEDENA, ni Galactis, ni Prosoft Africa. 40% commission à vie. Transforme coût en revenu. C'est NOTRE arme.</p>
+        <div class="when"><b>Différenciation réelle:</b> unique au Cameroun</div>
+        <p style="font-size:13px;color:var(--g700);line-height:1.65">Ni SIMPALA, ni LOGESCO, ni Prosoft Africa n’offrent cette logique revenue-share. C’est conservé dans les onglets concurrents et playbook.</p>
       </div>
       <div class="strat" style="margin-bottom:0">
-        <h4>📱 <span class="it">Mobile-First 2026</span></h4>
-        <div class="when"><b>Avantage technique:</b> interface moderne</div>
-        <p style="font-size:13px;color:var(--g700);line-height:1.65">TURBOSCHOOL = Windows desktop. LOGESCO = interface 2010. SAGICAM = PHP custom. NATEIVA = interface mobile moderne 2026, web+mobile natif.</p>
+        <h4>📱 <span class="it">Mobile + Terrain</span></h4>
+        <div class="when"><b>Vrai tracking:</b> prospection + appels + zone</div>
+        <p style="font-size:13px;color:var(--g700);line-height:1.65">Le dashboard croise désormais le terrain, les appels, les jours actifs, la vélocité et la progression par semaine pour savoir si l’équipe avance vraiment.</p>
       </div>
       <div class="strat" style="margin-bottom:0">
-        <h4>🇨🇲 <span class="it">Focus 100% Cameroun</span></h4>
-        <div class="when"><b>Souveraineté:</b> données chez vous</div>
-        <p style="font-size:13px;color:var(--g700);line-height:1.65">Pas Galactis (5 pays dilué). Pas FEDENA (Inde). Pas PowerSchool (USA). Pas Classe365 (Australie). NATEIVA = MINESEC, MTN/Orange Money, FCFA, FR+EN.</p>
+        <h4>🧠 <span class="it">BI + NLP + KPI</span></h4>
+        <div class="when"><b>Pilotage:</b> pas seulement affichage</div>
+        <p style="font-size:13px;color:var(--g700);line-height:1.65">On garde la lecture business complète: formules, glossaire, insights NLP, analyses de concurrence, matrices par zone, et KPI commerciaux pour organiser l’action.</p>
       </div>
     </div>
   </div>
   `;
-  
+
   document.getElementById('p-home').innerHTML=h;
 }
 
