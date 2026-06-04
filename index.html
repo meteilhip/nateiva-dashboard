@@ -3653,6 +3653,9 @@ function getAllUsers(){return DEFAULT_USERS.concat(invitedUsers)}
 function isSA(n){return n&&SUPER_ADMINS.some(function(a){return a.toLowerCase()===n.toLowerCase()})}
 var wizState={entryType:'',mode:'',dealValue:''};
 
+// === NAME NORMALIZATION (CALLS uses uppercase, RAW uses title case) ===
+var NAME_MAP={'KENDO FABIOLA':'Kendo Fabiola','KESSIE':'Kessi Taylor','MBEUKA BRICE':'Mbeuka brice','NTSA GUY':'Ntsa Guy','EMAMBO IDA':'Emambo ida','IVAN':'Ivan','NOAH':'Noah'};
+(function(){CALLS.forEach(function(c){if(NAME_MAP[c.e])c.e=NAME_MAP[c.e];else if(c.e){var k=c.e.toUpperCase();Object.keys(NAME_MAP).forEach(function(n){if(k===n)c.e=NAME_MAP[n]})}})})();
 // === HELPERS ===
 function getFieldDays(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode==='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
 function getCallDays(e){var s=new Set();CALLS.forEach(function(c){if(c.e===e&&c.t)s.add(new Date(c.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode!=='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
@@ -3875,6 +3878,7 @@ function rSuivi(){
   // Dashboard tabs
   h+='<div class="suivi-tabs">';
   h+='<button class="suivi-tab act" data-stab="combined">📊 Combiné</button>';
+  h+='<button class="suivi-tab" data-stab="pipeline">🔄 Pipeline</button>';
   h+='<button class="suivi-tab" data-stab="history">📋 Journal</button>';
   h+='<button class="suivi-tab" data-stab="ranking">🏆 Rang</button>';
   if(sa){
@@ -3974,6 +3978,112 @@ function rSuivi(){
     h+='<div style="text-align:center"><div style="font-family:Fraunces,serif;font-size:20px;font-weight:600">'+prog.nEntries+'</div><div style="font-size:8px;color:var(--g500);font-weight:700">TOTAL ENTRÉES</div></div>';
     h+='</div></div>';
   }
+
+  // === TAB: PIPELINE ===
+  h+='<div class="suivi-panel" id="stab-pipeline">';
+
+  // Build pipeline: group schools by status
+  var pipeSchools={};
+  var myRAW2=sa?RAW:RAW.filter(function(r){return r.e===me});
+  myRAW2.forEach(function(r){
+    if(!r.n)return;var k=r.n.toUpperCase();
+    if(!pipeSchools[k])pipeSchools[k]={name:r.n,expert:r.e,rate:r.r||0,contact:r.rn||'',phone:r.pw||r.pn||'',city:r.v||'',cat:r.ca||'',firstDate:r.t,lastDate:r.t,touches:0,calls:0,status:'prospect'};
+    pipeSchools[k].touches++;
+    if(r.r>pipeSchools[k].rate)pipeSchools[k].rate=r.r;
+    if(r.t&&new Date(r.t)>new Date(pipeSchools[k].lastDate))pipeSchools[k].lastDate=r.t;
+  });
+  // Add call touches
+  var myCalls=sa?CALLS:CALLS.filter(function(c){return c.e===me});
+  myCalls.forEach(function(c){
+    if(!c.n)return;var k=c.n.toUpperCase();
+    if(!pipeSchools[k])pipeSchools[k]={name:c.n,expert:c.e,rate:0,contact:c.cn||'',phone:c.ph||'',city:c.v||'',cat:'',firstDate:c.t,lastDate:c.t,touches:0,calls:0,status:'prospect'};
+    pipeSchools[k].calls++;pipeSchools[k].touches++;
+    if(c.t&&new Date(c.t)>new Date(pipeSchools[k].lastDate))pipeSchools[k].lastDate=c.t;
+  });
+  // Add suivi entries
+  var myEnt=sa?suiviEntries:suiviEntries.filter(function(e){return e.expert===me});
+  myEnt.forEach(function(e){
+    if(!e.school)return;var k=e.school.toUpperCase();
+    if(!pipeSchools[k])pipeSchools[k]={name:e.school,expert:e.expert,rate:0,contact:'',phone:'',city:e.city||'',cat:'',firstDate:e.date||e.createdAt,lastDate:e.date||e.createdAt,touches:0,calls:0,status:'prospect'};
+    pipeSchools[k].touches++;
+    if(e.rate&&Number(e.rate)>pipeSchools[k].rate)pipeSchools[k].rate=Number(e.rate);
+    if(e.status==='Converti')pipeSchools[k].status='won';
+    if(e.status==='Termine')pipeSchools[k].status='lost';
+    var d=e.date||e.createdAt;if(d&&new Date(d)>new Date(pipeSchools[k].lastDate))pipeSchools[k].lastDate=d;
+  });
+  // Classify by rate
+  var pList=Object.keys(pipeSchools).map(function(k){
+    var p=pipeSchools[k];
+    if(p.status==='won')p.stage='won';
+    else if(p.status==='lost')p.stage='lost';
+    else if(p.rate>=70)p.stage='hot';
+    else if(p.rate>=40)p.stage='warm';
+    else if(p.rate>=10)p.stage='cold';
+    else p.stage='new';
+    return p;
+  });
+  var stages={won:[],hot:[],warm:[],cold:[],new:[],lost:[]};
+  pList.forEach(function(p){stages[p.stage].push(p)});
+  Object.keys(stages).forEach(function(s){stages[s].sort(function(a,b){return b.rate-a.rate})});
+
+  // Pipeline funnel KPIs
+  var stageLabels={won:{icon:'🟢',label:'GAGNÉS',color:'var(--green)'},hot:{icon:'🔥',label:'CHAUDS ≥70%',color:'var(--red)'},warm:{icon:'🟡',label:'TIÈDES 40-69%',color:'var(--saffron)'},cold:{icon:'❄️',label:'FROIDS 10-39%',color:'var(--teal)'},'new':{icon:'⬜',label:'NOUVEAU 0%',color:'var(--g400)'},lost:{icon:'⚫',label:'PERDUS',color:'var(--g500)'}};
+
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px;margin-bottom:14px">';
+  h+='<h3 style="font-family:Fraunces,serif;font-size:20px;font-weight:600;margin-bottom:16px">Pipeline '+(sa?'Équipe':'')+'</h3>';
+
+  // Funnel visualization
+  h+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">';
+  ['won','hot','warm','cold','new','lost'].forEach(function(s){
+    var st2=stageLabels[s];var cnt=stages[s].length;var w=pList.length>0?Math.max(20,Math.round(cnt/pList.length*100)):0;
+    h+='<div style="display:flex;align-items:center;gap:10px">';
+    h+='<div style="min-width:100px;font-size:11px;font-weight:700;color:var(--g600);text-align:right">'+st2.icon+' '+st2.label+'</div>';
+    h+='<div style="flex:1;height:32px;background:var(--g100);border-radius:8px;overflow:hidden;position:relative">';
+    h+='<div style="height:100%;width:'+w+'%;background:'+st2.color+';border-radius:8px;display:flex;align-items:center;justify-content:center;min-width:40px">';
+    h+='<span style="color:var(--paper);font-size:13px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.3)">'+cnt+'</span></div></div>';
+    h+='<div style="min-width:40px;font-size:12px;font-weight:700;color:var(--g600)">'+w+'%</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+
+  // Revenue pipeline
+  var revWon=stages.won.length*60000;var revHot=stages.hot.reduce(function(s,p){return s+Math.round(p.rate/100*60000)},0);
+  var revWarm=stages.warm.reduce(function(s,p){return s+Math.round(p.rate/100*60000)},0);
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">';
+  h+='<div style="padding:14px;background:linear-gradient(135deg,var(--green),var(--green-bright));color:var(--paper);border-radius:12px;text-align:center"><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+fmt(revWon)+'</div><div style="font-size:9px;opacity:.85;font-weight:700">REVENU GAGNÉ</div></div>';
+  h+='<div style="padding:14px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:12px;text-align:center"><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+fmt(revHot)+'</div><div style="font-size:9px;opacity:.85;font-weight:700">PIPELINE CHAUD</div></div>';
+  h+='<div style="padding:14px;background:linear-gradient(135deg,var(--saffron),var(--saffron-deep));color:var(--paper);border-radius:12px;text-align:center"><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+fmt(revWarm)+'</div><div style="font-size:9px;opacity:.85;font-weight:700">PIPELINE TIÈDE</div></div>';
+  h+='</div></div>';
+
+  // School cards by stage
+  ['hot','warm','cold'].forEach(function(s){
+    if(!stages[s].length)return;
+    var st2=stageLabels[s];
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:16px;margin-bottom:12px">';
+    h+='<div style="font-size:12px;font-weight:700;color:'+st2.color+';text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">'+st2.icon+' '+st2.label+' ('+stages[s].length+')</div>';
+    stages[s].slice(0,10).forEach(function(p){
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--g100)">';
+      h+='<div style="min-width:42px">'+pct(p.rate)+'</div>';
+      h+='<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name)+'</div>';
+      h+='<div style="font-size:10px;color:var(--g500)">'+esc(p.expert)+' · '+p.touches+' contacts · '+p.calls+' appels'+(p.city?' · '+esc(p.city):'')+'</div></div>';
+      if(p.phone&&p.phone!=='0')h+='<a href="tel:'+p.phone+'" style="font-size:12px;color:var(--teal);font-weight:700;text-decoration:none;white-space:nowrap">📞</a>';
+      h+='</div>';
+    });
+    if(stages[s].length>10)h+='<div style="font-size:11px;color:var(--g400);padding:6px 0;text-align:center">+ '+(stages[s].length-10)+' autres</div>';
+    h+='</div>';
+  });
+
+  // Won deals
+  if(stages.won.length){
+    h+='<div style="background:linear-gradient(135deg,var(--green-soft),var(--paper));border:1.5px solid var(--green);border-radius:16px;padding:16px;margin-bottom:12px">';
+    h+='<div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">🟢 DEALS GAGNÉS ('+stages.won.length+')</div>';
+    stages.won.forEach(function(p){
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0"><span style="font-size:16px">🏆</span><span style="font-weight:600;font-size:13px">'+esc(p.name)+'</span><span style="margin-left:auto;color:var(--green);font-weight:700">'+fmt(60000)+' F</span></div>';
+    });
+    h+='</div>';
+  }
+
+  h+='</div>';
 
   // === TAB: HISTORY ===
   h+='<div class="suivi-panel" id="stab-history"><div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
