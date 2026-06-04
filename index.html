@@ -4116,6 +4116,146 @@ function rSuivi(){
     h+='</div>';
   }
 
+  // Weekly progression (inside pipeline tab)
+  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px;margin-top:14px">';
+  h+='<h3 style="font-family:Fraunces,serif;font-size:18px;font-weight:600;margin-bottom:16px">📅 Progression semaine par semaine'+(sa?'':' (mes données)')+'</h3>';
+
+  // Build weekly data
+  var weekData={};
+  function getWeek(d){var dt=new Date(d);var jan1=new Date(dt.getFullYear(),0,1);var days=Math.floor((dt-jan1)/86400000);return dt.getFullYear()+'-S'+(Math.ceil((days+jan1.getDay()+1)/7));};
+  function weekLabel(w){var p=w.split('-S');return 'S'+p[1]};
+
+  // Prospections by week
+  (sa?RAW:RAW.filter(function(r){return r.e===me})).forEach(function(r){
+    if(!r.t)return;var w=getWeek(r.t);
+    if(!weekData[w])weekData[w]={week:w,field:0,calls:0,hot:0,cold:0,total:0,schools:new Set()};
+    weekData[w].field++;weekData[w].total++;
+    if(r.r>=60)weekData[w].hot++;else weekData[w].cold++;
+    if(r.n)weekData[w].schools.add(r.n.toUpperCase());
+  });
+  // Calls by week
+  (sa?CALLS:CALLS.filter(function(c){return c.e===me})).forEach(function(c){
+    if(!c.t)return;var w=getWeek(c.t);
+    if(!weekData[w])weekData[w]={week:w,field:0,calls:0,hot:0,cold:0,total:0,schools:new Set()};
+    weekData[w].calls++;weekData[w].total++;
+    if(c.n)weekData[w].schools.add(c.n.toUpperCase());
+  });
+  // Suivi entries by week
+  (sa?suiviEntries:suiviEntries.filter(function(e){return e.expert===me})).forEach(function(e){
+    if(!e.date&&!e.createdAt)return;var w=getWeek(e.date||e.createdAt);
+    if(!weekData[w])weekData[w]={week:w,field:0,calls:0,hot:0,cold:0,total:0,schools:new Set()};
+    if(e.mode==='EN PERSONNE')weekData[w].field++;else weekData[w].calls++;
+    weekData[w].total++;
+    if(e.school)weekData[w].schools.add(e.school.toUpperCase());
+  });
+
+  var weeks=Object.keys(weekData).sort().map(function(k){var d=weekData[k];d.schoolCount=d.schools.size;return d});
+
+  if(weeks.length>1){
+    var maxW=1;weeks.forEach(function(w){if(w.total>maxW)maxW=w.total});
+
+    // Week bars
+    h+='<div style="overflow-x:auto;margin-bottom:16px"><div style="display:flex;align-items:flex-end;gap:6px;height:140px;min-width:'+(weeks.length*60)+'px">';
+    weeks.forEach(function(w,i){
+      var fH=Math.max(2,Math.round(w.field/maxW*100));
+      var cH=Math.max(0,Math.round(w.calls/maxW*100));
+      var prev=i>0?weeks[i-1]:null;
+      var diff=prev?w.total-prev.total:0;
+      var diffColor=diff>0?'var(--green)':diff<0?'var(--red)':'var(--g400)';
+      var diffSign=diff>0?'+':'';
+      h+='<div style="flex:0 0 50px;display:flex;flex-direction:column;align-items:center;gap:2px">';
+      if(i>0)h+='<div style="font-size:9px;font-weight:700;color:'+diffColor+'">'+diffSign+diff+'</div>';
+      else h+='<div style="font-size:9px;color:var(--g400)">—</div>';
+      h+='<div style="font-size:10px;font-weight:700;color:var(--ink)">'+w.total+'</div>';
+      h+='<div style="width:100%;display:flex;flex-direction:column">';
+      if(cH>0)h+='<div style="height:'+cH+'px;background:var(--teal);border-radius:4px 4px 0 0"></div>';
+      h+='<div style="height:'+fH+'px;background:var(--red);border-radius:'+(cH>0?'0':'4px 4px')+' 0 0"></div>';
+      h+='</div>';
+      h+='<div style="font-size:9px;color:var(--g500);font-weight:600">'+weekLabel(w.week)+'</div>';
+      h+='</div>';
+    });
+    h+='</div></div>';
+
+    // Legend
+    h+='<div style="display:flex;gap:14px;margin-bottom:16px;font-size:11px;color:var(--g500)"><span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Terrain</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Appels</span><span style="color:var(--green);font-weight:700">+N = croissance</span><span style="color:var(--red);font-weight:700">-N = baisse</span></div>';
+
+    // Week-over-week insights
+    if(weeks.length>=2){
+      var last=weeks[weeks.length-1],prev2=weeks[weeks.length-2];
+      var wDiff=last.total-prev2.total;
+      var wPct=prev2.total>0?Math.round(wDiff/prev2.total*100):0;
+      var fDiff=last.field-prev2.field;
+      var cDiff=last.calls-prev2.calls;
+      h+='<div style="background:'+(wDiff>=0?'linear-gradient(135deg,var(--green-soft),var(--paper))':'linear-gradient(135deg,var(--red-soft),var(--paper))')+';border:1.5px solid '+(wDiff>=0?'var(--green)':'var(--red)')+';border-radius:14px;padding:16px;margin-bottom:14px">';
+      h+='<div style="font-size:12px;font-weight:700;color:'+(wDiff>=0?'var(--green)':'var(--red)')+';margin-bottom:8px">'+(wDiff>=0?'📈':'📉')+' Cette semaine vs semaine précédente</div>';
+      h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">';
+      h+='<div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:'+(wDiff>=0?'var(--green)':'var(--red)  ')+'">'+(wDiff>=0?'+':'')+wDiff+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">TOTAL ('+(wPct>=0?'+':'')+wPct+'%)</div></div>';
+      h+='<div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:'+(fDiff>=0?'var(--green)':'var(--red)')+'">'+(fDiff>=0?'+':'')+fDiff+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">TERRAIN</div></div>';
+      h+='<div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600;color:'+(cDiff>=0?'var(--green)':'var(--red)')+'">'+(cDiff>=0?'+':'')+cDiff+'</div><div style="font-size:9px;color:var(--g500);font-weight:700">APPELS</div></div>';
+      h+='</div></div>';
+    }
+
+    // Weekly table
+    h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Semaine</th><th>🚶 Terrain</th><th>📞 Appels</th><th>Total</th><th>🔥 Chauds</th><th>🏫 Écoles</th><th>Tendance</th></tr></thead><tbody>';
+    weeks.slice().reverse().forEach(function(w,i){
+      var prev3=i<weeks.length-1?weeks[weeks.length-2-i]:null;
+      var diff3=prev3?w.total-prev3.total:0;
+      var tColor=diff3>0?'var(--green)':diff3<0?'var(--red)':'var(--g400)';
+      var tIcon=diff3>0?'📈':diff3<0?'📉':'➡️';
+      h+='<tr><td class="mono" style="font-weight:700">'+weekLabel(w.week)+'</td><td class="num">'+w.field+'</td><td class="num">'+w.calls+'</td><td class="num" style="font-weight:700">'+w.total+'</td><td class="num" style="color:var(--saffron)">'+w.hot+'</td><td class="num">'+w.schoolCount+'</td><td style="color:'+tColor+';font-weight:700;font-size:12px">'+tIcon+' '+(diff3>0?'+':'')+diff3+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  } else {
+    h+='<p style="color:var(--g400);text-align:center;padding:20px">Pas assez de données pour la progression hebdomadaire.</p>';
+  }
+
+  // === ADMIN ONLY: Individual agent weekly breakdown ===
+  if(sa){
+    h+='<div style="margin-top:20px"><div style="font-size:12px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">👥 Progression par agent (cette semaine vs précédente)</div>';
+    var allExp2=[];var seen2={};RAW.forEach(function(r){if(r.e&&!seen2[r.e]){seen2[r.e]=true;allExp2.push(r.e)}});
+    CALLS.forEach(function(c){if(c.e&&!seen2[c.e]){seen2[c.e]=true;allExp2.push(c.e)}});
+
+    allExp2.forEach(function(exp){
+      var expWeeks={};
+      RAW.forEach(function(r){if(r.e===exp&&r.t){var w=getWeek(r.t);if(!expWeeks[w])expWeeks[w]={f:0,c:0,t:0,h:0};expWeeks[w].f++;expWeeks[w].t++;if(r.r>=60)expWeeks[w].h++}});
+      CALLS.forEach(function(c){if(c.e===exp&&c.t){var w=getWeek(c.t);if(!expWeeks[w])expWeeks[w]={f:0,c:0,t:0,h:0};expWeeks[w].c++;expWeeks[w].t++}});
+      var wks=Object.keys(expWeeks).sort();
+      if(wks.length<1)return;
+      var last2=expWeeks[wks[wks.length-1]];
+      var prev4=wks.length>=2?expWeeks[wks[wks.length-2]]:{f:0,c:0,t:0,h:0};
+      var d4=last2.t-prev4.t;
+      var col4=d4>0?'var(--green)':d4<0?'var(--red)':'var(--g400)';
+      var ico4=d4>0?'📈':d4<0?'📉':'➡️';
+
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--g100)">';
+      h+='<div style="min-width:120px"><div style="font-weight:600;font-size:13px">'+esc(exp)+'</div>';
+      h+='<div style="font-size:10px;color:var(--g500)">'+wks.length+' sem. actives</div></div>';
+
+      // Mini bar chart (last 4 weeks)
+      var lastWks=wks.slice(-4);
+      var mxW2=1;lastWks.forEach(function(w){if(expWeeks[w].t>mxW2)mxW2=expWeeks[w].t});
+      h+='<div style="display:flex;gap:2px;align-items:flex-end;height:30px;flex:1">';
+      lastWks.forEach(function(w){
+        var ew=expWeeks[w];
+        var fh2=Math.max(1,Math.round(ew.f/mxW2*25));
+        var ch2=Math.max(0,Math.round(ew.c/mxW2*25));
+        h+='<div style="flex:1;display:flex;flex-direction:column">';
+        if(ch2>0)h+='<div style="height:'+ch2+'px;background:var(--teal);border-radius:2px 2px 0 0"></div>';
+        h+='<div style="height:'+fh2+'px;background:var(--red);border-radius:'+(ch2>0?'0':'2px 2px')+' 0 0"></div>';
+        h+='</div>';
+      });
+      h+='</div>';
+
+      // This week stats
+      h+='<div style="text-align:right;min-width:80px">';
+      h+='<div style="font-size:11px"><span style="color:var(--red);font-weight:700">'+last2.f+'🚶</span> <span style="color:var(--teal);font-weight:700">'+last2.c+'📞</span></div>';
+      h+='<div style="font-size:12px;font-weight:700;color:'+col4+'">'+ico4+' '+(d4>0?'+':'')+d4+'</div>';
+      h+='</div></div>';
+    });
+    h+='</div>';
+  }
+
+  h+='</div>';
   h+='</div>';
 
   // === TAB: HISTORY ===
