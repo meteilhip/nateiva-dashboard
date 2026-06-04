@@ -651,6 +651,67 @@ body{
 }
 .chart h3 .it{font-style:italic;color:var(--red);font-weight:600}
 .chart .desc{font-size:12px;color:var(--g500);margin-bottom:20px;font-family:'JetBrains Mono',monospace}
+.pie-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:24px}
+.pie-card{overflow:hidden}
+.pie-layout{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center}
+.pie-donut{
+  --pie: var(--g100) 0deg 360deg;
+  width:180px;height:180px;border-radius:50%;
+  background:conic-gradient(var(--pie));
+  position:relative;display:flex;align-items:center;justify-content:center;
+  margin:0 auto;
+}
+.pie-donut::before{
+  content:'';position:absolute;inset:18px;border-radius:50%;
+  background:var(--paper);
+  box-shadow:inset 0 0 0 1.5px var(--g100);
+}
+.pie-center{
+  position:relative;z-index:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:0 18px;
+}
+.pie-center strong{
+  font-family:'Fraunces',serif;font-size:34px;font-weight:600;
+  color:var(--ink);line-height:1;letter-spacing:-.04em;
+}
+.pie-center span{
+  margin-top:6px;font-family:'JetBrains Mono',monospace;
+  font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--g500);font-weight:700;
+}
+.pie-legend{display:flex;flex-direction:column;gap:10px}
+.pie-row{
+  display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;
+  padding:10px 0;border-bottom:1px solid var(--g100);
+}
+.pie-row:last-child{border-bottom:none;padding-bottom:0}
+.pie-swatch{width:12px;height:12px;border-radius:999px;margin-top:3px;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.pie-copy{display:flex;flex-direction:column;gap:3px}
+.pie-copy strong{font-size:13px;color:var(--ink);line-height:1.35}
+.pie-copy span{font-size:11px;color:var(--g500);line-height:1.5;font-family:'JetBrains Mono',monospace}
+.pie-val{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g700);white-space:nowrap}
+.pie-insights{
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--g100);
+  display:flex;flex-direction:column;gap:10px;
+}
+.pie-insight{
+  padding:10px 12px;border-radius:10px;background:var(--bg-warm);
+  font-size:12.5px;color:var(--g700);line-height:1.55;border:1px solid var(--g100);
+}
+.pie-insight b{color:var(--ink);font-weight:700}
+.call-insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+.call-signal-card{
+  background:var(--bg-warm);border:1.5px solid var(--g200);border-radius:12px;
+  padding:16px 16px 14px;
+}
+.call-signal-card .eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--g500);margin-bottom:10px;
+}
+.call-signal-card .value{
+  font-family:'Fraunces',serif;font-size:34px;font-weight:600;color:var(--red);line-height:1;letter-spacing:-.03em;
+}
+.call-signal-card .body{margin-top:8px;font-size:12.5px;color:var(--g700);line-height:1.6}
+.table-scroll{overflow:auto;-webkit-overflow-scrolling:touch}
 
 /* BARS */
 .bar-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--g100)}
@@ -1053,6 +1114,15 @@ body{
 .form-card h3 .it{font-style:italic;color:var(--red)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:768px){.form-grid{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .pie-layout{grid-template-columns:1fr}
+  .pie-legend{margin-top:4px}
+}
+@media(max-width:640px){
+  .pie-donut{width:160px;height:160px}
+  .pie-donut::before{inset:16px}
+  .pie-center strong{font-size:30px}
+}
 .form-field{display:flex;flex-direction:column;gap:6px}
 .form-field.full{grid-column:1/-1}
 .form-field label{
@@ -1547,6 +1617,91 @@ function countDistinctDays(rows,key){
   return days.size;
 }
 
+function parseCount(value){
+  const num=parseInt(String(value||'').replace(/\D/g,''),10);
+  return Number.isFinite(num) ? num : 0;
+}
+function isYesFlag(value){
+  const text=normalizeText(value);
+  return text==='oui' || text==='en cours' || text==='yes' || text==='true' || text==='1';
+}
+function hasAnyPattern(text,patterns){
+  return patterns.some(function(pattern){ return pattern.test(text); });
+}
+function resolveToneColor(tone){
+  return {
+    red:'var(--red)',
+    'red-deep':'var(--red-deep)',
+    saffron:'var(--saffron)',
+    teal:'var(--teal)',
+    green:'var(--green)',
+    dark:'var(--ink)',
+    gray:'var(--g400)'
+  }[tone] || tone || 'var(--g300)';
+}
+function primaryMatch(signalMap, orderedKeys, fallbackKey){
+  for(let i=0;i<orderedKeys.length;i++){
+    if(signalMap[orderedKeys[i]])return orderedKeys[i];
+  }
+  return fallbackKey;
+}
+
+const CALL_INTENT_RULES=[
+  {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',tone:'red-deep',patterns:[/pas interesse/,/non interesse/,/refus/,/deja un logiciel/,/pas encore pret/]},
+  {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',tone:'saffron',patterns:[/rdv/,/rendez/,/visite/,/passer/,/deposer/]},
+  {key:'escalation',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',tone:'dark',patterns:[/fondateur/,/fondatrice/,/hierarch/,/superieur/,/boss/,/conseil/]},
+  {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',tone:'teal',patterns:[/doc/,/whatsapp/,/brochure/,/proposition/,/envoy/,/support/]},
+  {key:'callback',label:'🔁 Relance / 2e appel',short:'Relance',tone:'red',patterns:[/rapp/,/recontacter/,/revenir/,/plus tard/,/juin/,/conges/,/vacance/,/examen/]},
+  {key:'interest',label:'✨ Intérêt / découverte',short:'Intérêt',tone:'green',patterns:[/interess/,/prendre connaissance/,/etudier l offre/,/prise de rendez/,/voudrait/,/pour la suite/,/acheminer/]}
+];
+const CALL_INTENT_ORDER=CALL_INTENT_RULES.map(function(rule){ return rule.key; });
+
+const PROSPECTION_THEME_RULES=[
+  {key:'competition',label:'⚔️ Prix / concurrent / refus',short:'Prix / refus',tone:'red-deep',patterns:[/deja un logiciel/,/pas capable de payer/,/pas encore pret/,/pas interesse/,/refus/]},
+  {key:'blocked',label:'🚪 Accès bloqué / fermé',short:'Accès bloqué',tone:'gray',patterns:[/pas recu/,/pas trouve/,/personne n etait disponible/,/n etait pas la/,/ferme/,/fermee/,/portails ferme/,/directeur n etait pas la/]},
+  {key:'documents',label:'📄 Dossier / documents',short:'Documents',tone:'teal',patterns:[/doc/,/whatsapp/,/brochure/,/proposition/,/photocop/,/envoy/,/support/]},
+  {key:'callback',label:'🔁 Repasser / relancer',short:'Relance',tone:'red',patterns:[/rdv/,/rendez/,/repass/,/rapp/,/relanc/,/passer/,/demain/,/lundi/,/aout/]},
+  {key:'hierarchie',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',tone:'dark',patterns:[/fondateur/,/fondatrice/,/hierarch/,/superieur/,/boss/,/conseil/,/administration/]},
+  {key:'interest',label:'✨ Intérêt chaud',short:'Intérêt',tone:'green',patterns:[/interess/,/aime/,/promet/,/forte chance/,/signe/,/voudrait/,/acheminer/]}
+];
+const PROSPECTION_THEME_ORDER=PROSPECTION_THEME_RULES.map(function(rule){ return rule.key; });
+
+function extractCallIntent(item){
+  const text=normalizeText([item && item.Status,item && item.Outcome,item && item.Notes,item && item.NextAction].join(' '));
+  const rating=parseCount(item && (item.CallRating||item.Rating));
+  const signals={
+    rejection:hasAnyPattern(text,CALL_INTENT_RULES[0].patterns),
+    visit:hasAnyPattern(text,CALL_INTENT_RULES[1].patterns) || isYesFlag(item && item.CallVisit),
+    escalation:hasAnyPattern(text,CALL_INTENT_RULES[2].patterns) || isYesFlag(item && item.CallToSuperior),
+    docs:hasAnyPattern(text,CALL_INTENT_RULES[3].patterns) || isYesFlag(item && item.CallWhatsappDocs),
+    callback:hasAnyPattern(text,CALL_INTENT_RULES[4].patterns) || isYesFlag(item && item.CallSecondCall) || parseCount(item && item.CallTimesCalled)>1,
+    interest:hasAnyPattern(text,CALL_INTENT_RULES[5].patterns) || rating>=3
+  };
+  signals.qualify=!CALL_INTENT_ORDER.some(function(key){ return signals[key]; });
+  return {
+    rating:rating,
+    signals:signals,
+    primary:primaryMatch(signals,CALL_INTENT_ORDER,'qualify')
+  };
+}
+
+function extractProspectionTheme(row){
+  const text=normalizeText([(row && row.co)||'',(row && row.re)||''].join(' '));
+  const signals={
+    competition:hasAnyPattern(text,PROSPECTION_THEME_RULES[0].patterns),
+    blocked:hasAnyPattern(text,PROSPECTION_THEME_RULES[1].patterns),
+    documents:hasAnyPattern(text,PROSPECTION_THEME_RULES[2].patterns),
+    callback:hasAnyPattern(text,PROSPECTION_THEME_RULES[3].patterns),
+    hierarchie:hasAnyPattern(text,PROSPECTION_THEME_RULES[4].patterns),
+    interest:hasAnyPattern(text,PROSPECTION_THEME_RULES[5].patterns) || (typeof (row && row.r)==='number' && row.r>=60)
+  };
+  signals.qualify=!PROSPECTION_THEME_ORDER.some(function(key){ return signals[key]; });
+  return {
+    signals:signals,
+    primary:primaryMatch(signals,PROSPECTION_THEME_ORDER,'qualify')
+  };
+}
+
 function attrEsc(value){
   return esc(String(value||'')).replace(/'/g,'&#39;');
 }
@@ -1612,20 +1767,34 @@ const DASHBOARD_STAGES=[
 function getDashboardScope(){
   const rawRows=gF();
   const allowed=new Set(rawRows.map(r=>schoolKey(r.n)).filter(Boolean));
+  const allowedExperts=new Set(rawRows.map(function(r){ return canonicalPersonKey(r.e); }).filter(Boolean));
+  const allowExpertFallback=!ST.rate && !ST.cat;
   const followups=getVisibleFollowups().filter(function(item){
-    if(!allowed.size) return false;
+    if(!allowed.size && !allowedExperts.size) return false;
     if(ST.city && item.City && item.City!==ST.city) return false;
     if(ST.expert && item.Expert && !samePerson(item.Expert,ST.expert)) return false;
-    const key=schoolKey(item.SchoolName);
+    if(ST.sec && item.Sector && item.Sector!==ST.sec) return false;
+    const key=item.SchoolKey || schoolKey(item.SchoolName);
     return key ? allowed.has(key) : false;
+  }).concat(getVisibleFollowups().filter(function(item){
+    if(!allowExpertFallback) return false;
+    if(!item || !item.Expert) return false;
+    if(ST.city && item.City && item.City!==ST.city) return false;
+    if(ST.expert && !samePerson(item.Expert,ST.expert)) return false;
+    if(ST.sec && item.Sector && item.Sector!==ST.sec) return false;
+    const key=item.SchoolKey || schoolKey(item.SchoolName);
+    if(key && allowed.has(key)) return false;
+    return allowedExperts.has(canonicalPersonKey(item.Expert));
+  })).filter(function(item,index,list){
+    return list.findIndex(function(other){ return other.ID===item.ID; })===index;
   });
   return {rawRows,followups};
 }
 
 function buildSchoolRecords(rawRows, followups){
   const map=new Map();
-  function ensure(name){
-    const key=schoolKey(name);
+  function ensure(name, forcedKey){
+    const key=forcedKey || schoolKey(name);
     if(!key)return null;
     if(!map.has(key)){
       map.set(key,{
@@ -1661,7 +1830,7 @@ function buildSchoolRecords(rawRows, followups){
   }
 
   rawRows.forEach(function(r){
-    const rec=ensure(r.n);
+    const rec=ensure(r.n,schoolKey(r.n));
     if(!rec)return;
     rec.rawCount++;
     rec.schoolName=r.n||rec.schoolName;
@@ -1692,7 +1861,9 @@ function buildSchoolRecords(rawRows, followups){
   });
 
   followups.forEach(function(item){
-    const rec=ensure(item.SchoolName);
+    const itemKey=item.SchoolKey || schoolKey(item.SchoolName);
+    if(item.Source==='calls-sheet' && itemKey && !map.has(itemKey))return;
+    const rec=ensure(item.SchoolName,itemKey);
     if(!rec)return;
     rec.followupCount++;
     rec.schoolName=item.SchoolName||rec.schoolName;
@@ -1936,28 +2107,133 @@ function buildAreaLayers(records){
 function buildCallAnalytics(followups, experts){
   const calls=followups.filter(function(item){ return item.FollowupType==='CALL'; });
   const summary={total:calls.length,connected:0,message:0,noAnswer:0,unreachable:0,other:0};
+  const signalTotals={docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0};
+  const primaryTotals={rejection:0,visit:0,escalation:0,docs:0,callback:0,interest:0,qualify:0};
   const byExpert=new Map();
+  let ratedCount=0;
+  let ratingTotal=0;
   (experts||[]).filter(Boolean).forEach(function(expert){
     const name=canonicalPersonName(expert);
-    byExpert.set(name,{expert:name,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:''});
+    byExpert.set(name,{expert:name,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0});
   });
   calls.forEach(function(item){
     const bucket=categorizeCallStatus(item);
-    summary[bucket]=(summary[bucket]||0)+1;
+    const bucketKey=bucket==='no_answer' ? 'noAnswer' : bucket;
+    summary[bucketKey]=(summary[bucketKey]||0)+1;
+    const intent=extractCallIntent(item);
     const expert=canonicalPersonName(item.Expert||'Non attribué');
     if(!byExpert.has(expert)){
-      byExpert.set(expert,{expert:expert,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:''});
+      byExpert.set(expert,{expert:expert,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0});
     }
     const row=byExpert.get(expert);
     row.total++;
-    row[bucket]=(row[bucket]||0)+1;
+    row[bucketKey]=(row[bucketKey]||0)+1;
     if(item.Timestamp && (!row.lastCall || item.Timestamp>row.lastCall))row.lastCall=item.Timestamp;
+    CALL_INTENT_ORDER.forEach(function(key){
+      if(intent.signals[key]){
+        signalTotals[key]++;
+        row[key]=(row[key]||0)+1;
+      }
+    });
+    if(intent.signals.qualify){
+      signalTotals.qualify++;
+      row.qualify++;
+    }
+    primaryTotals[intent.primary]=(primaryTotals[intent.primary]||0)+1;
+    if(intent.rating>0){
+      ratedCount++;
+      ratingTotal+=intent.rating;
+    }
   });
   const expertsTable=Array.from(byExpert.values()).sort(function(a,b){
     if(b.total!==a.total)return b.total-a.total;
     return a.expert.localeCompare(b.expert,'fr');
   });
-  return {summary:summary, experts:expertsTable};
+  const statusSegments=[
+    {label:'✅ Contact établi',short:'Joints',value:summary.connected,color:resolveToneColor('green'),detail:'bonne personne jointe'},
+    {label:'📝 Message laissé',short:'Messages',value:summary.message,color:resolveToneColor('teal'),detail:'intermédiaire ou message'},
+    {label:'📵 Sans réponse',short:'Sans réponse',value:summary.noAnswer,color:resolveToneColor('red'),detail:'ligne occupée / pas de réponse'},
+    {label:'⛔ Injoignable',short:'Injoignable',value:summary.unreachable,color:resolveToneColor('dark'),detail:'erreur / numéro KO'},
+    {label:'❔ Autre',short:'Autre',value:summary.other,color:resolveToneColor('gray'),detail:'à préciser'}
+  ].filter(function(segment){ return segment.value>0; });
+  const primaryIntentSegments=[
+    {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',value:primaryTotals.visit,color:resolveToneColor('saffron'),detail:'opportunité terrain immédiate'},
+    {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',value:primaryTotals.docs,color:resolveToneColor('teal'),detail:'envoi documentaire demandé'},
+    {key:'callback',label:'🔁 Relance / 2e appel',short:'Relance',value:primaryTotals.callback,color:resolveToneColor('red'),detail:'relance planifiée'},
+    {key:'escalation',label:'🏛️ Hiérarchie / fondateur',short:'Hiérarchie',value:primaryTotals.escalation,color:resolveToneColor('dark'),detail:'passe au décideur final'},
+    {key:'interest',label:'✨ Intérêt à nourrir',short:'Intérêt',value:primaryTotals.interest,color:resolveToneColor('green'),detail:'curiosité réelle détectée'},
+    {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',value:primaryTotals.rejection,color:resolveToneColor('red-deep'),detail:'blocage explicite'},
+    {key:'qualify',label:'📝 À qualifier',short:'À qualifier',value:primaryTotals.qualify,color:resolveToneColor('gray'),detail:'résumé trop faible pour lire la suite'}
+  ].filter(function(segment){ return segment.value>0; });
+  const topExpert=expertsTable[0] || null;
+  const actionableCalls=calls.length-primaryTotals.qualify;
+  const insights=[
+    `${signalTotals.docs} appels déclenchent déjà un envoi de documents ou de WhatsApp.`,
+    `${signalTotals.callback} demandent une relance explicite et ${signalTotals.visit} sont mûrs pour une visite ou un rendez-vous.`,
+    `${signalTotals.escalation} appellent une validation fondateur / hiérarchie: c’est la vraie marche de décision.`,
+    `${primaryTotals.qualify} appels restent à qualifier car le résumé métier n’explique pas encore la vraie suite commerciale.`
+  ];
+  if(topExpert && topExpert.total){
+    insights.push(`${topExpert.expert} porte aujourd’hui le plus gros volume d’appels visibles (${topExpert.total}).`);
+  }
+  return {
+    summary:summary,
+    experts:expertsTable,
+    signalTotals:signalTotals,
+    primaryTotals:primaryTotals,
+    statusSegments:statusSegments,
+    primaryIntentSegments:primaryIntentSegments,
+    quality:{
+      ratedCount:ratedCount,
+      avgRating:ratedCount ? (ratingTotal/ratedCount) : 0,
+      actionableCalls:actionableCalls,
+      qualifiesNeeded:primaryTotals.qualify
+    },
+    insights:insights
+  };
+}
+
+function buildProspectionAnalytics(rawRows, pipeline){
+  const overlap={competition:0,blocked:0,documents:0,callback:0,hierarchie:0,interest:0,qualify:0};
+  const primary={competition:0,blocked:0,documents:0,callback:0,hierarchie:0,interest:0,qualify:0};
+  rawRows.forEach(function(row){
+    const theme=extractProspectionTheme(row);
+    PROSPECTION_THEME_ORDER.forEach(function(key){
+      if(theme.signals[key])overlap[key]++;
+    });
+    if(theme.signals.qualify)overlap.qualify++;
+    primary[theme.primary]=(primary[theme.primary]||0)+1;
+  });
+  const stageSegments=(pipeline||[]).map(function(stage){
+    return {
+      label:stage.label,
+      short:stage.label.replace(/^[^\s]+\s+/,''),
+      value:stage.count,
+      color:resolveToneColor(stage.color),
+      detail:stage.range
+    };
+  }).filter(function(segment){ return segment.value>0; });
+  const primaryThemeSegments=[
+    {key:'hierarchie',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',value:primary.hierarchie,color:resolveToneColor('dark'),detail:'prochaine décision hors expert'},
+    {key:'documents',label:'📄 Dossier / documents',short:'Documents',value:primary.documents,color:resolveToneColor('teal'),detail:'supports à déposer/envoyer'},
+    {key:'callback',label:'🔁 Repasser / relancer',short:'Relance',value:primary.callback,color:resolveToneColor('red'),detail:'retour terrain planifié'},
+    {key:'interest',label:'✨ Intérêt déjà chaud',short:'Intérêt',value:primary.interest,color:resolveToneColor('green'),detail:'bonne traction visible'},
+    {key:'blocked',label:'🚪 Accès bloqué / fermé',short:'Accès bloqué',value:primary.blocked,color:resolveToneColor('gray'),detail:'absence du décideur / porte close'},
+    {key:'competition',label:'⚔️ Prix / concurrent / refus',short:'Prix / refus',value:primary.competition,color:resolveToneColor('red-deep'),detail:'objection dure'},
+    {key:'qualify',label:'📝 À qualifier',short:'À qualifier',value:primary.qualify,color:resolveToneColor('saffron'),detail:'note trop faible pour lecture fine'}
+  ].filter(function(segment){ return segment.value>0; });
+  return {
+    overlap:overlap,
+    primary:primary,
+    stageSegments:stageSegments,
+    primaryThemeSegments:primaryThemeSegments,
+    insights:[
+      `${overlap.hierarchie} notes mentionnent le fondateur ou la hiérarchie: c’est le goulot d’étranglement terrain dominant.`,
+      `${overlap.documents} demandes de documents et ${overlap.callback} demandes de repassage structurent déjà le suivi commercial.`,
+      `${overlap.competition} signaux parlent prix, refus ou logiciel déjà en place: à traiter comme blocage dur.`,
+      `${primary.qualify} prospections n’ont pas encore assez de commentaire métier pour une lecture NLP exploitable.`
+    ]
+  };
 }
 
 function buildAgentProgress(rawRows, followups){
@@ -1987,6 +2263,7 @@ function buildDashboardModel(){
   const layers=buildAreaLayers(records);
   const scopedExperts=[...new Set(scope.rawRows.map(function(row){ return row.e; }).filter(Boolean))];
   const callAnalytics=buildCallAnalytics(scope.followups,scopedExperts);
+  const prospectionAnalytics=buildProspectionAnalytics(scope.rawRows,pipeline);
   const hotStage=pipeline.find(function(stage){ return stage.key==='chaud'; }) || {count:0,amount:0};
   const warmStage=pipeline.find(function(stage){ return stage.key==='tiede'; }) || {count:0,amount:0};
   const wonStage=pipeline.find(function(stage){ return stage.key==='gagne'; }) || {count:0,amount:0};
@@ -2004,6 +2281,7 @@ function buildDashboardModel(){
     monthly,
     layers,
     callAnalytics,
+    prospectionAnalytics,
     wonDeals:records.filter(function(record){ return record.stage==='gagne'; }),
     wonRevenue:wonStage.amount||0,
     hotRevenue:hotStage.amount||0,
@@ -2040,6 +2318,50 @@ function renderRevenueCard(title,value,copy,colorClass){
     <div class="desc">Montant cumulé en FCFA</div>
     <div style="font-family:'Fraunces',serif;font-size:54px;font-weight:600;color:var(--red);line-height:1;letter-spacing:-.04em;margin:6px 0 10px">${moneyCompact(value)}</div>
     <div style="font-size:13px;color:var(--g600);line-height:1.7">${copy}</div>
+  </div>`;
+}
+
+function pieGradient(segments){
+  const active=(segments||[]).filter(function(segment){ return segment && segment.value>0; });
+  const total=active.reduce(function(sum,segment){ return sum+segment.value; },0) || 1;
+  let progress=0;
+  if(!active.length)return 'var(--g100) 0deg 360deg';
+  return active.map(function(segment){
+    const start=(progress/total)*360;
+    progress+=segment.value;
+    const end=(progress/total)*360;
+    return `${segment.color} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+  }).join(', ');
+}
+
+function renderPieCard(title, desc, segments, centerValue, centerLabel, insights){
+  const active=(segments||[]).filter(function(segment){ return segment && segment.value>0; });
+  const total=active.reduce(function(sum,segment){ return sum+segment.value; },0) || 1;
+  return `<div class="chart pie-card">
+    <h3>${title}</h3>
+    <div class="desc">${desc}</div>
+    <div class="pie-layout">
+      <div class="pie-donut" style="--pie:${pieGradient(active)}">
+        <div class="pie-center">
+          <strong>${esc(centerValue)}</strong>
+          <span>${esc(centerLabel)}</span>
+        </div>
+      </div>
+      <div class="pie-legend">
+        ${active.map(function(segment){
+          const pctv=Math.round((segment.value/total)*100);
+          return `<div class="pie-row">
+            <span class="pie-swatch" style="background:${segment.color}"></span>
+            <div class="pie-copy">
+              <strong>${esc(segment.label)}</strong>
+              <span>${esc(segment.detail || 'lecture principale')}</span>
+            </div>
+            <div class="pie-val">${segment.value} · ${pctv}%</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    ${insights && insights.length ? `<div class="pie-insights">${insights.map(function(item){ return `<div class="pie-insight">${item}</div>`; }).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -2311,6 +2633,8 @@ function rHome(){
   const zoneRows=dashboard.layers.zones.slice(0,8);
   const callSummary=dashboard.callAnalytics.summary;
   const callExperts=dashboard.callAnalytics.experts;
+  const callQuality=dashboard.callAnalytics.quality;
+  const prospectionAnalytics=dashboard.prospectionAnalytics;
 
   let h=`
   <div class="page-intro" data-num="01">
@@ -2393,6 +2717,36 @@ function rHome(){
 
   <div class="section">
     <div class="sec-head">
+      <h2>🥧 Prospection <span class="it">Pie Charts + NLP</span></h2>
+      <span class="anno">${totalProspections} prospections visibles · lecture exclusive + signaux terrain</span>
+    </div>
+    <div class="pie-grid">
+      ${renderPieCard(
+        'Pipeline visible',
+        'Répartition réelle du portefeuille prospection par étape, sans perdre la logique chaud / tiède / froid.',
+        prospectionAnalytics.stageSegments,
+        String(uniqueSchools),
+        'écoles visibles',
+        [
+          `<b>${hotStage.count + wonStage.count}</b> écoles sont déjà en zone chaude ou gagnée.`,
+          `<b>${dashboard.hotRate}%</b> du portefeuille visible est aujourd’hui chaud/gagné.`,
+          `<b>${dashboard.pipeline.find(stage=>stage.key==='nouveau')?.count || 0}</b> écoles sont encore nouvelles et demandent une première qualification claire.`
+        ]
+      )}
+      ${renderPieCard(
+        'Lecture terrain des notes',
+        'Chaque prospection reçoit ici un thème principal exclusif pour garder un vrai camembert lisible.',
+        prospectionAnalytics.primaryThemeSegments,
+        String(totalProspections - prospectionAnalytics.primary.qualify),
+        'notes interprétables',
+        prospectionAnalytics.insights
+      )}
+    </div>
+    <div class="note teal"><b>Lecture utile:</b> le camembert terrain est <b>exclusif</b> pour rester honnête, mais les insights NLP ci-dessous gardent les chevauchements réels: une même école peut demander des documents <i>et</i> être bloquée en hiérarchie.</div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
       <h2>📞 Appels <span class="it">& Résultats</span></h2>
       <span class="anno">${dashboard.sourceCallCount} appels source · suivi par issue et par expert</span>
     </div>
@@ -2408,43 +2762,87 @@ function rHome(){
         <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% du volume appels</div>
       </div>
       <div class="kpi saffron">
-        <div class="lbl">Messages / Autres</div>
-        <div class="val">${callSummary.message + callSummary.other}</div>
-        <div class="delta">${callSummary.message} message laissé · ${callSummary.other} à qualifier</div>
+        <div class="lbl">Actions Détectées</div>
+        <div class="val">${callQuality.actionableCalls}</div>
+        <div class="delta">${dashboard.callAnalytics.signalTotals.docs} docs · ${dashboard.callAnalytics.signalTotals.callback} relances · ${dashboard.callAnalytics.signalTotals.visit} RDV</div>
       </div>
       <div class="kpi red">
-        <div class="lbl">Sans Réponse</div>
-        <div class="val">${callSummary.noAnswer + callSummary.unreachable}</div>
-        <div class="delta">${callSummary.noAnswer} ligne occupée · ${callSummary.unreachable} injoignable</div>
+        <div class="lbl">À Requalifier</div>
+        <div class="val">${callQuality.qualifiesNeeded}</div>
+        <div class="delta">${callSummary.noAnswer} sans réponse · ${callSummary.unreachable} erreurs · notes trop faibles sinon</div>
+      </div>
+    </div>
+    <div class="pie-grid">
+      ${renderPieCard(
+        'Issue opérationnelle des appels',
+        'Camembert exclusif: ce qui s’est passé au téléphone avant toute interprétation business.',
+        dashboard.callAnalytics.statusSegments,
+        String(callSummary.total),
+        'appels',
+        [
+          `<b>${callSummary.connected}</b> appels ont joint directement la bonne personne.`,
+          `<b>${callSummary.noAnswer + callSummary.unreachable}</b> appels sont bloqués par la joignabilité avant même la vente.`,
+          `${callQuality.ratedCount ? `Seulement <b>${callQuality.ratedCount}</b> appels ont une note/rating exploitable pour enrichir l’analyse.` : `<b>Aucun rating exploitable</b> n’est encore saisi côté appels.`}`
+        ]
+      )}
+      ${renderPieCard(
+        'Suite commerciale détectée',
+        'NLP + drapeaux source pour lire la prochaine action dominante derrière chaque appel.',
+        dashboard.callAnalytics.primaryIntentSegments,
+        String(callQuality.actionableCalls),
+        'appels lisibles',
+        dashboard.callAnalytics.insights
+      )}
+    </div>
+    <div class="call-insight-grid">
+      <div class="call-signal-card">
+        <div class="eyebrow">📄 Documents / WhatsApp</div>
+        <div class="value">${dashboard.callAnalytics.signalTotals.docs}</div>
+        <div class="body">Appels où la personne a demandé l’envoi de documents, brochure ou supports WhatsApp.</div>
+      </div>
+      <div class="call-signal-card">
+        <div class="eyebrow">🔁 Relances demandées</div>
+        <div class="value">${dashboard.callAnalytics.signalTotals.callback}</div>
+        <div class="body">Appels qui demandent un rappel, un second passage ou une reprise après examens / congés.</div>
+      </div>
+      <div class="call-signal-card">
+        <div class="eyebrow">📍 RDV / Visites</div>
+        <div class="value">${dashboard.callAnalytics.signalTotals.visit}</div>
+        <div class="body">Appels déjà assez mûrs pour un rendez-vous physique, un dépôt ou une visite commerciale.</div>
+      </div>
+      <div class="call-signal-card">
+        <div class="eyebrow">🏛️ Hiérarchie</div>
+        <div class="value">${dashboard.callAnalytics.signalTotals.escalation}</div>
+        <div class="body">Cas où l’offre monte au fondateur, à la hiérarchie ou au conseil avant arbitrage final.</div>
       </div>
     </div>
     <div class="two">
       <div class="chart">
-        <h3>Résultats <span class="it">des 105 appels</span></h3>
-        <div class="desc">Lecture directe de la campagne téléphonique: ce qui a abouti, ce qui demande une relance, et ce qui bloque.</div>
-        <table class="tbl">
-          <thead><tr><th>Issue</th><th>Volume</th><th>Part</th></tr></thead>
+        <h3>Lecture <span class="it">NLP des appels</span></h3>
+        <div class="desc">Interprétation métier de ce que les résumés racontent vraiment, au-delà du simple statut technique.</div>
+        <div class="table-scroll"><table class="tbl">
+          <thead><tr><th>Signal</th><th>Volume</th><th>Part</th><th>Interprétation utile</th></tr></thead>
           <tbody>
-            <tr><td><b>✅ Contact établi</b></td><td class="num">${callSummary.connected}</td><td class="num">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}%</td></tr>
-            <tr><td><b>📝 Message laissé / autre personne</b></td><td class="num">${callSummary.message}</td><td class="num">${callSummary.total ? Math.round((callSummary.message/callSummary.total)*100) : 0}%</td></tr>
-            <tr><td><b>📵 Aucune réponse / ligne occupée</b></td><td class="num">${callSummary.noAnswer}</td><td class="num">${callSummary.total ? Math.round((callSummary.noAnswer/callSummary.total)*100) : 0}%</td></tr>
-            <tr><td><b>⛔ Numéro injoignable / erreur</b></td><td class="num">${callSummary.unreachable}</td><td class="num">${callSummary.total ? Math.round((callSummary.unreachable/callSummary.total)*100) : 0}%</td></tr>
-            <tr><td><b>❔ Non classé</b></td><td class="num">${callSummary.other}</td><td class="num">${callSummary.total ? Math.round((callSummary.other/callSummary.total)*100) : 0}%</td></tr>
+            <tr><td><b>📄 Docs / WhatsApp</b></td><td class="num">${dashboard.callAnalytics.signalTotals.docs}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.docs/callSummary.total)*100) : 0}%</td><td>Le contact veut matière pour continuer la discussion.</td></tr>
+            <tr><td><b>🔁 Relance / 2e appel</b></td><td class="num">${dashboard.callAnalytics.signalTotals.callback}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.callback/callSummary.total)*100) : 0}%</td><td>La conversation n’est pas morte, mais demande timing et discipline.</td></tr>
+            <tr><td><b>📍 RDV / visite</b></td><td class="num">${dashboard.callAnalytics.signalTotals.visit}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.visit/callSummary.total)*100) : 0}%</td><td>Ce sont les appels les plus proches d’un vrai mouvement terrain.</td></tr>
+            <tr><td><b>🏛️ Hiérarchie / fondateur</b></td><td class="num">${dashboard.callAnalytics.signalTotals.escalation}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.escalation/callSummary.total)*100) : 0}%</td><td>Décision non locale: il faut armer le dossier et suivre le décideur final.</td></tr>
+            <tr><td><b>📝 À qualifier</b></td><td class="num">${callQuality.qualifiesNeeded}</td><td class="num">${callSummary.total ? Math.round((callQuality.qualifiesNeeded/callSummary.total)*100) : 0}%</td><td>Le statut existe, mais pas encore l’histoire commerciale exploitable.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
       <div class="chart">
         <h3>Par <span class="it">expert</span></h3>
-        <div class="desc">Noah peut maintenant vérifier qui appelle, avec quel résultat, et repérer immédiatement les écarts de volume.</div>
-        <table class="tbl">
-          <thead><tr><th>Expert</th><th>Appels</th><th>Joints</th><th>Sans réponse</th><th>Autres</th><th>Dernier appel</th></tr></thead>
+        <div class="desc">On voit enfin non seulement qui appelle, mais ce que ces appels débloquent réellement.</div>
+        <div class="table-scroll"><table class="tbl">
+          <thead><tr><th>Expert</th><th>Appels</th><th>Joints</th><th>Docs</th><th>Relances</th><th>RDV</th><th>À qualifier</th><th>Dernier appel</th></tr></thead>
           <tbody>
-            ${callExperts.map(agent=>`<tr><td><b>${esc(agent.expert)}</b></td><td class="num">${agent.total}</td><td class="num">${agent.connected}</td><td class="num">${agent.noAnswer + agent.unreachable}</td><td class="num">${agent.message + agent.other}</td><td>${agent.lastCall ? esc(String(agent.lastCall).slice(0,10)) : '—'}</td></tr>`).join('')}
+            ${callExperts.map(agent=>`<tr><td><b>${esc(agent.expert)}</b></td><td class="num">${agent.total}</td><td class="num">${agent.connected}</td><td class="num">${agent.docs}</td><td class="num">${agent.callback}</td><td class="num">${agent.visit}</td><td class="num">${agent.qualify}</td><td>${agent.lastCall ? esc(String(agent.lastCall).slice(0,10)) : '—'}</td></tr>`).join('')}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
-    <div class="note teal"><b>Lecture source actuelle:</b> la feuille appels importée contient aujourd'hui des appels saisis pour <b>Kendo Fabiola</b> et <b>Kessi Taylor</b>. Si Noah veut attribuer d'autres appels à un autre expert, il faut corriger la feuille source ou l'accès utilisateur concerné.</div>
+    <div class="note teal"><b>Lecture source actuelle:</b> la feuille appels importée visible aujourd’hui répartit les <b>105 appels</b> entre <b>Kendo Fabiola</b> et <b>Kessi Taylor</b>. Cette section ne fabrique pas les résultats: elle interprète les résumés et drapeaux réellement saisis, puis signale aussi quand une note est trop faible pour un vrai diagnostic commercial.</div>
   </div>
 
   <div class="section">
@@ -4301,7 +4699,7 @@ function buildImportedSheetFollowups() {
   getAllRawRows().forEach(function(r) {
     var schoolKey = normalizeText(r.n);
     if (schoolKey) {
-      if (!schoolMeta[schoolKey]) schoolMeta[schoolKey] = { school: r.n || '', city: r.v || '', sector: zoneLabel(r) || '', experts: [] };
+      if (!schoolMeta[schoolKey]) schoolMeta[schoolKey] = { key: schoolKey, school: r.n || '', city: r.v || '', sector: zoneLabel(r) || '', experts: [] };
       if (r.v && !schoolMeta[schoolKey].city) schoolMeta[schoolKey].city = r.v;
       if (zoneLabel(r) && !schoolMeta[schoolKey].sector) schoolMeta[schoolKey].sector = zoneLabel(r);
       if (r.e && schoolMeta[schoolKey].experts.indexOf(r.e) === -1) schoolMeta[schoolKey].experts.push(r.e);
@@ -4310,7 +4708,7 @@ function buildImportedSheetFollowups() {
     [r.pw, r.pn].forEach(function(phone) {
       var clean = digitsOnly(phone);
       if (!clean) return;
-      if (!phoneMeta[clean]) phoneMeta[clean] = { school: r.n || '', city: r.v || '', sector: zoneLabel(r) || '', experts: [] };
+      if (!phoneMeta[clean]) phoneMeta[clean] = { key: schoolKey, school: r.n || '', city: r.v || '', sector: zoneLabel(r) || '', experts: [] };
       if (r.e && phoneMeta[clean].experts.indexOf(r.e) === -1) phoneMeta[clean].experts.push(r.e);
       if (r.n && !phoneMeta[clean].school) phoneMeta[clean].school = r.n;
     });
@@ -4331,11 +4729,13 @@ function buildImportedSheetFollowups() {
     if (call.whatsappDocs) nextActions.push('Docs WhatsApp');
     if (call.toSuperior) nextActions.push('Transmission supérieur');
     if (call.visit) nextActions.push('Visite sur site');
+    var matchedSchoolKey = (schoolInfo && schoolInfo.key) || (phoneInfo && phoneInfo.key) || schoolKey(inferredSchool);
     return {
       ID: 'IMP-CALL-' + (index + 1),
       Timestamp: call.timestamp || call.date || '',
       Expert: inferredExpert,
       SchoolName: inferredSchool,
+      SchoolKey: matchedSchoolKey,
       ContactName: call.contact || '',
       ContactPhone: call.phone || '',
       FollowupType: 'CALL',
@@ -4348,7 +4748,13 @@ function buildImportedSheetFollowups() {
       City: inferredCity,
       Sector: inferredSector,
       Source: 'calls-sheet',
-      Imported: true
+      Imported: true,
+      CallRating: parseCount(call.rating),
+      CallTimesCalled: parseCount(call.timesCalled),
+      CallSecondCall: call.secondCall || '',
+      CallWhatsappDocs: call.whatsappDocs || '',
+      CallToSuperior: call.toSuperior || '',
+      CallVisit: call.visit || ''
     };
   });
 }
