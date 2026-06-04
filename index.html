@@ -1485,8 +1485,45 @@ function normalizeText(value){
     .toLowerCase()
     .replace(/\s+/g,' ');
 }
-function samePerson(a,b){return normalizeText(a)===normalizeText(b)}
+const PERSON_ALIASES={
+  'kessie':'kessi taylor',
+  'kessie taylor':'kessi taylor',
+  'kessi':'kessi taylor',
+  'kessy':'kessi taylor',
+  'emambo ida':'emambo ida',
+  'ida':'emambo ida',
+  'kendo fabiola':'kendo fabiola',
+  'fabiola':'kendo fabiola',
+  'mbeuka brice':'mbeuka brice',
+  'ntsa guy':'ntsa guy',
+  'noah':'noah'
+};
+const PERSON_DISPLAY_NAMES={
+  'kessi taylor':'Kessi Taylor',
+  'emambo ida':'Emambo Ida',
+  'kendo fabiola':'Kendo Fabiola',
+  'mbeuka brice':'Mbeuka brice',
+  'ntsa guy':'Ntsa Guy',
+  'noah':'Noah'
+};
+function canonicalPersonKey(value){
+  const normalized=normalizeText(value);
+  return PERSON_ALIASES[normalized] || normalized;
+}
+function canonicalPersonName(value){
+  const key=canonicalPersonKey(value);
+  return PERSON_DISPLAY_NAMES[key] || String(value||'').trim();
+}
+function samePerson(a,b){return canonicalPersonKey(a)===canonicalPersonKey(b)}
 function digitsOnly(value){return String(value||'').replace(/\D/g,'')}
+function categorizeCallStatus(item){
+  const text=normalizeText((item && item.Status)||'')+' '+normalizeText((item && item.Outcome)||'')+' '+normalizeText((item && item.Notes)||'');
+  if(/contact etabli/.test(text) && /message laisse|autre personne/.test(text))return 'message';
+  if(/contact etabli|rdv fixe|interesse|demo faite|dossier transmis|converti|signe/.test(text))return 'connected';
+  if(/aucune reponse|ligne occupee|pas joignable/.test(text))return 'no_answer';
+  if(/injoignable|erreur/.test(text))return 'unreachable';
+  return 'other';
+}
 function zoneLabel(row){return row && row.v==='YAOUNDE' ? row.sy : row && row.sd}
 function parseEntryDate(value){
   if(!value)return null;
@@ -1896,6 +1933,33 @@ function buildAreaLayers(records){
   };
 }
 
+function buildCallAnalytics(followups, experts){
+  const calls=followups.filter(function(item){ return item.FollowupType==='CALL'; });
+  const summary={total:calls.length,connected:0,message:0,noAnswer:0,unreachable:0,other:0};
+  const byExpert=new Map();
+  (experts||[]).filter(Boolean).forEach(function(expert){
+    const name=canonicalPersonName(expert);
+    byExpert.set(name,{expert:name,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:''});
+  });
+  calls.forEach(function(item){
+    const bucket=categorizeCallStatus(item);
+    summary[bucket]=(summary[bucket]||0)+1;
+    const expert=canonicalPersonName(item.Expert||'Non attribué');
+    if(!byExpert.has(expert)){
+      byExpert.set(expert,{expert:expert,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:''});
+    }
+    const row=byExpert.get(expert);
+    row.total++;
+    row[bucket]=(row[bucket]||0)+1;
+    if(item.Timestamp && (!row.lastCall || item.Timestamp>row.lastCall))row.lastCall=item.Timestamp;
+  });
+  const expertsTable=Array.from(byExpert.values()).sort(function(a,b){
+    if(b.total!==a.total)return b.total-a.total;
+    return a.expert.localeCompare(b.expert,'fr');
+  });
+  return {summary:summary, experts:expertsTable};
+}
+
 function buildAgentProgress(rawRows, followups){
   const experts=[...new Set(rawRows.map(r=>r.e).concat(followups.map(f=>f.Expert)).filter(Boolean))];
   return experts.map(function(expert){
@@ -1921,6 +1985,8 @@ function buildDashboardModel(){
   const weekly=buildWeeklySeries(scope.rawRows,scope.followups,8);
   const monthly=buildMonthlySeries(scope.rawRows,scope.followups,6);
   const layers=buildAreaLayers(records);
+  const scopedExperts=[...new Set(scope.rawRows.map(function(row){ return row.e; }).filter(Boolean))];
+  const callAnalytics=buildCallAnalytics(scope.followups,scopedExperts);
   const hotStage=pipeline.find(function(stage){ return stage.key==='chaud'; }) || {count:0,amount:0};
   const warmStage=pipeline.find(function(stage){ return stage.key==='tiede'; }) || {count:0,amount:0};
   const wonStage=pipeline.find(function(stage){ return stage.key==='gagne'; }) || {count:0,amount:0};
@@ -1937,6 +2003,7 @@ function buildDashboardModel(){
     weekly,
     monthly,
     layers,
+    callAnalytics,
     wonDeals:records.filter(function(record){ return record.stage==='gagne'; }),
     wonRevenue:wonStage.amount||0,
     hotRevenue:hotStage.amount||0,
@@ -2242,6 +2309,8 @@ function rHome(){
     : 'Vue personnelle active: cet expert ne voit que ses propres écoles, appels, KPI et progression.';
   const cityRows=dashboard.layers.cities.slice(0,6);
   const zoneRows=dashboard.layers.zones.slice(0,8);
+  const callSummary=dashboard.callAnalytics.summary;
+  const callExperts=dashboard.callAnalytics.experts;
 
   let h=`
   <div class="page-intro" data-num="01">
@@ -2285,7 +2354,7 @@ function rHome(){
       <div class="kpi teal">
         <div class="lbl">Appels suivis</div>
         <div class="val">${dashboard.callInputs}</div>
-        <div class="delta">${dashboard.followups.length} follow-ups liés au scope</div>
+        <div class="delta">${callSummary.connected} contacts établis · ${callSummary.noAnswer} sans réponse</div>
       </div>
       <div class="kpi dark">
         <div class="lbl">Vélocité</div>
@@ -2320,6 +2389,62 @@ function rHome(){
       ${renderRevenueCard('🔥 Pipeline chaud',dashboard.hotRevenue,'Valeur probable des écoles chaudes prêtes à closer.','')}
       ${renderRevenueCard('🟠 Pipeline tiède',dashboard.warmRevenue,'Valeur des écoles tièdes à travailler avant rentrée.','')}
     </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head">
+      <h2>📞 Appels <span class="it">& Résultats</span></h2>
+      <span class="anno">${dashboard.sourceCallCount} appels source · suivi par issue et par expert</span>
+    </div>
+    <div class="kpis">
+      <div class="kpi teal">
+        <div class="lbl">Appels Totaux</div>
+        <div class="val">${callSummary.total}</div>
+        <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% de contacts joints</div>
+      </div>
+      <div class="kpi green">
+        <div class="lbl">Contacts Établis</div>
+        <div class="val">${callSummary.connected}</div>
+        <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% du volume appels</div>
+      </div>
+      <div class="kpi saffron">
+        <div class="lbl">Messages / Autres</div>
+        <div class="val">${callSummary.message + callSummary.other}</div>
+        <div class="delta">${callSummary.message} message laissé · ${callSummary.other} à qualifier</div>
+      </div>
+      <div class="kpi red">
+        <div class="lbl">Sans Réponse</div>
+        <div class="val">${callSummary.noAnswer + callSummary.unreachable}</div>
+        <div class="delta">${callSummary.noAnswer} ligne occupée · ${callSummary.unreachable} injoignable</div>
+      </div>
+    </div>
+    <div class="two">
+      <div class="chart">
+        <h3>Résultats <span class="it">des 105 appels</span></h3>
+        <div class="desc">Lecture directe de la campagne téléphonique: ce qui a abouti, ce qui demande une relance, et ce qui bloque.</div>
+        <table class="tbl">
+          <thead><tr><th>Issue</th><th>Volume</th><th>Part</th></tr></thead>
+          <tbody>
+            <tr><td><b>✅ Contact établi</b></td><td class="num">${callSummary.connected}</td><td class="num">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}%</td></tr>
+            <tr><td><b>📝 Message laissé / autre personne</b></td><td class="num">${callSummary.message}</td><td class="num">${callSummary.total ? Math.round((callSummary.message/callSummary.total)*100) : 0}%</td></tr>
+            <tr><td><b>📵 Aucune réponse / ligne occupée</b></td><td class="num">${callSummary.noAnswer}</td><td class="num">${callSummary.total ? Math.round((callSummary.noAnswer/callSummary.total)*100) : 0}%</td></tr>
+            <tr><td><b>⛔ Numéro injoignable / erreur</b></td><td class="num">${callSummary.unreachable}</td><td class="num">${callSummary.total ? Math.round((callSummary.unreachable/callSummary.total)*100) : 0}%</td></tr>
+            <tr><td><b>❔ Non classé</b></td><td class="num">${callSummary.other}</td><td class="num">${callSummary.total ? Math.round((callSummary.other/callSummary.total)*100) : 0}%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="chart">
+        <h3>Par <span class="it">expert</span></h3>
+        <div class="desc">Noah peut maintenant vérifier qui appelle, avec quel résultat, et repérer immédiatement les écarts de volume.</div>
+        <table class="tbl">
+          <thead><tr><th>Expert</th><th>Appels</th><th>Joints</th><th>Sans réponse</th><th>Autres</th><th>Dernier appel</th></tr></thead>
+          <tbody>
+            ${callExperts.map(agent=>`<tr><td><b>${esc(agent.expert)}</b></td><td class="num">${agent.total}</td><td class="num">${agent.connected}</td><td class="num">${agent.noAnswer + agent.unreachable}</td><td class="num">${agent.message + agent.other}</td><td>${agent.lastCall ? esc(String(agent.lastCall).slice(0,10)) : '—'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note teal"><b>Lecture source actuelle:</b> la feuille appels importée contient aujourd'hui des appels saisis pour <b>Kendo Fabiola</b> et <b>Kessi Taylor</b>. Si Noah veut attribuer d'autres appels à un autre expert, il faut corriger la feuille source ou l'accès utilisateur concerné.</div>
   </div>
 
   <div class="section">
@@ -4000,6 +4125,7 @@ function renderAll(){
   rIntel();
   rGlossary();
   rSuivi();
+  applyNavigationAccess();
   setTimeout(()=>{
     document.querySelectorAll('.pane.act .bar-row').forEach(b=>b.classList.add('animate'));
   },100);
@@ -4015,6 +4141,16 @@ var importedSheetFollowups = [];
 var suiviRankings = [];
 var SUPER_ADMINS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
 var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
+var PANE_ACCESS_CONFIG = [
+  { key: 'home', label: 'Dashboard' },
+  { key: 'suivi', label: 'Workspace' },
+  { key: 'metrics', label: 'BI & KPI' },
+  { key: 'team', label: 'Équipe' },
+  { key: 'market', label: 'Marché' },
+  { key: 'playbook', label: 'Playbook' },
+  { key: 'intel', label: 'NLP' },
+  { key: 'glossary', label: 'Glossaire' }
+];
 
 var DEFAULT_USERS = [
   { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'DOUALA' },
@@ -4028,18 +4164,115 @@ var DEFAULT_USERS = [
 
 // Load invited users from localStorage
 var invitedUsers = JSON.parse(localStorage.getItem('nateiva_invited_users') || '[]');
+var userOverrides = JSON.parse(localStorage.getItem('nateiva_user_overrides') || '{}');
 
-function getAllUsers() { return DEFAULT_USERS.concat(invitedUsers); }
+function allPaneKeys() { return PANE_ACCESS_CONFIG.map(function(item) { return item.key; }); }
+
+function hasAdminRole(userOrName) {
+  if (!userOrName) return false;
+  var name = typeof userOrName === 'string'
+    ? userOrName
+    : (userOrName.fullName || userOrName.username || '');
+  var role = typeof userOrName === 'string' ? '' : (userOrName.role || '');
+  return role === 'SuperAdmin' || (Array.isArray(SUPER_ADMINS) && SUPER_ADMINS.some(function(a) { return samePerson(a, name); }));
+}
+
+function getDefaultPermissions(user) {
+  return {
+    panes: allPaneKeys(),
+    dataScope: hasAdminRole(user) ? 'all' : 'own',
+    manageUsers: hasAdminRole(user)
+  };
+}
+
+function normalizePermissions(user) {
+  var defaults = getDefaultPermissions(user || {});
+  var permissions = user && user.permissions ? user.permissions : {};
+  var panes = Array.isArray(permissions.panes) && permissions.panes.length
+    ? permissions.panes.filter(function(pane) { return allPaneKeys().indexOf(pane) > -1; })
+    : defaults.panes.slice();
+  if (!panes.length) panes = ['home'];
+  if (panes.indexOf('home') === -1) panes.unshift('home');
+  return {
+    panes: Array.from(new Set(panes)),
+    dataScope: permissions.dataScope === 'all' ? 'all' : (permissions.dataScope === 'own' ? 'own' : defaults.dataScope),
+    manageUsers: typeof permissions.manageUsers === 'boolean' ? permissions.manageUsers : defaults.manageUsers
+  };
+}
+
+function mergeUserRecord(user) {
+  var override = user && user.username ? (userOverrides[user.username] || {}) : {};
+  var merged = Object.assign({}, user || {}, override);
+  merged.fullName = canonicalPersonName(merged.fullName || merged.username || '');
+  merged.permissions = normalizePermissions(merged);
+  return merged;
+}
+
+function getAllUsers() { return DEFAULT_USERS.concat(invitedUsers).map(mergeUserRecord); }
+
+function getUserByUsername(username) {
+  return getAllUsers().find(function(user) { return user.username === username; }) || null;
+}
+
+function persistUserOverrides() {
+  localStorage.setItem('nateiva_user_overrides', JSON.stringify(userOverrides));
+}
+
+function getUserAllowedPanes(user) {
+  return normalizePermissions(user || {}).panes;
+}
+
+function userCanAccessPane(user, pane) {
+  if (!user) return true;
+  return getUserAllowedPanes(user).indexOf(pane) > -1;
+}
 
 function canSeeAllData(user) {
-  if (!user || !Array.isArray(SUPER_ADMINS)) return false;
-  return SUPER_ADMINS.some(function(a) { return samePerson(a, user.fullName || user.username); });
+  if (!user) return false;
+  return normalizePermissions(user).dataScope === 'all';
 }
 
-function isSuperAdmin(name) {
-  if (!name) return false;
-  return canSeeAllData({ fullName: name });
+function isSuperAdmin(userOrName) {
+  return hasAdminRole(userOrName);
 }
+
+function canManageUsers(user) {
+  if (!user) return false;
+  return !!normalizePermissions(user).manageUsers;
+}
+
+function canManageUserAccess(user) {
+  return !!(user && samePerson(user.fullName || user.username, 'Noah'));
+}
+
+function applyNavigationAccess() {
+  var allowed = currentUser ? getUserAllowedPanes(currentUser) : allPaneKeys();
+  document.querySelectorAll('.nav-btn').forEach(function(btn) {
+    var isAllowed = allowed.indexOf(btn.dataset.pane) > -1;
+    btn.style.display = isAllowed ? '' : 'none';
+    btn.disabled = !isAllowed;
+    if (!isAllowed) btn.classList.remove('act');
+  });
+  document.querySelectorAll('.pane').forEach(function(pane) {
+    var paneKey = pane.id.replace(/^p-/, '');
+    var isAllowed = allowed.indexOf(paneKey) > -1;
+    pane.style.display = isAllowed ? '' : 'none';
+    if (!isAllowed) pane.classList.remove('act');
+  });
+  var activeBtn = document.querySelector('.nav-btn.act');
+  if (!activeBtn || allowed.indexOf(activeBtn.dataset.pane) === -1) {
+    var firstAllowed = document.querySelector('.nav-btn[data-pane="' + allowed[0] + '"]');
+    if (firstAllowed) {
+      document.querySelectorAll('.nav-btn').forEach(function(btn) { btn.classList.remove('act'); });
+      document.querySelectorAll('.pane').forEach(function(pane) { pane.classList.remove('act'); });
+      firstAllowed.classList.add('act');
+      var targetPane = document.getElementById('p-' + firstAllowed.dataset.pane);
+      if (targetPane) targetPane.classList.add('act');
+    }
+  }
+}
+
+currentUser = currentUser && currentUser.username ? (getUserByUsername(currentUser.username) || mergeUserRecord(currentUser)) : null;
 
 function getAllRawRows() {
   var imported = LIVE_DATA && Array.isArray(LIVE_DATA.prospection) ? LIVE_DATA.prospection : null;
@@ -4086,12 +4319,13 @@ function buildImportedSheetFollowups() {
   return calls.map(function(call, index) {
     var schoolInfo = schoolMeta[normalizeText(call.school)] || null;
     var phoneInfo = phoneMeta[digitsOnly(call.phone)] || null;
-    var inferredSchool = call.school || (phoneInfo ? phoneInfo.school : '') || '';
+    var inferredSchool = (call.school || (phoneInfo ? phoneInfo.school : '') || '').trim();
     var inferredCity = call.city || (schoolInfo ? schoolInfo.city : '') || (phoneInfo ? phoneInfo.city : '') || '';
     var inferredSector = (schoolInfo ? schoolInfo.sector : '') || (phoneInfo ? phoneInfo.sector : '') || '';
     var inferredExpert = call.expert || '';
     if (!inferredExpert && schoolInfo && schoolInfo.experts.length === 1) inferredExpert = schoolInfo.experts[0];
     if (!inferredExpert && phoneInfo && phoneInfo.experts.length === 1) inferredExpert = phoneInfo.experts[0];
+    inferredExpert = canonicalPersonName(inferredExpert);
     var nextActions = [];
     if (call.secondCall) nextActions.push('Second appel');
     if (call.whatsappDocs) nextActions.push('Docs WhatsApp');
@@ -4143,7 +4377,7 @@ function getDaysOnField(expertName) {
   var visibleRaw = getAllRawRows();
   for (var i = 0; i < visibleRaw.length; i++) {
     var r = visibleRaw[i];
-    if (r.e === expertName && r.t) {
+    if (samePerson(r.e, expertName) && r.t) {
       var day = activeDayKey(r.t);
       if (day) daySet.add(day);
     }
@@ -4151,7 +4385,7 @@ function getDaysOnField(expertName) {
   var allFollowups = getAllFollowups();
   for (var j = 0; j < allFollowups.length; j++) {
     var fu = allFollowups[j];
-    if (fu.Expert === expertName && fu.Timestamp) {
+    if (samePerson(fu.Expert, expertName) && fu.Timestamp) {
       var day2 = activeDayKey(fu.Timestamp);
       if (day2) daySet.add(day2);
     }
@@ -4183,7 +4417,7 @@ function localFallback(action, params) {
   switch (action) {
     case 'login': {
       var u = getAllUsers().find(function(x) { return x.username === params.user && x.password === params.pass; });
-      if (u) return { success: true, user: { username: u.username, fullName: u.fullName, role: u.role, city: u.city } };
+      if (u) return { success: true, user: mergeUserRecord({ username: u.username, fullName: u.fullName, role: u.role, city: u.city, permissions: u.permissions }) };
       return { success: false, error: 'Identifiants incorrects' };
     }
     case 'addFollowup': {
@@ -4209,12 +4443,30 @@ function localFallback(action, params) {
       return { success: true, id: fu.ID, message: 'Suivi ajouté avec succès' };
     }
     case 'addUser': {
+      if (!canManageUsers(currentUser)) return { success: false, error: 'Accès réservé à la gestion utilisateurs' };
       var exists = getAllUsers().find(function(x) { return x.username === params.username; });
       if (exists) return { success: false, error: 'Ce nom d\'utilisateur existe déjà' };
-      var newUser = { username: params.username, password: params.password, fullName: params.fullName, role: params.role || 'Expert', city: params.city || 'DOUALA' };
+      var newUser = { username: params.username, password: params.password, fullName: canonicalPersonName(params.fullName), role: params.role || 'Expert', city: params.city || 'DOUALA', permissions: params.permissions || null };
       invitedUsers.push(newUser);
       localStorage.setItem('nateiva_invited_users', JSON.stringify(invitedUsers));
       return { success: true, message: 'Utilisateur ' + params.fullName + ' ajouté avec succès' };
+    }
+    case 'updateUserAccess': {
+      if (!canManageUserAccess(currentUser)) return { success: false, error: 'Accès réservé à Noah' };
+      if (!params.username) return { success: false, error: 'Utilisateur manquant' };
+      userOverrides[params.username] = Object.assign({}, userOverrides[params.username] || {}, {
+        permissions: {
+          panes: Array.isArray(params.panes) ? params.panes : allPaneKeys(),
+          dataScope: params.dataScope === 'all' ? 'all' : 'own',
+          manageUsers: !!params.manageUsers
+        }
+      });
+      persistUserOverrides();
+      if (currentUser && currentUser.username === params.username) {
+        currentUser = getUserByUsername(params.username) || currentUser;
+        localStorage.setItem('nateiva_user', JSON.stringify(currentUser));
+      }
+      return { success: true, message: 'Accès utilisateur mis à jour' };
     }
     default: return { success: false, error: 'Local fallback: ' + action };
   }
@@ -4279,11 +4531,20 @@ function computeExpertStats(expertName) {
   var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
   var avgRate = rawData.length ? Math.round(rawData.reduce(function(s, r) { return s + (r.r || 0); }, 0) / rawData.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
+  var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
   var converted = 0, inProgress = 0, relance = 0;
   var schoolsFollowed = new Set();
   for (var i = 0; i < fuData.length; i++) {
     var f = fuData[i];
-    if (f.FollowupType === 'CALL') calls++;
+    if (f.FollowupType === 'CALL') {
+      calls++;
+      var callBucket = categorizeCallStatus(f);
+      if (callBucket === 'connected') callConnected++;
+      else if (callBucket === 'message') callMessage++;
+      else if (callBucket === 'no_answer') callNoAnswer++;
+      else if (callBucket === 'unreachable') callUnreachable++;
+      else callOther++;
+    }
     else if (f.FollowupType === 'WHATSAPP') whatsapp++;
     else if (f.FollowupType === 'SMS') sms++;
     else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
@@ -4294,7 +4555,7 @@ function computeExpertStats(expertName) {
   }
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score) };
+  return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
 function buildRankings() {
@@ -4336,7 +4597,9 @@ function rSuivi() {
   }
 
   var me = currentUser.fullName;
-  var isSuper = isSuperAdmin(me);
+  var isSuper = canSeeAllData(currentUser);
+  var canAdminUsers = canManageUsers(currentUser);
+  var isAdminRole = isSuperAdmin(currentUser);
   var stats = computeExpertStats(me);
   var myRank = suiviRankings.find(function(r) { return samePerson(r.expert, me); });
   var myFollowups = getVisibleFollowups().sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
@@ -4366,17 +4629,17 @@ function rSuivi() {
 
   var h = '';
   h += '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2>';
-  h += '<p>Tableau de bord ' + (isSuper ? '<b>Super Admin</b>' : 'personnel') + ' de <b>' + esc(me) + '</b>. ' + (isSuper ? 'Vous voyez les données de toute l\'équipe.' : 'Enregistrez vos follow-ups et consultez votre classement.') + '</p></div>';
+  h += '<p>Tableau de bord ' + (isSuper ? '<b>Super Admin</b>' : (canAdminUsers ? '<b>Admin</b>' : 'personnel')) + ' de <b>' + esc(me) + '</b>. ' + (isSuper ? 'Vous voyez les données de toute l\'équipe.' : (canAdminUsers ? 'Vous gérez les utilisateurs avec une vue restreinte à vos données.' : 'Enregistrez vos follow-ups et consultez votre classement.')) + '</p></div>';
 
   // Header
   h += '<div class="suivi-header"><div class="suivi-user">';
   h += '<div class="suivi-avatar">' + me.charAt(0).toUpperCase() + '</div>';
   h += '<div><div class="suivi-name">' + esc(me) + '</div>';
-  h += '<div class="suivi-role">' + (isSuper ? 'SUPER ADMIN' : 'EXPERT') + ' · ' + esc(currentUser.city) + '</div></div>';
+  h += '<div class="suivi-role">' + (isAdminRole ? 'SUPER ADMIN' : 'EXPERT') + ' · ' + esc(currentUser.city) + '</div></div>';
   h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
   h += '</div><div class="suivi-actions">';
   h += '<button class="primary" onclick="showFollowupForm()">+ Nouveau suivi</button>';
-  if (isSuper) h += '<button onclick="showInviteForm()">+ Inviter</button>';
+  if (canAdminUsers) h += '<button onclick="showInviteForm()">+ Inviter</button>';
   h += '<button onclick="doLogout()">Déconnexion</button>';
   h += '</div></div>';
 
@@ -4385,7 +4648,9 @@ function rSuivi() {
   h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
   h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalProspections + '</div><div class="sk-lbl">Prospections</div></div>';
   h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.totalFollowups + '</div><div class="sk-lbl">Follow-ups total</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.calls + '</div><div class="sk-lbl">Appels saisis</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val">' + stats.callConnected + '</div><div class="sk-lbl">Contacts établis</div></div>';
+  h += '<div class="suivi-kpi"><div class="sk-icon">📵</div><div class="sk-val">' + (stats.callNoAnswer + stats.callUnreachable) + '</div><div class="sk-lbl">Sans réponse / erreur</div></div>';
   h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
   h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
   h += '</div>';
@@ -4397,7 +4662,7 @@ function rSuivi() {
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
   if (isSuper) h += '<button class="suivi-tab" data-stab="team">Équipe complète</button>';
-  if (isSuper) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
+  if (canAdminUsers) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
   h += '</div>';
 
   // Panel: Add followup
@@ -4527,14 +4792,39 @@ function rSuivi() {
     h += '<div class="form-field"><label>Rôle</label><select id="invRole"><option value="Expert">Expert (voit ses données uniquement)</option><option value="SuperAdmin">Super Admin (voit tout)</option></select></div>';
     h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter l\'utilisateur</button></div>';
 
+    if (canManageUserAccess(currentUser)) {
+      h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Noah · Contrôle des accès</h4>';
+      h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Noah choisit ici quels onglets chaque utilisateur voit et s\'il reste sur ses propres données ou peut voir toute l\'équipe.</p>';
+      h += '<div class="agent-grid">';
+      getAllUsers().filter(function(u) { return u.username !== 'noah'; }).forEach(function(u) {
+        var permissions = normalizePermissions(u);
+        h += '<div class="agent-card">';
+        h += '<div class="agent-head"><strong>' + esc(u.fullName) + '</strong><span class="trend-chip flat">' + esc(u.username) + '</span></div>';
+        h += '<div class="form-field"><label>Portée des données</label><select id="accessScope-' + esc(u.username) + '"><option value="own"' + (permissions.dataScope === 'own' ? ' selected' : '') + '>Données personnelles uniquement</option><option value="all"' + (permissions.dataScope === 'all' ? ' selected' : '') + '>Toute la donnée équipe</option></select></div>';
+        h += '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--g200);border-radius:14px;background:#fff6f6;font-size:12px;color:var(--g700)"><input type="checkbox" id="accessManage-' + esc(u.username) + '"' + (permissions.manageUsers ? ' checked' : '') + '> Gestion utilisateurs</label>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 16px">';
+        PANE_ACCESS_CONFIG.forEach(function(pane) {
+          h += '<label style="display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--g200);border-radius:999px;background:var(--bg-warm);font-size:12px;color:var(--g700)"><input type="checkbox" id="access-' + esc(u.username) + '-' + pane.key + '"' + (permissions.panes.indexOf(pane.key) > -1 ? ' checked' : '') + '> ' + esc(pane.label) + '</label>';
+        });
+        h += '</div>';
+        h += '<button class="btn-save" onclick="submitUserAccess(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">Enregistrer l\'accès</button>';
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+
     // Existing users list
     h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Utilisateurs actuels</h4>';
-    h += '<table class="tbl"><thead><tr><th>Utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Ville</th><th>Source</th></tr></thead><tbody>';
+    h += '<table class="tbl"><thead><tr><th>Utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Ville</th><th>Portée</th><th>Gestion</th><th>Onglets</th><th>Source</th></tr></thead><tbody>';
     getAllUsers().forEach(function(u) {
-      var isS = isSuperAdmin(u.fullName);
+      var isS = isSuperAdmin(u);
+      var permissions = normalizePermissions(u);
       h += '<tr><td class="mono">' + esc(u.username) + '</td><td><b>' + esc(u.fullName) + '</b></td>';
       h += '<td>' + (isS ? '<span style="color:var(--red);font-weight:700">SUPER ADMIN</span>' : 'Expert') + '</td>';
       h += '<td>' + esc(u.city) + '</td>';
+      h += '<td>' + (permissions.dataScope === 'all' ? '<span style="color:var(--green);font-weight:700">Toute la donnée</span>' : 'Données perso') + '</td>';
+      h += '<td>' + (permissions.manageUsers ? '<span style="color:var(--red);font-weight:700">Oui</span>' : 'Non') + '</td>';
+      h += '<td style="font-size:12px;color:var(--g600)">' + permissions.panes.map(function(paneKey) { var cfg = PANE_ACCESS_CONFIG.find(function(item) { return item.key === paneKey; }); return cfg ? cfg.label : paneKey; }).join(', ') + '</td>';
       h += '<td><span class="src ' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'src-fondateur' : 'src-terrain') + '">' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'INITIAL' : 'INVITÉ') + '</span></td></tr>';
     });
     h += '</tbody></table></div></div>';
@@ -4602,6 +4892,7 @@ function showFollowupForm() {
 }
 
 function showInviteForm() {
+  if (!canManageUsers(currentUser)) { showToast('Accès réservé à la gestion utilisateurs', true); return; }
   var el = document.getElementById('p-suivi');
   el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
   el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
@@ -4648,6 +4939,7 @@ async function submitFollowup() {
 }
 
 async function submitInvite() {
+  if (!canManageUsers(currentUser)) { showToast('Accès réservé à la gestion utilisateurs', true); return; }
   var fullName = document.getElementById('invFullName').value.trim();
   var username = document.getElementById('invUsername').value.trim().toLowerCase();
   var password = document.getElementById('invPassword').value;
@@ -4655,7 +4947,7 @@ async function submitInvite() {
   var role = document.getElementById('invRole').value;
   if (!fullName || !username || !password) { showToast('Remplissez tous les champs', true); return; }
   if (role === 'SuperAdmin') SUPER_ADMINS.push(fullName);
-  var res = await apiPost({ action: 'addUser', fullName: fullName, username: username, password: password, city: city, role: role });
+  var res = await apiPost({ action: 'addUser', fullName: fullName, username: username, password: password, city: city, role: role, requestedBy: currentUser ? currentUser.username : '' });
   if (res.success) {
     showToast(res.message);
     document.getElementById('invFullName').value = '';
@@ -4663,6 +4955,35 @@ async function submitInvite() {
     document.getElementById('invPassword').value = '';
     rSuivi();
   } else { showToast(res.error || 'Erreur', true); }
+}
+
+async function submitUserAccess(username) {
+  if (!canManageUserAccess(currentUser)) { showToast('Accès réservé à Noah', true); return; }
+  var scopeEl = document.getElementById('accessScope-' + username);
+  var manageUsersEl = document.getElementById('accessManage-' + username);
+  if (!scopeEl) { showToast('Utilisateur introuvable', true); return; }
+  var panes = PANE_ACCESS_CONFIG.filter(function(pane) {
+    var checkbox = document.getElementById('access-' + username + '-' + pane.key);
+    return checkbox && checkbox.checked;
+  }).map(function(pane) { return pane.key; });
+  if (!panes.length) {
+    showToast('Au moins un onglet doit rester accessible', true);
+    return;
+  }
+  var res = await apiPost({ action: 'updateUserAccess', username: username, dataScope: scopeEl.value, panes: panes, manageUsers: !!(manageUsersEl && manageUsersEl.checked), requestedBy: currentUser ? currentUser.username : '' });
+  if (res.success) {
+    if (currentUser && currentUser.username === username) {
+      currentUser = getUserByUsername(username) || currentUser;
+      localStorage.setItem('nateiva_user', JSON.stringify(currentUser));
+      renderAll();
+    } else {
+      rSuivi();
+      applyNavigationAccess();
+    }
+    showToast(res.message || 'Accès utilisateur mis à jour');
+  } else {
+    showToast(res.error || 'Erreur de sauvegarde', true);
+  }
 }
 
 rSuivi();
