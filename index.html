@@ -1309,8 +1309,8 @@ body{
 <div id="loginOverlay" class="login-overlay" style="display:flex">
   <div class="login-box">
     <button class="login-close" onclick="closeLogin()">&times;</button>
-    <h2>Connexion <span style="color:var(--red);font-style:italic">Suivi</span></h2>
-    <p class="login-sub">Entrez vos identifiants pour accéder au suivi de prospection</p>
+    <h2>Connexion <span style="color:var(--red);font-style:italic">NATEIVA</span></h2>
+    <p class="login-sub">Entrez les identifiants pour accéder à votre compte prospection</p>
     <div class="login-field">
       <label>Nom d'utilisateur</label>
       <input type="text" id="loginUser" placeholder="ex: ivan, fabiola, brice..." autocomplete="off">
@@ -3654,8 +3654,17 @@ function isSA(n){return n&&SUPER_ADMINS.some(function(a){return a.toLowerCase()=
 var wizState={entryType:'',mode:'',dealValue:''};
 
 // === NAME NORMALIZATION (CALLS uses uppercase, RAW uses title case) ===
-var NAME_MAP={'KENDO FABIOLA':'Kendo Fabiola','KESSIE':'Kessi Taylor','MBEUKA BRICE':'Mbeuka brice','NTSA GUY':'Ntsa Guy','EMAMBO IDA':'Emambo ida','IVAN':'Ivan','NOAH':'Noah'};
-(function(){CALLS.forEach(function(c){if(NAME_MAP[c.e])c.e=NAME_MAP[c.e];else if(c.e){var k=c.e.toUpperCase();Object.keys(NAME_MAP).forEach(function(n){if(k===n)c.e=NAME_MAP[n]})}})})();
+var NAME_MAP={'KENDO FABIOLA':'Kendo Fabiola','KESSIE':'Kessi Taylor','KESSI TAYLOR':'Kessi Taylor','KESSI':'Kessi Taylor','MBEUKA BRICE':'Mbeuka brice','NTSA GUY':'Ntsa Guy','EMAMBO IDA':'Emambo ida','IVAN':'Ivan','NOAH':'Noah','KENDO':'Kendo Fabiola','MBEUKA':'Mbeuka brice','EMAMBO':'Emambo ida','GUY':'Ntsa Guy'};
+function normName(n){if(!n)return '';var u=n.trim().toUpperCase();if(NAME_MAP[u])return NAME_MAP[u];for(var k in NAME_MAP){if(u.indexOf(k)>-1||k.indexOf(u)>-1)return NAME_MAP[k]}return n.trim()}
+// Normalize all expert names in RAW and CALLS
+(function(){RAW.forEach(function(r){if(r.e)r.e=normName(r.e)});CALLS.forEach(function(c){if(c.e)c.e=normName(c.e)})})();
+// Normalize city names, categories, sectors
+(function(){
+  var normCity=function(v){if(!v)return '';var u=v.trim().toUpperCase();if(u==='YAOUNDE'||u==='YAOUNDÉ'||u==='YAOUNDE '||u==='YAOUNDÉ ')return 'YAOUNDE';if(u==='DOUALA'||u==='DOUALA ')return 'DOUALA';return v.trim()};
+  var normCat=function(c){if(!c)return '';var u=c.trim().toUpperCase().replace(/É/g,'E').replace(/È/g,'E');if(u.indexOf('TRES HAUTE')>-1)return 'TRES HAUTE STANDING';if(u.indexOf('HAUTE')>-1&&u.indexOf('TRES')===-1)return 'HAUTE STANDING';if(u.indexOf('MOYEN')>-1||u.indexOf('STANDIG M')>-1||u.indexOf('STANDING M')>-1)return 'STANDIG MOYEN';if(u.indexOf('TRES BASSE')>-1)return 'TRES BASSE STANDING';if(u.indexOf('BASSE')>-1&&u.indexOf('TRES')===-1)return 'BASSE STANDING';return c.trim()};
+  RAW.forEach(function(r){r.v=normCity(r.v);r.ca=normCat(r.ca)});
+  CALLS.forEach(function(c){c.v=normCity(c.v)});
+})();
 // === HELPERS ===
 function getFieldDays(e){var s=new Set();RAW.forEach(function(r){if(r.e===e&&r.t)s.add(new Date(r.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode==='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
 function getCallDays(e){var s=new Set();CALLS.forEach(function(c){if(c.e===e&&c.t)s.add(new Date(c.t).toDateString())});suiviEntries.forEach(function(f){if(f.expert===e&&f.mode!=='EN PERSONNE'&&f.date)s.add(new Date(f.date).toDateString())});return s.size}
