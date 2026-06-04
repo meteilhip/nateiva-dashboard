@@ -3715,51 +3715,80 @@ function rSuivi(){
 
   var h='';
   // ======== HOME SCREEN — 2 big action cards ========
-  h+='<div id="suiviHome" style="padding:20px 0">';
-  // Welcome bar
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;flex-wrap:wrap;gap:12px">';
-  h+='<div style="display:flex;align-items:center;gap:14px"><div class="suivi-avatar">'+me.charAt(0).toUpperCase()+'</div>';
-  h+='<div><div style="font-size:13px;color:var(--g500)">Bonjour</div><div style="font-family:Fraunces,serif;font-size:24px;font-weight:600">'+esc(me)+'</div></div></div>';
-  h+='<div style="display:flex;gap:8px;align-items:center"><div class="days-badge"><span class="days-num">'+st.fDays+'</span>🚶 <span class="days-num">'+st.cDays+'</span>📞</div>';
-  h+='<button onclick="doLogout()" style="padding:8px 14px;border:1.5px solid var(--g200);border-radius:10px;background:var(--paper);font-size:11px;font-weight:700;cursor:pointer;font-family:JetBrains Mono,monospace">Déco</button></div></div>';
+  h+='<div id="suiviHome" style="padding:16px 0">';
+  // Welcome bar with prominent logout
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">';
+  h+='<div style="display:flex;align-items:center;gap:12px"><div class="suivi-avatar">'+me.charAt(0).toUpperCase()+'</div>';
+  h+='<div><div style="font-size:12px;color:var(--g500)">'+(sa?'Super Admin':'Expert')+'</div><div style="font-family:Fraunces,serif;font-size:22px;font-weight:600">'+esc(me)+'</div></div></div>';
+  h+='<button onclick="doLogout()" style="padding:12px 20px;border:2px solid var(--red);border-radius:12px;background:var(--paper);color:var(--red);font-size:14px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px">🚪 Déconnexion</button></div>';
 
   // 2 Big action cards
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">';
-  // Card 1: New entry
-  h+='<div onclick="switchView(\'form\')" style="cursor:pointer;padding:32px 24px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-red)" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
-  h+='<div style="font-size:48px;margin-bottom:12px">📝</div>';
-  h+='<div style="font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-bottom:6px">Nouvelle entrée</div>';
-  h+='<div style="font-size:13px;opacity:.85">Prospection ou suivi</div>';
-  h+='<div style="display:flex;justify-content:center;gap:12px;margin-top:14px;font-size:20px">🚶 📞 💬 📱</div></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">';
+  // Card 1: New entry (hide for Noah who doesn't prospect)
+  if(me!=='Noah'){
+    h+='<div onclick="switchView(\'form\')" style="cursor:pointer;padding:28px 20px;background:linear-gradient(135deg,var(--red),var(--red-deep));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-red)" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
+    h+='<div style="font-size:40px;margin-bottom:10px">📝</div>';
+    h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px">Nouvelle entrée</div>';
+    h+='<div style="font-size:12px;opacity:.85">Prospection · Suivi</div>';
+    h+='<div style="display:flex;justify-content:center;gap:10px;margin-top:10px;font-size:18px">🚶 📞 💬</div></div>';
+  }
   // Card 2: Dashboard
-  h+='<div onclick="switchView(\'dashboard\')" style="cursor:pointer;padding:32px 24px;background:linear-gradient(135deg,var(--ink),var(--g800));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-lg)" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
-  h+='<div style="font-size:48px;margin-bottom:12px">📊</div>';
-  h+='<div style="font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-bottom:6px">Dashboard</div>';
-  h+='<div style="font-size:13px;opacity:.85">Stats, KPIs & classement</div>';
-  h+='<div style="display:flex;justify-content:center;gap:12px;margin-top:14px;font-size:20px">📈 🏆 💼 🧠</div></div>';
+  h+='<div onclick="switchView(\'dashboard\')" style="cursor:pointer;padding:28px 20px;background:linear-gradient(135deg,var(--ink),var(--g800));color:var(--paper);border-radius:20px;text-align:center;transition:all .3s;box-shadow:var(--shadow-lg)'+(me==='Noah'?';grid-column:1/-1':'')+'" onmouseover="this.style.transform=\'translateY(-4px)\'" onmouseout="this.style.transform=\'none\'">';
+  h+='<div style="font-size:40px;margin-bottom:10px">📊</div>';
+  h+='<div style="font-size:18px;font-weight:700;margin-bottom:4px">'+(sa?'Dashboard Admin':'Mon Dashboard')+'</div>';
+  h+='<div style="font-size:12px;opacity:.85">'+(sa?'Vue d\'ensemble · Équipe · KPIs':'Mes stats · Classement · Insights')+'</div>';
+  h+='<div style="display:flex;justify-content:center;gap:10px;margin-top:10px;font-size:18px">📈 🏆 '+(sa?'👥 🧠':'💼')+'</div></div>';
   h+='</div>';
 
-  // Quick stats row
-  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">';
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--ink)">'+st.sc+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Score #'+(mr?mr.rank:'-')+'</div></div>';
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--green)">'+st.clC+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Deals fermés</div></div>';
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--red)">'+st.hot+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Chauds ≥60%</div></div>';
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:16px;text-align:center"><div style="font-family:Fraunces,serif;font-size:28px;font-weight:600;color:var(--saffron)">'+st.schs+'</div><div style="font-size:9px;color:var(--g500);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Écoles</div></div>';
-  h+='</div>';
-
-  // Recent activity (last 5)
-  h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-family:Fraunces,serif;font-size:18px;font-weight:600">Activité récente</span><button onclick="switchView(\'dashboard\');switchTab(\'history\')" style="font-size:11px;color:var(--red);font-weight:700;background:none;border:none;cursor:pointer;font-family:JetBrains Mono,monospace">Voir tout →</button></div>';
-  if(!myE.length)h+='<p style="color:var(--g400);text-align:center;padding:20px">Aucune entrée. Commencez!</p>';
-  myE.slice(0,5).forEach(function(e){
-    h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--g100)">';
-    h+='<span style="font-size:20px">'+mI(e.mode)+'</span>';
-    h+='<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.school||'')+'</div>';
-    h+='<div style="font-size:11px;color:var(--g500)">'+fD(e.date||e.createdAt)+'</div></div>';
-    if(e.rate)h+='<span>'+pct(Number(e.rate))+'</span>';
+  // Quick stats — different for admin vs expert
+  if(sa){
+    // Admin home: team overview
+    var teamTotal=RAW.length+CALLS.length+suiviEntries.length;
+    var teamSchools=new Set();RAW.forEach(function(r){if(r.n)teamSchools.add(r.n.toUpperCase())});
+    var teamHot=RAW.filter(function(r){return r.r>=60}).length;
+    var teamClosed=suiviEntries.filter(function(e){return e.status==='Converti'}).length;
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600">'+teamTotal+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">CONTACTS</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600">'+teamSchools.size+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">ÉCOLES</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600;color:var(--red)">'+teamHot+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">CHAUDS</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600;color:var(--green)">'+teamClosed+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">FERMÉS</div></div>';
     h+='</div>';
-  });
-  h+='</div></div>';
+    // Top performers quick view
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:16px;margin-bottom:16px">';
+    h+='<div style="font-size:13px;font-weight:700;margin-bottom:10px">🏆 Classement rapide</div>';
+    suiviRankings.slice(0,4).forEach(function(r){
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--g100)">';
+      h+='<span style="font-family:Fraunces,serif;font-size:20px;font-weight:600;color:var(--g400);min-width:28px">'+r.rank+'</span>';
+      h+='<span style="flex:1;font-weight:600;font-size:13px">'+esc(r.expert)+'</span>';
+      h+='<span style="font-size:11px;color:var(--g500)">'+r.fDays+'j🚶 '+r.cDays+'j📞</span>';
+      h+='<span style="font-family:Fraunces,serif;font-size:16px;font-weight:600;color:var(--red)">'+r.sc+'</span>';
+      h+='</div>';
+    });
+    h+='</div>';
+  } else {
+    // Expert home: personal performance + insights
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600">'+st.sc+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">SCORE #'+(mr?mr.rank:'-')+'</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600">'+st.fDays+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">JOURS 🚶</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600">'+st.cDays+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">JOURS 📞</div></div>';
+    h+='<div style="background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;padding:14px;text-align:center"><div style="font-family:Fraunces,serif;font-size:26px;font-weight:600;color:var(--red)">'+st.hot+'</div><div style="font-size:8px;color:var(--g500);font-weight:700;text-transform:uppercase;margin-top:4px">CHAUDS</div></div>';
+    h+='</div>';
+
+    // Expert insights — prioritization tips
+    var myHotSchools=RAW.filter(function(r){return r.e===me&&r.r>=60});
+    if(myHotSchools.length>0){
+      h+='<div style="background:linear-gradient(135deg,var(--bg-warm),var(--paper));border:1.5px solid var(--saffron);border-radius:16px;padding:16px;margin-bottom:16px">';
+      h+='<div style="font-size:13px;font-weight:700;color:var(--saffron-deep);margin-bottom:8px">💡 À prioriser — '+myHotSchools.length+' écoles chaudes</div>';
+      myHotSchools.slice(0,3).forEach(function(r){
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px"><span>'+pct(r.r)+'</span><span style="font-weight:600">'+esc(r.n)+'</span>';
+        if(r.pw)h+='<a href="tel:'+r.pw+'" style="color:var(--teal);font-size:11px;font-weight:700;text-decoration:none;margin-left:auto">📞 '+esc(r.pw)+'</a>';
+        h+='</div>';
+      });
+      if(myHotSchools.length>3)h+='<div style="font-size:11px;color:var(--g500);margin-top:4px">+ '+(myHotSchools.length-3)+' autres → Voir Dashboard</div>';
+      h+='</div>';
+    }
+  }
+  h+='</div>'; // close suiviHome
 
   // ======== FORM VIEW (hidden by default) ========
   h+='<div id="suiviForm" style="display:none;padding:20px 0">';
