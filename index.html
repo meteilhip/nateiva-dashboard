@@ -2412,12 +2412,12 @@ function getSelectedTrackingContext(dashboard){
 function renderTrackingToolbar(context){
   return `<div class="tracking-toolbar">
     <div class="tracking-toggle">
-      <button type="button" class="${DASH_STATE.trackingMode==='week'?'act':''}" data-track-mode="week">📅 Hebdomadaire</button>
-      <button type="button" class="${DASH_STATE.trackingMode==='month'?'act':''}" data-track-mode="month">🗓️ Mensuel</button>
+      <button type="button" class="${DASH_STATE.trackingMode==='week'?'act':''}" data-track-mode="week" onclick="setTrackingMode('week')">📅 Hebdomadaire</button>
+      <button type="button" class="${DASH_STATE.trackingMode==='month'?'act':''}" data-track-mode="month" onclick="setTrackingMode('month')">🗓️ Mensuel</button>
     </div>
     <label class="tracking-select">
       <span>Période affichée</span>
-      <select data-action="tracking-select">
+      <select data-action="tracking-select" onchange="setTrackingPeriod(this.value)">
         ${context.series.map(function(item){
           return `<option value="${attrEsc(item.key)}" ${item.key===context.selectedKey?'selected':''}>${esc(item.label)}</option>`;
         }).join('')}
@@ -2611,20 +2611,27 @@ document.addEventListener('click',e=>{
 });
 
 // TRACKING MODE / PERIOD
-document.addEventListener('click',e=>{
-  const trackBtn=e.target.closest('[data-track-mode]');
-  if(!trackBtn)return;
-  const nextMode=trackBtn.dataset.trackMode;
+function setTrackingMode(nextMode){
   if(!nextMode || nextMode===DASH_STATE.trackingMode)return;
   DASH_STATE.trackingMode=nextMode;
   DASH_STATE.selectedPeriodKey='';
   rHome();
+}
+
+function setTrackingPeriod(nextPeriod){
+  DASH_STATE.selectedPeriodKey=nextPeriod || '';
+  rHome();
+}
+
+document.addEventListener('click',e=>{
+  const trackBtn=e.target.closest('[data-track-mode]');
+  if(!trackBtn)return;
+  setTrackingMode(trackBtn.dataset.trackMode);
 });
 
 document.addEventListener('change',e=>{
   if(!e.target.matches('select[data-action="tracking-select"]'))return;
-  DASH_STATE.selectedPeriodKey=e.target.value || '';
-  rHome();
+  setTrackingPeriod(e.target.value || '');
 });
 
 
