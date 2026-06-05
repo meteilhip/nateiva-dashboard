@@ -1587,7 +1587,10 @@ function canonicalPersonName(value){
 function samePerson(a,b){return canonicalPersonKey(a)===canonicalPersonKey(b)}
 function digitsOnly(value){return String(value||'').replace(/\D/g,'')}
 function categorizeCallStatus(item){
-  const text=normalizeText((item && item.Status)||'')+' '+normalizeText((item && item.Outcome)||'')+' '+normalizeText((item && item.Notes)||'');
+  const text=[(item && item.Status)||'',(item && item.Outcome)||'']
+    .map(function(value){ return normalizeText(value); })
+    .filter(Boolean)
+    .join(' ');
   if(/contact etabli/.test(text) && /message laisse|autre personne/.test(text))return 'message';
   if(/contact etabli|rdv fixe|interesse|demo faite|dossier transmis|converti|signe/.test(text))return 'connected';
   if(/aucune reponse|ligne occupee|pas joignable/.test(text))return 'no_answer';
@@ -1667,21 +1670,21 @@ const PROSPECTION_THEME_RULES=[
 const PROSPECTION_THEME_ORDER=PROSPECTION_THEME_RULES.map(function(rule){ return rule.key; });
 
 function extractCallIntent(item){
-  const text=normalizeText([item && item.Status,item && item.Outcome,item && item.Notes,item && item.NextAction].join(' '));
-  const rating=parseCount(item && (item.CallRating||item.Rating));
+  const text=normalizeText(item && item.Notes);
   const signals={
     rejection:hasAnyPattern(text,CALL_INTENT_RULES[0].patterns),
-    visit:hasAnyPattern(text,CALL_INTENT_RULES[1].patterns) || isYesFlag(item && item.CallVisit),
-    escalation:hasAnyPattern(text,CALL_INTENT_RULES[2].patterns) || isYesFlag(item && item.CallToSuperior),
-    docs:hasAnyPattern(text,CALL_INTENT_RULES[3].patterns) || isYesFlag(item && item.CallWhatsappDocs),
-    callback:hasAnyPattern(text,CALL_INTENT_RULES[4].patterns) || isYesFlag(item && item.CallSecondCall) || parseCount(item && item.CallTimesCalled)>1,
-    interest:hasAnyPattern(text,CALL_INTENT_RULES[5].patterns) || rating>=3
+    visit:hasAnyPattern(text,CALL_INTENT_RULES[1].patterns),
+    escalation:hasAnyPattern(text,CALL_INTENT_RULES[2].patterns),
+    docs:hasAnyPattern(text,CALL_INTENT_RULES[3].patterns),
+    callback:hasAnyPattern(text,CALL_INTENT_RULES[4].patterns),
+    interest:hasAnyPattern(text,CALL_INTENT_RULES[5].patterns)
   };
-  signals.qualify=!CALL_INTENT_ORDER.some(function(key){ return signals[key]; });
+  const hasNote=!!text;
+  signals.qualify=hasNote && !CALL_INTENT_ORDER.some(function(key){ return signals[key]; });
   return {
-    rating:rating,
+    hasNote:hasNote,
     signals:signals,
-    primary:primaryMatch(signals,CALL_INTENT_ORDER,'qualify')
+    primary:hasNote ? primaryMatch(signals,CALL_INTENT_ORDER,'qualify') : 'none'
   };
 }
 
@@ -2107,14 +2110,13 @@ function buildAreaLayers(records){
 function buildCallAnalytics(followups, experts){
   const calls=followups.filter(function(item){ return item.FollowupType==='CALL'; });
   const summary={total:calls.length,connected:0,message:0,noAnswer:0,unreachable:0,other:0};
-  const signalTotals={docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0};
-  const primaryTotals={rejection:0,visit:0,escalation:0,docs:0,callback:0,interest:0,qualify:0};
+  const sourceFlags={secondCall:0,whatsappDocs:0,toSuperior:0,visit:0,ratingFilled:0,summaryFilled:0,summaryBlank:0,contactFilled:0,phoneFilled:0};
+  const noteSignalTotals={docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0};
+  const notePrimaryTotals={rejection:0,visit:0,escalation:0,docs:0,callback:0,interest:0,qualify:0};
   const byExpert=new Map();
-  let ratedCount=0;
-  let ratingTotal=0;
   (experts||[]).filter(Boolean).forEach(function(expert){
     const name=canonicalPersonName(expert);
-    byExpert.set(name,{expert:name,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0});
+    byExpert.set(name,{expert:name,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',secondCall:0,whatsappDocs:0,toSuperior:0,visit:0,summaryFilled:0,summaryBlank:0,ratingFilled:0});
   });
   calls.forEach(function(item){
     const bucket=categorizeCallStatus(item);
@@ -2123,26 +2125,38 @@ function buildCallAnalytics(followups, experts){
     const intent=extractCallIntent(item);
     const expert=canonicalPersonName(item.Expert||'Non attribué');
     if(!byExpert.has(expert)){
-      byExpert.set(expert,{expert:expert,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0});
+      byExpert.set(expert,{expert:expert,total:0,connected:0,message:0,noAnswer:0,unreachable:0,other:0,lastCall:'',secondCall:0,whatsappDocs:0,toSuperior:0,visit:0,summaryFilled:0,summaryBlank:0,ratingFilled:0});
     }
     const row=byExpert.get(expert);
     row.total++;
     row[bucketKey]=(row[bucketKey]||0)+1;
     if(item.Timestamp && (!row.lastCall || item.Timestamp>row.lastCall))row.lastCall=item.Timestamp;
-    CALL_INTENT_ORDER.forEach(function(key){
-      if(intent.signals[key]){
-        signalTotals[key]++;
-        row[key]=(row[key]||0)+1;
-      }
-    });
-    if(intent.signals.qualify){
-      signalTotals.qualify++;
-      row.qualify++;
+
+    if(item.ContactName){ sourceFlags.contactFilled++; }
+    if(digitsOnly(item.ContactPhone)){ sourceFlags.phoneFilled++; }
+    if(isYesFlag(item.CallSecondCall)){ sourceFlags.secondCall++; row.secondCall++; }
+    if(isYesFlag(item.CallWhatsappDocs)){ sourceFlags.whatsappDocs++; row.whatsappDocs++; }
+    if(isYesFlag(item.CallToSuperior)){ sourceFlags.toSuperior++; row.toSuperior++; }
+    if(isYesFlag(item.CallVisit)){ sourceFlags.visit++; row.visit++; }
+    if(parseCount(item.CallRating)>0){ sourceFlags.ratingFilled++; row.ratingFilled++; }
+    if(normalizeText(item.Notes)){
+      sourceFlags.summaryFilled++;
+      row.summaryFilled++;
+    }else{
+      sourceFlags.summaryBlank++;
+      row.summaryBlank++;
     }
-    primaryTotals[intent.primary]=(primaryTotals[intent.primary]||0)+1;
-    if(intent.rating>0){
-      ratedCount++;
-      ratingTotal+=intent.rating;
+
+    if(intent.hasNote){
+      CALL_INTENT_ORDER.forEach(function(key){
+        if(intent.signals[key]){
+          noteSignalTotals[key]++;
+        }
+      });
+      if(intent.signals.qualify){
+        noteSignalTotals.qualify++;
+      }
+      notePrimaryTotals[intent.primary]=(notePrimaryTotals[intent.primary]||0)+1;
     }
   });
   const expertsTable=Array.from(byExpert.values()).sort(function(a,b){
@@ -2154,24 +2168,23 @@ function buildCallAnalytics(followups, experts){
     {label:'📝 Message laissé',short:'Messages',value:summary.message,color:resolveToneColor('teal'),detail:'intermédiaire ou message'},
     {label:'📵 Sans réponse',short:'Sans réponse',value:summary.noAnswer,color:resolveToneColor('red'),detail:'ligne occupée / pas de réponse'},
     {label:'⛔ Injoignable',short:'Injoignable',value:summary.unreachable,color:resolveToneColor('dark'),detail:'erreur / numéro KO'},
-    {label:'❔ Autre',short:'Autre',value:summary.other,color:resolveToneColor('gray'),detail:'à préciser'}
+    {label:'❔ Statut vide / autre',short:'Autre',value:summary.other,color:resolveToneColor('gray'),detail:'statut non saisi'}
   ].filter(function(segment){ return segment.value>0; });
   const primaryIntentSegments=[
-    {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',value:primaryTotals.visit,color:resolveToneColor('saffron'),detail:'opportunité terrain immédiate'},
-    {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',value:primaryTotals.docs,color:resolveToneColor('teal'),detail:'envoi documentaire demandé'},
-    {key:'callback',label:'🔁 Relance / 2e appel',short:'Relance',value:primaryTotals.callback,color:resolveToneColor('red'),detail:'relance planifiée'},
-    {key:'escalation',label:'🏛️ Hiérarchie / fondateur',short:'Hiérarchie',value:primaryTotals.escalation,color:resolveToneColor('dark'),detail:'passe au décideur final'},
-    {key:'interest',label:'✨ Intérêt à nourrir',short:'Intérêt',value:primaryTotals.interest,color:resolveToneColor('green'),detail:'curiosité réelle détectée'},
-    {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',value:primaryTotals.rejection,color:resolveToneColor('red-deep'),detail:'blocage explicite'},
-    {key:'qualify',label:'📝 À qualifier',short:'À qualifier',value:primaryTotals.qualify,color:resolveToneColor('gray'),detail:'résumé trop faible pour lire la suite'}
+    {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',value:notePrimaryTotals.docs,color:resolveToneColor('teal'),detail:'résumé orienté envoi docs'},
+    {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',value:notePrimaryTotals.visit,color:resolveToneColor('saffron'),detail:'résumé orienté rencontre'},
+    {key:'callback',label:'🔁 Relance / rappel',short:'Relance',value:notePrimaryTotals.callback,color:resolveToneColor('red'),detail:'résumé orienté reprise'},
+    {key:'escalation',label:'🏛️ Hiérarchie / fondateur',short:'Hiérarchie',value:notePrimaryTotals.escalation,color:resolveToneColor('dark'),detail:'résumé orienté décideur final'},
+    {key:'interest',label:'✨ Intérêt explicite',short:'Intérêt',value:notePrimaryTotals.interest,color:resolveToneColor('green'),detail:'résumé orienté intérêt'},
+    {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',value:notePrimaryTotals.rejection,color:resolveToneColor('red-deep'),detail:'résumé orienté blocage dur'},
+    {key:'qualify',label:'📝 Note à clarifier',short:'À clarifier',value:notePrimaryTotals.qualify,color:resolveToneColor('gray'),detail:'résumé rempli mais flou'}
   ].filter(function(segment){ return segment.value>0; });
   const topExpert=expertsTable[0] || null;
-  const actionableCalls=calls.length-primaryTotals.qualify;
   const insights=[
-    `${signalTotals.docs} appels déclenchent déjà un envoi de documents ou de WhatsApp.`,
-    `${signalTotals.callback} demandent une relance explicite et ${signalTotals.visit} sont mûrs pour une visite ou un rendez-vous.`,
-    `${signalTotals.escalation} appellent une validation fondateur / hiérarchie: c’est la vraie marche de décision.`,
-    `${primaryTotals.qualify} appels restent à qualifier car le résumé métier n’explique pas encore la vraie suite commerciale.`
+    `${sourceFlags.summaryFilled} appels ont un résumé saisi et ${sourceFlags.summaryBlank} n'ont aucune note.`,
+    `${sourceFlags.whatsappDocs} appels sont marqués "WhatsApp docs", ${sourceFlags.secondCall} "2e appel", ${sourceFlags.visit} "visite" et ${sourceFlags.toSuperior} "transmission supérieur".`,
+    `Sur les ${sourceFlags.summaryFilled} résumés réels, ${noteSignalTotals.docs} parlent de documents, ${noteSignalTotals.callback} de relance, ${noteSignalTotals.visit} de rendez-vous/visite et ${noteSignalTotals.escalation} de hiérarchie.`,
+    `${summary.message} appels sont passés par une autre personne et ${summary.other} gardent un statut vide ou non exploitable.`
   ];
   if(topExpert && topExpert.total){
     insights.push(`${topExpert.expert} porte aujourd’hui le plus gros volume d’appels visibles (${topExpert.total}).`);
@@ -2179,15 +2192,16 @@ function buildCallAnalytics(followups, experts){
   return {
     summary:summary,
     experts:expertsTable,
-    signalTotals:signalTotals,
-    primaryTotals:primaryTotals,
+    sourceFlags:sourceFlags,
+    noteSignalTotals:noteSignalTotals,
+    notePrimaryTotals:notePrimaryTotals,
     statusSegments:statusSegments,
     primaryIntentSegments:primaryIntentSegments,
     quality:{
-      ratedCount:ratedCount,
-      avgRating:ratedCount ? (ratingTotal/ratedCount) : 0,
-      actionableCalls:actionableCalls,
-      qualifiesNeeded:primaryTotals.qualify
+      ratedCount:sourceFlags.ratingFilled,
+      summaryFilled:sourceFlags.summaryFilled,
+      summaryBlank:sourceFlags.summaryBlank,
+      qualifiesNeeded:notePrimaryTotals.qualify
     },
     insights:insights
   };
@@ -2619,16 +2633,13 @@ function rHome(){
   const dashboard=buildDashboardModel();
   const uniqueSchools=dashboard.records.length;
   const totalProspections=dashboard.rawRows.length;
+  const showAll=canSeeAllData(currentUser);
   const hotStage=dashboard.pipeline.find(stage=>stage.key==='chaud') || {count:0};
   const wonStage=dashboard.pipeline.find(stage=>stage.key==='gagne') || {count:0};
-  const showAll=!!(currentUser && canSeeAllData(currentUser));
   const trackingContext=getSelectedTrackingContext(dashboard);
   const trackingTitle=DASH_STATE.trackingMode==='month' ? 'mensuel' : 'hebdomadaire';
   const trackingTableTitle=DASH_STATE.trackingMode==='month' ? 'Mensuel Détaillé' : 'Hebdomadaire Détaillé';
   const trackingPeriodHeader=DASH_STATE.trackingMode==='month' ? 'Mois' : 'Semaine';
-  const scopeCopy=showAll
-    ? 'Vue combinée active: Noah, Mbeuka et Guy peuvent voir la progression de toute l’équipe.'
-    : 'Vue personnelle active: cet expert ne voit que ses propres écoles, appels, KPI et progression.';
   const cityRows=dashboard.layers.cities.slice(0,6);
   const zoneRows=dashboard.layers.zones.slice(0,8);
   const callSummary=dashboard.callAnalytics.summary;
@@ -2657,14 +2668,6 @@ function rHome(){
   </div>
 
   <div class="section">
-    <div class="page-intro" style="background:linear-gradient(135deg, var(--red), var(--red-deep));padding:28px 32px" data-num="🎯">
-      <h2 style="font-size:32px">🎯 Tracking <span class="it">Volume + Qualité</span></h2>
-      <p style="font-size:14.5px">Objectif central: <b>10 écoles / jour / expert</b>. La vélocité est calculée sur le <b>nombre de jours actifs distincts</b> où au moins une saisie a été faite. On peut donc voir clairement si le rythme monte, baisse, et si cette baisse est saine ou non.</p>
-      <p style="font-size:14px;margin-top:10px;color:rgba(255,255,255,.92)">${scopeCopy}</p>
-    </div>
-  </div>
-
-  <div class="section">
     <div class="sec-head">
       <h2>📌 Dashboard <span class="it">KPI</span></h2>
       <span class="anno">Prospection · appels · vélocité</span>
@@ -2678,7 +2681,7 @@ function rHome(){
       <div class="kpi teal">
         <div class="lbl">Appels suivis</div>
         <div class="val">${dashboard.callInputs}</div>
-        <div class="delta">${callSummary.connected} contacts établis · ${callSummary.noAnswer} sans réponse</div>
+        <div class="delta">${callSummary.connected} contacts établis · ${callSummary.noAnswer + callSummary.unreachable} sans réponse / erreur</div>
       </div>
       <div class="kpi dark">
         <div class="lbl">Vélocité</div>
@@ -2691,7 +2694,6 @@ function rHome(){
         <div class="delta">${hotStage.count + wonStage.count} chauds/gagnés sur ${uniqueSchools}</div>
       </div>
     </div>
-    <div class="note teal"><b>💡 Ce dashboard répond maintenant aux demandes de tracking:</b> pipeline par étape, revenus en FCFA, progression hebdomadaire, mensuelle, croissance ou baisse, écoles par étape, progression par agent et matrices par ville / zone.</div>
   </div>
 
   <div class="section">
@@ -2754,7 +2756,7 @@ function rHome(){
       <div class="kpi teal">
         <div class="lbl">Appels Totaux</div>
         <div class="val">${callSummary.total}</div>
-        <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% de contacts joints</div>
+        <div class="delta">${callSummary.connected} joints · ${callSummary.message} messages laissés</div>
       </div>
       <div class="kpi green">
         <div class="lbl">Contacts Établis</div>
@@ -2762,14 +2764,14 @@ function rHome(){
         <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% du volume appels</div>
       </div>
       <div class="kpi saffron">
-        <div class="lbl">Actions Détectées</div>
-        <div class="val">${callQuality.actionableCalls}</div>
-        <div class="delta">${dashboard.callAnalytics.signalTotals.docs} docs · ${dashboard.callAnalytics.signalTotals.callback} relances · ${dashboard.callAnalytics.signalTotals.visit} RDV</div>
+        <div class="lbl">Sans Réponse / Erreur</div>
+        <div class="val">${callSummary.noAnswer + callSummary.unreachable}</div>
+        <div class="delta">${callSummary.noAnswer} sans réponse · ${callSummary.unreachable} injoignables</div>
       </div>
       <div class="kpi red">
-        <div class="lbl">À Requalifier</div>
-        <div class="val">${callQuality.qualifiesNeeded}</div>
-        <div class="delta">${callSummary.noAnswer} sans réponse · ${callSummary.unreachable} erreurs · notes trop faibles sinon</div>
+        <div class="lbl">Résumés Remplis</div>
+        <div class="val">${callQuality.summaryFilled}</div>
+        <div class="delta">${callQuality.summaryBlank} appels sans note · ${callQuality.ratedCount} avec rating</div>
       </div>
     </div>
     <div class="pie-grid">
@@ -2782,67 +2784,67 @@ function rHome(){
         [
           `<b>${callSummary.connected}</b> appels ont joint directement la bonne personne.`,
           `<b>${callSummary.noAnswer + callSummary.unreachable}</b> appels sont bloqués par la joignabilité avant même la vente.`,
-          `${callQuality.ratedCount ? `Seulement <b>${callQuality.ratedCount}</b> appels ont une note/rating exploitable pour enrichir l’analyse.` : `<b>Aucun rating exploitable</b> n’est encore saisi côté appels.`}`
+          `<b>${callSummary.message}</b> appels ont seulement laissé un message ou parlé à une autre personne, et <b>${callSummary.other}</b> ont un statut vide / autre.`
         ]
       )}
       ${renderPieCard(
-        'Suite commerciale détectée',
-        'NLP + drapeaux source pour lire la prochaine action dominante derrière chaque appel.',
+        'Résumés d’appels interprétés',
+        'Camembert NLP calculé uniquement sur les résumés réellement saisis, pas sur les 105 appels entiers.',
         dashboard.callAnalytics.primaryIntentSegments,
-        String(callQuality.actionableCalls),
-        'appels lisibles',
+        String(callQuality.summaryFilled),
+        'résumés remplis',
         dashboard.callAnalytics.insights
       )}
     </div>
     <div class="call-insight-grid">
       <div class="call-signal-card">
-        <div class="eyebrow">📄 Documents / WhatsApp</div>
-        <div class="value">${dashboard.callAnalytics.signalTotals.docs}</div>
-        <div class="body">Appels où la personne a demandé l’envoi de documents, brochure ou supports WhatsApp.</div>
+        <div class="eyebrow">📄 WhatsApp Docs</div>
+        <div class="value">${dashboard.callAnalytics.sourceFlags.whatsappDocs}</div>
+        <div class="body">Champ source marqué <b>Oui</b> pour l’envoi de documents ou supports sur WhatsApp.</div>
       </div>
       <div class="call-signal-card">
-        <div class="eyebrow">🔁 Relances demandées</div>
-        <div class="value">${dashboard.callAnalytics.signalTotals.callback}</div>
-        <div class="body">Appels qui demandent un rappel, un second passage ou une reprise après examens / congés.</div>
+        <div class="eyebrow">🔁 Second Call</div>
+        <div class="value">${dashboard.callAnalytics.sourceFlags.secondCall}</div>
+        <div class="body">Champ source marqué <b>Oui</b> pour un deuxième appel / relance prévue.</div>
       </div>
       <div class="call-signal-card">
-        <div class="eyebrow">📍 RDV / Visites</div>
-        <div class="value">${dashboard.callAnalytics.signalTotals.visit}</div>
-        <div class="body">Appels déjà assez mûrs pour un rendez-vous physique, un dépôt ou une visite commerciale.</div>
+        <div class="eyebrow">📍 Visit</div>
+        <div class="value">${dashboard.callAnalytics.sourceFlags.visit}</div>
+        <div class="body">Champ source marqué <b>Oui</b> ou <b>En cours</b> pour une visite / action terrain liée à l’appel.</div>
       </div>
       <div class="call-signal-card">
-        <div class="eyebrow">🏛️ Hiérarchie</div>
-        <div class="value">${dashboard.callAnalytics.signalTotals.escalation}</div>
-        <div class="body">Cas où l’offre monte au fondateur, à la hiérarchie ou au conseil avant arbitrage final.</div>
+        <div class="eyebrow">🏛️ To Superior</div>
+        <div class="value">${dashboard.callAnalytics.sourceFlags.toSuperior}</div>
+        <div class="body">Champ source marqué <b>Oui</b> pour une transmission explicite au supérieur / décideur.</div>
       </div>
     </div>
     <div class="two">
       <div class="chart">
         <h3>Lecture <span class="it">NLP des appels</span></h3>
-        <div class="desc">Interprétation métier de ce que les résumés racontent vraiment, au-delà du simple statut technique.</div>
+        <div class="desc">Lecture NLP uniquement sur les <b>${callQuality.summaryFilled}</b> résumés saisis. Les appels sans note ne sont pas interprétés ici.</div>
         <div class="table-scroll"><table class="tbl">
           <thead><tr><th>Signal</th><th>Volume</th><th>Part</th><th>Interprétation utile</th></tr></thead>
           <tbody>
-            <tr><td><b>📄 Docs / WhatsApp</b></td><td class="num">${dashboard.callAnalytics.signalTotals.docs}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.docs/callSummary.total)*100) : 0}%</td><td>Le contact veut matière pour continuer la discussion.</td></tr>
-            <tr><td><b>🔁 Relance / 2e appel</b></td><td class="num">${dashboard.callAnalytics.signalTotals.callback}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.callback/callSummary.total)*100) : 0}%</td><td>La conversation n’est pas morte, mais demande timing et discipline.</td></tr>
-            <tr><td><b>📍 RDV / visite</b></td><td class="num">${dashboard.callAnalytics.signalTotals.visit}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.visit/callSummary.total)*100) : 0}%</td><td>Ce sont les appels les plus proches d’un vrai mouvement terrain.</td></tr>
-            <tr><td><b>🏛️ Hiérarchie / fondateur</b></td><td class="num">${dashboard.callAnalytics.signalTotals.escalation}</td><td class="num">${callSummary.total ? Math.round((dashboard.callAnalytics.signalTotals.escalation/callSummary.total)*100) : 0}%</td><td>Décision non locale: il faut armer le dossier et suivre le décideur final.</td></tr>
-            <tr><td><b>📝 À qualifier</b></td><td class="num">${callQuality.qualifiesNeeded}</td><td class="num">${callSummary.total ? Math.round((callQuality.qualifiesNeeded/callSummary.total)*100) : 0}%</td><td>Le statut existe, mais pas encore l’histoire commerciale exploitable.</td></tr>
+            <tr><td><b>📄 Docs / WhatsApp</b></td><td class="num">${dashboard.callAnalytics.noteSignalTotals.docs}</td><td class="num">${callQuality.summaryFilled ? Math.round((dashboard.callAnalytics.noteSignalTotals.docs/callQuality.summaryFilled)*100) : 0}%</td><td>Le résumé dit explicitement qu’il faut envoyer des documents ou supports.</td></tr>
+            <tr><td><b>🔁 Relance / rappel</b></td><td class="num">${dashboard.callAnalytics.noteSignalTotals.callback}</td><td class="num">${callQuality.summaryFilled ? Math.round((dashboard.callAnalytics.noteSignalTotals.callback/callQuality.summaryFilled)*100) : 0}%</td><td>Le résumé demande un rappel ou un retour plus tard.</td></tr>
+            <tr><td><b>📍 RDV / visite</b></td><td class="num">${dashboard.callAnalytics.noteSignalTotals.visit}</td><td class="num">${callQuality.summaryFilled ? Math.round((dashboard.callAnalytics.noteSignalTotals.visit/callQuality.summaryFilled)*100) : 0}%</td><td>Le résumé parle de rendez-vous, passage ou visite.</td></tr>
+            <tr><td><b>🏛️ Hiérarchie / fondateur</b></td><td class="num">${dashboard.callAnalytics.noteSignalTotals.escalation}</td><td class="num">${callQuality.summaryFilled ? Math.round((dashboard.callAnalytics.noteSignalTotals.escalation/callQuality.summaryFilled)*100) : 0}%</td><td>Le résumé remonte au fondateur, à la hiérarchie ou au conseil.</td></tr>
+            <tr><td><b>📝 Note à clarifier</b></td><td class="num">${callQuality.qualifiesNeeded}</td><td class="num">${callQuality.summaryFilled ? Math.round((callQuality.qualifiesNeeded/callQuality.summaryFilled)*100) : 0}%</td><td>Le résumé existe mais n’exprime pas encore une suite commerciale claire.</td></tr>
           </tbody>
         </table></div>
       </div>
       <div class="chart">
         <h3>Par <span class="it">expert</span></h3>
-        <div class="desc">On voit enfin non seulement qui appelle, mais ce que ces appels débloquent réellement.</div>
+        <div class="desc">Vue directe des colonnes source par expert, sans sur-interprétation.</div>
         <div class="table-scroll"><table class="tbl">
-          <thead><tr><th>Expert</th><th>Appels</th><th>Joints</th><th>Docs</th><th>Relances</th><th>RDV</th><th>À qualifier</th><th>Dernier appel</th></tr></thead>
+          <thead><tr><th>Expert</th><th>Appels</th><th>Joints</th><th>Msg</th><th>Sans rép.</th><th>2e appel</th><th>WA docs</th><th>Visite</th><th>Notes</th><th>Dernier appel</th></tr></thead>
           <tbody>
-            ${callExperts.map(agent=>`<tr><td><b>${esc(agent.expert)}</b></td><td class="num">${agent.total}</td><td class="num">${agent.connected}</td><td class="num">${agent.docs}</td><td class="num">${agent.callback}</td><td class="num">${agent.visit}</td><td class="num">${agent.qualify}</td><td>${agent.lastCall ? esc(String(agent.lastCall).slice(0,10)) : '—'}</td></tr>`).join('')}
+            ${callExperts.map(agent=>`<tr><td><b>${esc(agent.expert)}</b></td><td class="num">${agent.total}</td><td class="num">${agent.connected}</td><td class="num">${agent.message}</td><td class="num">${agent.noAnswer + agent.unreachable}</td><td class="num">${agent.secondCall}</td><td class="num">${agent.whatsappDocs}</td><td class="num">${agent.visit}</td><td class="num">${agent.summaryFilled}</td><td>${agent.lastCall ? esc(String(agent.lastCall).slice(0,10)) : '—'}</td></tr>`).join('')}
           </tbody>
         </table></div>
       </div>
     </div>
-    <div class="note teal"><b>Lecture source actuelle:</b> la feuille appels importée visible aujourd’hui répartit les <b>105 appels</b> entre <b>Kendo Fabiola</b> et <b>Kessi Taylor</b>. Cette section ne fabrique pas les résultats: elle interprète les résumés et drapeaux réellement saisis, puis signale aussi quand une note est trop faible pour un vrai diagnostic commercial.</div>
+    <div class="note teal"><b>Vérification source:</b> les <b>105 appels</b> visibles viennent aujourd’hui de <b>Kendo Fabiola (95)</b> et <b>Kessi Taylor (10)</b>. Les compteurs source ci-dessus lisent directement les colonnes du fichier appels; la partie NLP n’interprète que les <b>${callQuality.summaryFilled}</b> résumés réellement remplis.</div>
   </div>
 
   <div class="section">
