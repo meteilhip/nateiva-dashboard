@@ -849,6 +849,52 @@ body{
 .heat-cell .h-name{font-size:12px;font-weight:700;margin-bottom:8px}
 .heat-cell .h-val{font-family:'Fraunces',serif;font-size:30px;font-weight:600;line-height:1;letter-spacing:-.025em}
 .heat-cell .h-sub{font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:6px;opacity:.85;font-weight:600}
+.city-heatmap{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
+.city-heatmap-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.city-heat-legend{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.city-heat-legend span{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;padding:6px 10px;border-radius:999px;border:1px solid var(--g200);background:var(--paper);color:var(--g600)
+}
+.city-heat-legend .hot{background:linear-gradient(135deg, #FEF3C7, #FDE68A);border-color:#FDE68A;color:#92400E}
+.city-heat-legend .warmer{background:linear-gradient(135deg, #FDE68A, var(--saffron));border-color:var(--saffron);color:var(--paper)}
+.city-heat-legend .hottest{background:linear-gradient(135deg, var(--saffron), var(--red));border-color:var(--red);color:var(--paper)}
+.city-heat-rows{display:grid;gap:12px}
+.city-heat-row{
+  display:grid;grid-template-columns:minmax(160px,1.15fr) minmax(320px,2fr) minmax(220px,1.25fr);
+  gap:12px;align-items:stretch;padding:16px;border:1.5px solid var(--g200);border-radius:16px;
+  background:linear-gradient(135deg, rgba(255,255,255,.98), rgba(247,244,238,.96));box-shadow:var(--shadow)
+}
+.city-heat-city{display:flex;flex-direction:column;justify-content:center;gap:8px}
+.city-heat-city .name{font-family:'Fraunces',serif;font-size:28px;font-weight:600;letter-spacing:-.03em;color:var(--ink);line-height:1}
+.city-heat-city .sub{font-size:12px;color:var(--g600);line-height:1.65}
+.city-heat-cells{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.city-heat-cell{
+  min-height:88px;border-radius:14px;padding:12px 12px 10px;border:1.5px solid var(--g200);
+  background:var(--g50);display:flex;flex-direction:column;justify-content:space-between
+}
+.city-heat-cell span{
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;opacity:.85
+}
+.city-heat-cell strong{font-family:'Fraunces',serif;font-size:28px;font-weight:600;line-height:1;color:inherit}
+.city-focus{
+  border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;gap:8px;
+  border:1.5px solid var(--g200);background:var(--paper)
+}
+.city-focus.good{background:linear-gradient(135deg, rgba(5,150,105,.08), rgba(255,255,255,.98));border-color:rgba(5,150,105,.25)}
+.city-focus.warn{background:linear-gradient(135deg, rgba(245,158,11,.12), rgba(255,255,255,.98));border-color:rgba(245,158,11,.28)}
+.city-focus.alert{background:linear-gradient(135deg, rgba(220,38,38,.1), rgba(255,255,255,.98));border-color:rgba(220,38,38,.28)}
+.city-focus.neutral{background:linear-gradient(135deg, rgba(15,23,42,.06), rgba(255,255,255,.98));border-color:rgba(148,163,184,.35)}
+.city-focus .pill{
+  align-self:flex-start;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;padding:6px 10px;border-radius:999px;background:rgba(15,23,42,.92);color:var(--paper)
+}
+.city-focus.good .pill{background:var(--green)}
+.city-focus.warn .pill{background:var(--saffron)}
+.city-focus.alert .pill{background:var(--red)}
+.city-focus .stat{font-family:'Fraunces',serif;font-size:22px;font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.city-focus .note{margin:0;padding:0;background:none;border:none;font-size:12px;line-height:1.65;color:var(--g700)}
 
 /* CHAIN CARDS */
 .chain-card{
@@ -974,6 +1020,7 @@ body{
   .two,.three,.four{grid-template-columns:1fr 1fr}
   .nav-btn{min-width:120px}
   .week-chart{min-width:700px}
+  .city-heat-row{grid-template-columns:1fr}
 }
 @media (max-width:768px){
   .app{padding:18px}
@@ -999,6 +1046,10 @@ body{
   .week-stack{width:34px}
   .week-meta strong{font-size:20px}
   .compare-card .value{font-size:40px}
+  .city-heatmap-head{flex-direction:column}
+  .city-heat-legend{justify-content:flex-start}
+  .city-heat-cells{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .city-heat-city .name{font-size:24px}
 }
 /* ============================================
    SUIVI — LOGIN & TRACKER
@@ -2066,33 +2117,57 @@ function buildAreaLayers(records){
   records.forEach(function(record){
     const city=record.city||'NON DEFINI';
     const zone=record.zone||'Sans zone';
-    const cityRef=cities.get(city)||{city,count:0,hot:0,won:0,zones:new Map()};
+    const cityRef=cities.get(city)||{city,count:0,hot:0,warm:0,cold:0,newCount:0,lost:0,won:0,zones:new Map(),experts:new Set(),rateSum:0,rateCount:0,lastTouch:null};
     cityRef.count++;
     cityRef.zones.set(zone,(cityRef.zones.get(zone)||0)+1);
-    if(record.stage==='chaud' || record.stage==='gagne')cityRef.hot++;
-    if(record.stage==='gagne')cityRef.won++;
+    if(record.expert)cityRef.experts.add(record.expert);
+    if(typeof record.rate==='number'){
+      cityRef.rateSum+=record.rate;
+      cityRef.rateCount++;
+    }
+    if(record.lastTouch && (!cityRef.lastTouch || record.lastTouch>cityRef.lastTouch))cityRef.lastTouch=record.lastTouch;
+    if(record.stage==='chaud')cityRef.hot++;
+    else if(record.stage==='gagne'){cityRef.hot++;cityRef.won++;}
+    else if(record.stage==='tiede')cityRef.warm++;
+    else if(record.stage==='froid')cityRef.cold++;
+    else if(record.stage==='nouveau')cityRef.newCount++;
+    else if(record.stage==='perdu')cityRef.lost++;
     cities.set(city,cityRef);
 
     const zoneKey=city+'__'+zone;
-    const zoneRef=zones.get(zoneKey)||{city,zone,count:0,hot:0,warm:0,won:0,experts:new Set()};
+    const zoneRef=zones.get(zoneKey)||{city,zone,count:0,hot:0,warm:0,cold:0,newCount:0,lost:0,won:0,experts:new Set()};
     zoneRef.count++;
     if(record.expert)zoneRef.experts.add(record.expert);
     if(record.stage==='chaud')zoneRef.hot++;
     if(record.stage==='tiede')zoneRef.warm++;
     if(record.stage==='gagne')zoneRef.won++;
+    if(record.stage==='froid')zoneRef.cold++;
+    if(record.stage==='nouveau')zoneRef.newCount++;
+    if(record.stage==='perdu')zoneRef.lost++;
     zones.set(zoneKey,zoneRef);
   });
 
   return {
     cities:Array.from(cities.values()).map(function(city){
       const topZone=Array.from(city.zones.entries()).sort(function(a,b){ return b[1]-a[1]; })[0];
+      const engaged=city.hot+city.warm;
+      const backlog=city.cold+city.newCount+city.lost;
       return {
         city:city.city,
         count:city.count,
         hot:city.hot,
+        warm:city.warm,
+        cold:city.cold,
+        newCount:city.newCount,
+        lost:city.lost,
         won:city.won,
+        engaged:engaged,
+        backlog:backlog,
         hotRate:city.count ? Math.round((city.hot/city.count)*100) : 0,
-        topZone:topZone ? topZone[0] : '—'
+        avgRate:city.rateCount ? Math.round(city.rateSum/city.rateCount) : 0,
+        expertCount:city.experts.size,
+        topZone:topZone ? topZone[0] : '—',
+        lastTouch:city.lastTouch || null
       };
     }).sort(function(a,b){ return b.count-a.count; }),
     zones:Array.from(zones.values()).map(function(zone){
@@ -2102,6 +2177,9 @@ function buildAreaLayers(records){
         count:zone.count,
         hot:zone.hot,
         warm:zone.warm,
+        cold:zone.cold,
+        newCount:zone.newCount,
+        lost:zone.lost,
         won:zone.won,
         expertCount:zone.experts.size,
         hotRate:zone.count ? Math.round(((zone.hot+zone.won)/zone.count)*100) : 0
@@ -2381,6 +2459,102 @@ function renderPieCard(title, desc, segments, centerValue, centerLabel, insights
       </div>
     </div>
     ${insights && insights.length ? `<div class="pie-insights">${insights.map(function(item){ return `<div class="pie-insight">${item}</div>`; }).join('')}</div>` : ''}
+  </div>`;
+}
+
+function heatLevelByRatio(value,maxValue){
+  if(!value || !maxValue)return 'h-0';
+  const ratio=value/maxValue;
+  if(ratio>=0.85)return 'h-4';
+  if(ratio>=0.6)return 'h-3';
+  if(ratio>=0.35)return 'h-2';
+  return 'h-1';
+}
+
+function getCityFocusMeta(city,maxCount){
+  const volumeHeavy=city.count>=Math.max(20,Math.round(maxCount*0.65));
+  if(city.hotRate>=40 && city.hot>=Math.max(3,Math.round(city.count*0.2))){
+    return {
+      tone:'good',
+      label:'Closer maintenant',
+      stat:`${city.hotRate}% hot rate`,
+      note:`${city.hot} écoles sont déjà chaudes ou gagnées. Il faut pousser les suivis et les décideurs sur ${city.topZone||city.city}.`
+    };
+  }
+  if(volumeHeavy && city.backlog>=city.engaged){
+    return {
+      tone:'alert',
+      label:'Requalifier vite',
+      stat:`${city.backlog} à reprendre`,
+      note:`Le portefeuille est lourd mais encore froid ou nouveau. Repassage terrain, relances et recadrage du pitch en priorité.`
+    };
+  }
+  if(city.hotRate>=30){
+    return {
+      tone:'warn',
+      label:'Accélérer volume',
+      stat:`${city.engaged} engagées`,
+      note:`La ville répond correctement. On peut ouvrir plus de couches autour de ${city.topZone||city.city} sans dégrader la qualité.`
+    };
+  }
+  return {
+    tone:'neutral',
+    label:'Construire prudemment',
+    stat:`${city.avgRate||0}% moyen`,
+    note:`La traction reste moyenne. Continuer à tester les approches, qualifier les décideurs et sécuriser les documents.`
+  };
+}
+
+function renderCityHeatmap(cities){
+  const items=(cities||[]).filter(Boolean);
+  if(!items.length)return '';
+  const maxCount=items.reduce(function(max,city){ return Math.max(max,city.count||0); },1);
+  const maxHot=items.reduce(function(max,city){ return Math.max(max,city.hot||0); },1);
+  const maxWarm=items.reduce(function(max,city){ return Math.max(max,city.warm||0); },1);
+  const maxBacklog=items.reduce(function(max,city){ return Math.max(max,city.backlog||0); },1);
+  const priorityCity=items.slice().sort(function(a,b){ return (b.backlog-a.backlog) || (b.count-a.count); })[0];
+  const closeCity=items.slice().sort(function(a,b){ return (b.hot-a.hot) || (b.hotRate-a.hotRate); })[0];
+  const expandCity=items.slice().sort(function(a,b){ return (b.hotRate-a.hotRate) || (b.warm-a.warm) || (b.count-a.count); })[0];
+  return `<div class="city-heatmap">
+    <div class="city-heatmap-head">
+      <div>
+        <h3>🌆 Heatmap <span class="it">Villes</span></h3>
+        <div class="desc">Chaque cellule chauffe selon l’intensité réelle du portefeuille. On voit vite où closer, où relancer et où reprendre la qualification.</div>
+      </div>
+      <div class="city-heat-legend">
+        <span>froid</span>
+        <span class="hot">modéré</span>
+        <span class="warmer">chaud</span>
+        <span class="hottest">très chaud</span>
+      </div>
+    </div>
+    <div class="city-heat-rows">
+      ${items.map(function(city){
+        const focus=getCityFocusMeta(city,maxCount);
+        return `<article class="city-heat-row">
+          <div class="city-heat-city">
+            <div class="name">${esc(city.city)}</div>
+            <div class="sub"><b>${esc(city.topZone||'Sans zone dominante')}</b> domine la ville · ${city.expertCount} expert${city.expertCount>1?'s':''} actif${city.expertCount>1?'s':''} · ${city.avgRate||0}% de taux moyen.</div>
+          </div>
+          <div class="city-heat-cells">
+            <div class="city-heat-cell ${heatLevelByRatio(city.count,maxCount)}"><span>Portefeuille</span><strong>${city.count}</strong></div>
+            <div class="city-heat-cell ${heatLevelByRatio(city.hot,maxHot)}"><span>Chauds / gagnés</span><strong>${city.hot}</strong></div>
+            <div class="city-heat-cell ${heatLevelByRatio(city.warm,maxWarm)}"><span>Tièdes</span><strong>${city.warm}</strong></div>
+            <div class="city-heat-cell ${heatLevelByRatio(city.backlog,maxBacklog)}"><span>À requalifier</span><strong>${city.backlog}</strong></div>
+          </div>
+          <div class="city-focus ${focus.tone}">
+            <div class="pill">${esc(focus.label)}</div>
+            <div class="stat">${esc(focus.stat)}</div>
+            <p class="note">${esc(focus.note)}</p>
+          </div>
+        </article>`;
+      }).join('')}
+    </div>
+    <div class="pie-insights">
+      <div class="pie-insight"><b>Focus reprise:</b> ${esc(priorityCity.city)} concentre le plus gros stock à requalifier avec <b>${priorityCity.backlog}</b> écoles encore froides, perdues ou nouvelles.</div>
+      <div class="pie-insight"><b>Focus closing:</b> ${esc(closeCity.city)} porte aujourd’hui le plus de deals chauds ou gagnés avec <b>${closeCity.hot}</b> écoles à pousser jusqu’à décision.</div>
+      <div class="pie-insight"><b>Focus expansion:</b> ${esc(expandCity.city)} affiche le meilleur hot rate visible à <b>${expandCity.hotRate}%</b>; c’est la ville où ouvrir plus de volume garde le plus de sens.</div>
+    </div>
   </div>`;
 }
 
@@ -2915,10 +3089,11 @@ function rHome(){
       <div class="chart">
         <h3>🗺️ Matrix <span class="it">Zone · Ville · Couches</span></h3>
         <div class="desc">Navigation rapide par ville et couche terrain pour réorganiser l’effort commercial.</div>
+        ${renderCityHeatmap(dashboard.layers.cities)}
         <table class="tbl" style="margin-bottom:16px">
-          <thead><tr><th>Ville</th><th>Écoles</th><th>Chauds</th><th>Hot Rate</th><th>Top zone</th></tr></thead>
+          <thead><tr><th>Ville</th><th>Écoles</th><th>Chauds</th><th>Tièdes</th><th>À requalifier</th><th>Hot Rate</th><th>Top zone</th></tr></thead>
           <tbody>
-            ${cityRows.map(row=>`<tr><td><b>${esc(row.city)}</b></td><td class="num">${row.count}</td><td class="num">${row.hot}</td><td class="num">${row.hotRate}%</td><td>${esc(row.topZone)}</td></tr>`).join('')}
+            ${cityRows.map(row=>`<tr><td><b>${esc(row.city)}</b></td><td class="num">${row.count}</td><td class="num">${row.hot}</td><td class="num">${row.warm}</td><td class="num">${row.backlog}</td><td class="num">${row.hotRate}%</td><td>${esc(row.topZone)}</td></tr>`).join('')}
           </tbody>
         </table>
         <table class="tbl">
