@@ -2767,44 +2767,6 @@ function renderCategoryHeatmap(records) {
          '  </div>' +
          insightsHtml +
          '</div>';
-}al > 0) {
-    insightsArr.push('🎯 <b>Closing Premium:</b> Le segment haut de gamme (Très Haute + Haute Standing) compte <b>' + premiumTotal + '</b> écoles avec un taux de conversion ou intérêt chaud de <b>' + premiumHotRate + '%</b> (<b>' + premiumActive + '</b> écoles). C’est ici que les efforts de closing doivent se concentrer pour maximiser la valeur contractuelle.');
-  }
-  
-  // Qualification volume insight (Moyen)
-  var moyenTotal = catTotals['STANDIG MOYEN'] || 0;
-  var moyenNewOrCold = (catStageMatrix['STANDIG MOYEN']['nouveau'] || 0) + (catStageMatrix['STANDIG MOYEN']['froid'] || 0);
-  var moyenPct = moyenTotal ? Math.round((moyenNewOrCold / moyenTotal) * 100) : 0;
-  if (moyenTotal > 0) {
-    insightsArr.push('⚡ <b>Volume Moyen Standing:</b> C’est notre plus gros segment de marché avec <b>' + moyenTotal + '</b> écoles (soit ' + Math.round((moyenTotal / items.length) * 100) + '% du portefeuille). Cependant, <b>' + moyenNewOrCold + '</b> écoles (<b>' + moyenPct + '%</b>) sont encore neuves ou froides. Une campagne de relance téléphonique et de repassage terrain structurée est essentielle sur cette catégorie.');
-  }
-
-  // Geographic comparison insight
-  var dlaPremium = (catCitiesMatrix['TRES HAUTE STANDING']['DOUALA'] || 0) + (catCitiesMatrix['HAUTE STANDING']['DOUALA'] || 0);
-  var ydePremium = (catCitiesMatrix['TRES HAUTE STANDING']['YAOUNDE'] || 0) + (catCitiesMatrix['HAUTE STANDING']['YAOUNDE'] || 0);
-  insightsArr.push('🗺️ <b>Couverture Régionale:</b> Douala concentre un plus grand nombre d\'écoles Premium (<b>' + dlaPremium + '</b>) par rapport à Yaoundé (<b>' + ydePremium + '</b>). Yaoundé représente une opportunité sous-exploitée pour cibler les établissements à fort potentiel.');
-
-  var insightsHtml = '<div class="pie-insights" style="margin-top: 18px;">';
-  insightsArr.forEach(function(insight) {
-    insightsHtml += '  <div class="pie-insight">' + insight + '</div>';
-  });
-  insightsHtml += '</div>';
-
-  // Return the combined HTML
-  return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
-         '  <div class="city-heatmap-head">' +
-         '    <div>' +
-         '      <h3>📋 Heatmap & Focus <span class="it">par Catégories</span></h3>' +
-         '      <div class="desc">Distribution de l\'effort et du potentiel commercial. Les cellules s\'intensifient selon le nombre d\'écoles. Utilisez cette carte pour prioriser le closing sur le haut de gamme et les actions de masse sur le moyen standing.</div>' +
-         '    </div>' +
-         '  </div>' +
-         kpiHtml +
-         '  <div class="two">' +
-         matrix1Html +
-         matrix2Html +
-         '  </div>' +
-         insightsHtml +
-         '</div>';
 }
 
 function getTrackingSeries(dashboard){
