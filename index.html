@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -1999,6 +1999,7 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
       hotKeys:new Set(),
       schoolKeys:new Set(),
       activeDays:new Set(),
+      fieldDays:new Set(),
       total:0,
       delta:0,
       hot:0,
@@ -2014,7 +2015,10 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
     if(!bucket)return;
     bucket.terrain++;
     const day=activeDayKey(row.t);
-    if(day)bucket.activeDays.add(day);
+    if(day){
+      bucket.activeDays.add(day);
+      bucket.fieldDays.add(day);
+    }
     const school=schoolKey(row.n);
     if(school)bucket.schoolKeys.add(school);
     if(typeof row.r==='number' && row.r>=60 && school)bucket.hotKeys.add(school);
@@ -2025,7 +2029,12 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
     const bucket=weekMap.get(key);
     if(!bucket)return;
     const day=activeDayKey(item.Timestamp);
-    if(day)bucket.activeDays.add(day);
+    if(day){
+      bucket.activeDays.add(day);
+      if(item.FollowupType==='VISIT'){
+        bucket.fieldDays.add(day);
+      }
+    }
     if(item.FollowupType==='CALL')bucket.calls++;
     if(item.FollowupType==='VISIT')bucket.terrain++;
     const school=schoolKey(item.SchoolName);
@@ -2046,7 +2055,8 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
       hot:week.hotKeys.size,
       schools:week.schoolKeys.size,
       activeDays:active,
-      velocity:active ? total/active : 0
+      velocity:active ? total/active : 0,
+      fieldDays:week.fieldDays.size
     };
   });
 }
@@ -2337,14 +2347,28 @@ function buildAgentProgress(rawRows, followups){
     const expertRows=rawRows.filter(function(row){ return samePerson(row.e,expert); });
     const expertFollowups=followups.filter(function(item){ return samePerson(item.Expert,expert); });
     const weekly=buildWeeklySeries(expertRows,expertFollowups,4);
-    const current=weekly[weekly.length-1]||{terrain:0,calls:0,total:0};
+    const current=weekly[weekly.length-1]||{terrain:0,calls:0,total:0,fieldDays:0};
     const previous=weekly[weekly.length-2]||{total:0};
+
+    const allFieldDays = new Set();
+    expertRows.forEach(function(row){
+      const day = activeDayKey(row.t);
+      if(day) allFieldDays.add(day);
+    });
+    expertFollowups.forEach(function(item){
+      if(item.FollowupType==='VISIT' && item.Timestamp){
+        const day = activeDayKey(item.Timestamp);
+        if(day) allFieldDays.add(day);
+      }
+    });
+
     return {
       expert,
       series:weekly,
       current,
       trend:current.total-(previous.total||0),
-      schools:new Set(expertRows.map(function(row){ return schoolKey(row.n); }).filter(Boolean)).size
+      schools:new Set(expertRows.map(function(row){ return schoolKey(row.n); }).filter(Boolean)).size,
+      totalFieldDays:allFieldDays.size
     };
   }).sort(function(a,b){ return b.current.total-a.current.total; });
 }
@@ -2505,57 +2529,237 @@ function getCityFocusMeta(city,maxCount){
   };
 }
 
-function renderCityHeatmap(cities){
-  const items=(cities||[]).filter(Boolean);
-  if(!items.length)return '';
-  const maxCount=items.reduce(function(max,city){ return Math.max(max,city.count||0); },1);
-  const maxHot=items.reduce(function(max,city){ return Math.max(max,city.hot||0); },1);
-  const maxWarm=items.reduce(function(max,city){ return Math.max(max,city.warm||0); },1);
-  const maxBacklog=items.reduce(function(max,city){ return Math.max(max,city.backlog||0); },1);
-  const priorityCity=items.slice().sort(function(a,b){ return (b.backlog-a.backlog) || (b.count-a.count); })[0];
-  const closeCity=items.slice().sort(function(a,b){ return (b.hot-a.hot) || (b.hotRate-a.hotRate); })[0];
-  const expandCity=items.slice().sort(function(a,b){ return (b.hotRate-a.hotRate) || (b.warm-a.warm) || (b.count-a.count); })[0];
-  return `<div class="city-heatmap">
-    <div class="city-heatmap-head">
-      <div>
-        <h3>🌆 Heatmap <span class="it">Villes</span></h3>
-        <div class="desc">Chaque cellule chauffe selon l’intensité réelle du portefeuille. On voit vite où closer, où relancer et où reprendre la qualification.</div>
-      </div>
-      <div class="city-heat-legend">
-        <span>froid</span>
-        <span class="hot">modéré</span>
-        <span class="warmer">chaud</span>
-        <span class="hottest">très chaud</span>
-      </div>
-    </div>
-    <div class="city-heat-rows">
-      ${items.map(function(city){
-        const focus=getCityFocusMeta(city,maxCount);
-        return `<article class="city-heat-row">
-          <div class="city-heat-city">
-            <div class="name">${esc(city.city)}</div>
-            <div class="sub"><b>${esc(city.topZone||'Sans zone dominante')}</b> domine la ville · ${city.expertCount} expert${city.expertCount>1?'s':''} actif${city.expertCount>1?'s':''} · ${city.avgRate||0}% de taux moyen.</div>
-          </div>
-          <div class="city-heat-cells">
-            <div class="city-heat-cell ${heatLevelByRatio(city.count,maxCount)}"><span>Portefeuille</span><strong>${city.count}</strong></div>
-            <div class="city-heat-cell ${heatLevelByRatio(city.hot,maxHot)}"><span>Chauds / gagnés</span><strong>${city.hot}</strong></div>
-            <div class="city-heat-cell ${heatLevelByRatio(city.warm,maxWarm)}"><span>Tièdes</span><strong>${city.warm}</strong></div>
-            <div class="city-heat-cell ${heatLevelByRatio(city.backlog,maxBacklog)}"><span>À requalifier</span><strong>${city.backlog}</strong></div>
-          </div>
-          <div class="city-focus ${focus.tone}">
-            <div class="pill">${esc(focus.label)}</div>
-            <div class="stat">${esc(focus.stat)}</div>
-            <p class="note">${esc(focus.note)}</p>
-          </div>
-        </article>`;
-      }).join('')}
-    </div>
-    <div class="pie-insights">
-      <div class="pie-insight"><b>Focus reprise:</b> ${esc(priorityCity.city)} concentre le plus gros stock à requalifier avec <b>${priorityCity.backlog}</b> écoles encore froides, perdues ou nouvelles.</div>
-      <div class="pie-insight"><b>Focus closing:</b> ${esc(closeCity.city)} porte aujourd’hui le plus de deals chauds ou gagnés avec <b>${closeCity.hot}</b> écoles à pousser jusqu’à décision.</div>
-      <div class="pie-insight"><b>Focus expansion:</b> ${esc(expandCity.city)} affiche le meilleur hot rate visible à <b>${expandCity.hotRate}%</b>; c’est la ville où ouvrir plus de volume garde le plus de sens.</div>
-    </div>
-  </div>`;
+function renderCategoryHeatmap(records) {
+  var items = records || [];
+  if (!items.length) return '';
+
+  var STANDING_CATEGORIES = [
+    { key: 'TRES HAUTE STANDING', label: 'Très Haute Standing', hue: 263, sat: 70, light: 50 },
+    { key: 'HAUTE STANDING', label: 'Haute Standing', hue: 217, sat: 89, light: 60 },
+    { key: 'STANDIG MOYEN', label: 'Moyen Standing', hue: 142, sat: 72, light: 29 },
+    { key: 'BASSE STANDING', label: 'Basse Standing', hue: 38, sat: 92, light: 50 },
+    { key: 'TRES BASSE STANDING', label: 'Très Basse Standing', hue: 215, sat: 16, light: 47 },
+    { key: 'SANS_CATEGORIE', label: 'Non défini', hue: 0, sat: 0, light: 50 }
+  ];
+
+  var PIPELINE_STAGES = [
+    { key: 'gagne', label: '🏆 Gagné' },
+    { key: 'chaud', label: '🔥 Chaud' },
+    { key: 'tiede', label: '⚡ Tiède' },
+    { key: 'froid', label: '❄️ Froid' },
+    { key: 'nouveau', label: '✨ Nouveau' },
+    { key: 'perdu', label: '❌ Perdu' }
+  ];
+
+  // Aggregation containers
+  var catTotals = {};
+  var catStageMatrix = {};
+  var catCitiesMatrix = {};
+  var catExperts = {};
+
+  // Initialize
+  STANDING_CATEGORIES.forEach(function(cat) {
+    catTotals[cat.key] = 0;
+    catStageMatrix[cat.key] = {};
+    catCitiesMatrix[cat.key] = {};
+    catExperts[cat.key] = new Set();
+    PIPELINE_STAGES.forEach(function(stage) {
+      catStageMatrix[cat.key][stage.key] = 0;
+    });
+  });
+
+  var citiesList = new Set();
+
+  items.forEach(function(rec) {
+    var cat = rec.standing || 'SANS_CATEGORIE';
+    if (!catTotals.hasOwnProperty(cat)) {
+      cat = 'SANS_CATEGORIE';
+    }
+    var stage = rec.stage || 'nouveau';
+    var city = rec.city || 'NON DEFINI';
+    citiesList.add(city);
+
+    catTotals[cat]++;
+    if (catStageMatrix[cat].hasOwnProperty(stage)) {
+      catStageMatrix[cat][stage]++;
+    } else {
+      catStageMatrix[cat]['nouveau']++;
+    }
+
+    catCitiesMatrix[cat][city] = (catCitiesMatrix[cat][city] || 0) + 1;
+    if (rec.expert) {
+      catExperts[cat].add(rec.expert);
+    }
+  });
+
+  var citiesArr = Array.from(citiesList).sort();
+
+  // Find max cell count for matrices to calculate shading
+  var maxStageCellVal = 1;
+  STANDING_CATEGORIES.forEach(function(cat) {
+    PIPELINE_STAGES.forEach(function(stage) {
+      var val = catStageMatrix[cat.key][stage.key];
+      if (val > maxStageCellVal) maxStageCellVal = val;
+    });
+  });
+
+  var maxCityCellVal = 1;
+  STANDING_CATEGORIES.forEach(function(cat) {
+    citiesArr.forEach(function(city) {
+      var val = catCitiesMatrix[cat.key][city] || 0;
+      if (val > maxCityCellVal) maxCityCellVal = val;
+    });
+  });
+
+  // Build KPIs
+  var kpiHtml = '<div class="kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">';
+  STANDING_CATEGORIES.forEach(function(cat) {
+    var total = catTotals[cat.key];
+    if (total === 0 && cat.key === 'SANS_CATEGORIE') return; // Hide empty undefined category card
+    
+    var won = catStageMatrix[cat.key]['gagne'] || 0;
+    var hot = catStageMatrix[cat.key]['chaud'] || 0;
+    var warm = catStageMatrix[cat.key]['tiede'] || 0;
+    
+    var hotRate = total ? Math.round(((won + hot) / total) * 100) : 0;
+    var experts = catExperts[cat.key].size;
+    
+    // Style card using category theme
+    kpiHtml += '<div class="kpi" style="border-left: 5px solid hsl(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%); background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(247,244,238,.96)); box-shadow: var(--shadow);">';
+    kpiHtml += '  <div class="lbl" style="color: hsl(' + cat.hue + ', ' + cat.sat + '%, ' + (cat.light - 10) + '%); font-weight: 700;">' + esc(cat.label) + '</div>';
+    kpiHtml += '  <div class="val" style="font-size: 32px; color: var(--ink);">' + total + '<small style="font-size: 12px; margin-left: 4px;">écoles</small></div>';
+    kpiHtml += '  <div class="delta" style="font-size: 11px; color: var(--g600); margin-top: 4px;">';
+    kpiHtml += '    <b>' + hotRate + '%</b> hot/won rate · ' + (won + hot) + ' actifs · ' + experts + ' expert' + (experts > 1 ? 's' : '');
+    kpiHtml += '  </div>';
+    kpiHtml += '</div>';
+  });
+  kpiHtml += '</div>';
+
+  // Build Matrix 1: Pipeline vs Category
+  var matrix1Html = '<div class="chart" style="margin-bottom: 24px;">';
+  matrix1Html += '  <h3>📊 Funnel de Prospection <span class="it">par Catégorie</span></h3>';
+  matrix1Html += '  <div class="desc">Chaque cellule montre le nombre d’écoles et est colorée selon le code couleur de la catégorie. L’intensité reflète la densité des prospects à cette étape.</div>';
+  matrix1Html += '  <div class="table-scroll"><table class="tbl" style="width:100%; border-collapse:collapse; margin-top:10px;">';
+  matrix1Html += '    <thead><tr style="background:var(--g50);"><th>Catégorie</th>';
+  PIPELINE_STAGES.forEach(function(stage) {
+    matrix1Html += '      <th class="num" style="text-align:center; padding:10px;">' + esc(stage.label) + '</th>';
+  });
+  matrix1Html += '      <th class="num" style="text-align:center; font-weight:700;">Total</th></tr></thead>';
+  matrix1Html += '    <tbody>';
+
+  STANDING_CATEGORIES.forEach(function(cat) {
+    var total = catTotals[cat.key];
+    if (total === 0 && cat.key === 'SANS_CATEGORIE') return;
+    
+    matrix1Html += '    <tr>';
+    matrix1Html += '      <td style="font-weight:700; border-left: 4px solid hsl(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%); padding-left: 8px;">' + esc(cat.label) + '</td>';
+    
+    PIPELINE_STAGES.forEach(function(stage) {
+      var val = catStageMatrix[cat.key][stage.key] || 0;
+      var opacity = val ? 0.08 + (val / maxStageCellVal) * 0.92 : 0.03;
+      var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
+      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+      var cellBgStyle = val ? 'background: ' + bg + ';' : '';
+      
+      matrix1Html += '      <td class="num" style="text-align:center; transition: all 0.2s; ' + cellBgStyle + textStyle + '" title="' + val + ' écoles dans ' + stage.label + ' / ' + cat.label + '">';
+      matrix1Html += '        ' + val;
+      matrix1Html += '      </td>';
+    });
+    matrix1Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + total + '</td>';
+    matrix1Html += '    </tr>';
+  });
+
+  matrix1Html += '    </tbody>';
+  matrix1Html += '  </table></div>';
+  matrix1Html += '</div>';
+
+  // Build Matrix 2: City vs Category
+  var matrix2Html = '<div class="chart">';
+  matrix2Html += '  <h3>🗺️ Répartition Géographique <span class="it">par Catégorie</span></h3>';
+  matrix2Html += '  <div class="desc">Visualisation croisée des villes et des standings pour équilibrer la couverture régionale des équipes terrain.</div>';
+  matrix2Html += '  <div class="table-scroll"><table class="tbl" style="width:100%; border-collapse:collapse; margin-top:10px;">';
+  matrix2Html += '    <thead><tr style="background:var(--g50);"><th>Ville / Région</th>';
+  STANDING_CATEGORIES.forEach(function(cat) {
+    if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
+    matrix2Html += '      <th class="num" style="text-align:center; padding:10px; font-size:12px;">' + esc(cat.label) + '</th>';
+  });
+  matrix2Html += '      <th class="num" style="text-align:center; font-weight:700;">Total</th></tr></thead>';
+  matrix2Html += '    <tbody>';
+
+  citiesArr.forEach(function(city) {
+    var cityTotal = 0;
+    matrix2Html += '    <tr>';
+    matrix2Html += '      <td style="font-weight:700;">📍 ' + esc(city) + '</td>';
+    
+    STANDING_CATEGORIES.forEach(function(cat) {
+      if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
+      var val = catCitiesMatrix[cat.key][city] || 0;
+      cityTotal += val;
+      
+      var opacity = val ? 0.08 + (val / maxCityCellVal) * 0.92 : 0.03;
+      var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
+      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+      var cellBgStyle = val ? 'background: ' + bg + ';' : '';
+      
+      matrix2Html += '      <td class="num" style="text-align:center; transition: all 0.2s; ' + cellBgStyle + textStyle + '" title="' + val + ' écoles à ' + city + ' dans la catégorie ' + cat.label + '">';
+      matrix2Html += '        ' + val;
+      matrix2Html += '      </td>';
+    });
+    
+    matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + cityTotal + '</td>';
+    matrix2Html += '    </tr>';
+  });
+
+  matrix2Html += '    </tbody>';
+  matrix2Html += '  </table></div>';
+  matrix2Html += '</div>';
+
+  // Build Insights
+  var insightsArr = [];
+  
+  // Closing potential insight (Très Haute / Haute)
+  var premiumTotal = (catTotals['TRES HAUTE STANDING'] || 0) + (catTotals['HAUTE STANDING'] || 0);
+  var premiumActive = (catStageMatrix['TRES HAUTE STANDING']['gagne'] || 0) + (catStageMatrix['TRES HAUTE STANDING']['chaud'] || 0) +
+                      (catStageMatrix['HAUTE STANDING']['gagne'] || 0) + (catStageMatrix['HAUTE STANDING']['chaud'] || 0);
+  var premiumHotRate = premiumTotal ? Math.round((premiumActive / premiumTotal) * 100) : 0;
+  if (premiumTotal > 0) {
+    insightsArr.push('🎯 <b>Closing Premium:</b> Le segment haut de gamme (Très Haute + Haute Standing) compte <b>' + premiumTotal + '</b> écoles avec un taux de conversion ou intérêt chaud de <b>' + premiumHotRate + '%</b> (<b>' + premiumActive + '</b> écoles). C’est ici que les efforts de closing doivent se concentrer pour maximiser la valeur contractuelle.');
+  }
+  
+  // Qualification volume insight (Moyen)
+  var moyenTotal = catTotals['STANDIG MOYEN'] || 0;
+  var moyenNewOrCold = (catStageMatrix['STANDIG MOYEN']['nouveau'] || 0) + (catStageMatrix['STANDIG MOYEN']['froid'] || 0);
+  var moyenPct = moyenTotal ? Math.round((moyenNewOrCold / moyenTotal) * 100) : 0;
+  if (moyenTotal > 0) {
+    insightsArr.push('⚡ <b>Volume Moyen Standing:</b> C’est notre plus gros segment de marché avec <b>' + moyenTotal + '</b> écoles (soit ' + Math.round((moyenTotal / items.length) * 100) + '% du portefeuille). Cependant, <b>' + moyenNewOrCold + '</b> écoles (<b>' + moyenPct + '%</b>) sont encore neuves ou froides. Une campagne de relance téléphonique et de repassage terrain structurée est essentielle sur cette catégorie.');
+  }
+
+  // Geographic comparison insight
+  var dlaPremium = (catCitiesMatrix['TRES HAUTE STANDING']['DOUALA'] || 0) + (catCitiesMatrix['HAUTE STANDING']['DOUALA'] || 0);
+  var ydePremium = (catCitiesMatrix['TRES HAUTE STANDING']['YAOUNDE'] || 0) + (catCitiesMatrix['HAUTE STANDING']['YAOUNDE'] || 0);
+  insightsArr.push('🗺️ <b>Couverture Régionale:</b> Douala concentre un plus grand nombre d\'écoles Premium (<b>' + dlaPremium + '</b>) par rapport à Yaoundé (<b>' + ydePremium + '</b>). Yaoundé représente une opportunité sous-exploitée pour cibler les établissements à fort potentiel.');
+
+  var insightsHtml = '<div class="pie-insights" style="margin-top: 18px;">';
+  insightsArr.forEach(function(insight) {
+    insightsHtml += '  <div class="pie-insight">' + insight + '</div>';
+  });
+  insightsHtml += '</div>';
+
+  // Return the combined HTML
+  return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
+         '  <div class="city-heatmap-head">' +
+         '    <div>' +
+         '      <h3>📋 Heatmap & Focus <span class="it">par Catégories</span></h3>' +
+         '      <div class="desc">Distribution de l\'effort et du potentiel commercial. Les cellules s\'intensifient selon le nombre d\'écoles. Utilisez cette carte pour prioriser le closing sur le haut de gamme et les actions de masse sur le moyen standing.</div>' +
+         '    </div>' +
+         '  </div>' +
+         kpiHtml +
+         '  <div class="two">' +
+         matrix1Html +
+         matrix2Html +
+         '  </div>' +
+         insightsHtml +
+         '</div>';
 }
 
 function getTrackingSeries(dashboard){
@@ -2939,6 +3143,10 @@ function rHome(){
   ` : ''}
 
   <div class="section">
+    ${renderCategoryHeatmap(dashboard.records)}
+  </div>
+
+  <div class="section">
     <div class="sec-head">
       <h2>🥧 Prospection <span class="it">Pie Charts + NLP</span></h2>
       <span class="anno">${totalProspections} prospections visibles · lecture exclusive + signaux terrain</span>
@@ -3089,7 +3297,6 @@ function rHome(){
       <div class="chart">
         <h3>🗺️ Matrix <span class="it">Zone · Ville · Couches</span></h3>
         <div class="desc">Navigation rapide par ville et couche terrain pour réorganiser l’effort commercial.</div>
-        ${renderCityHeatmap(dashboard.layers.cities)}
         <table class="tbl" style="margin-bottom:16px">
           <thead><tr><th>Ville</th><th>Écoles</th><th>Chauds</th><th>Tièdes</th><th>À requalifier</th><th>Hot Rate</th><th>Top zone</th></tr></thead>
           <tbody>
@@ -3129,6 +3336,34 @@ function rHome(){
     </table>
   </div>
 
+  ${showAll ? `
+  <div class="section">
+    <div class="sec-head">
+      <h2>👥 Progression <span class="it">par Agent</span></h2>
+      <span class="anno">Mini graphique 4 semaines · stats semaine · tendance · visites terrain</span>
+    </div>
+    <div class="agent-grid">
+      ${dashboard.agentProgress.map(agent=>`
+        <div class="agent-card">
+          <div class="agent-head">
+            <strong>${esc(agent.expert)}</strong>
+            <span class="trend-chip ${agent.trend>0?'up':(agent.trend<0?'down':'flat')}">${agent.trend>0?'📈 +':''}${agent.trend<0?'📉 ':''}${agent.trend===0?'➡ ':''}${Math.abs(agent.trend)}</span>
+          </div>
+          ${renderMiniChart(agent.series)}
+          <div class="agent-meta">
+            <div><b>${agent.current.total}</b>Cette semaine</div>
+            <div><b>${agent.current.terrain}</b>Terrain</div>
+            <div><b>${agent.current.calls}</b>Appels</div>
+            <div><b>${agent.schools}</b>Écoles</div>
+            <div><b>${agent.current.fieldDays} j.</b>J. Terrain (Sem.)</div>
+            <div><b>${agent.totalFieldDays} j.</b>J. Terrain (Cumul)</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  ` : ''}
+
   <div class="section">
     <div class="sec-head">
       <h2>🏫 Écoles <span class="it">par Étape</span></h2>
@@ -3156,31 +3391,7 @@ function rHome(){
   </div>
   ` : ''}
 
-  ${showAll ? `
-  <div class="section">
-    <div class="sec-head">
-      <h2>👥 Progression <span class="it">par Agent</span></h2>
-      <span class="anno">Mini graphique 4 semaines · stats semaine · tendance</span>
-    </div>
-    <div class="agent-grid">
-      ${dashboard.agentProgress.map(agent=>`
-        <div class="agent-card">
-          <div class="agent-head">
-            <strong>${esc(agent.expert)}</strong>
-            <span class="trend-chip ${agent.trend>0?'up':(agent.trend<0?'down':'flat')}">${agent.trend>0?'📈 +':''}${agent.trend<0?'📉 ':''}${agent.trend===0?'➡ ':''}${Math.abs(agent.trend)}</span>
-          </div>
-          ${renderMiniChart(agent.series)}
-          <div class="agent-meta">
-            <div><b>${agent.current.total}</b>Cette semaine</div>
-            <div><b>${agent.current.terrain}</b>Terrain</div>
-            <div><b>${agent.current.calls}</b>Appels</div>
-            <div><b>${agent.schools}</b>Écoles</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  </div>
-  ` : ''}
+
 
   ${showAll ? `
   <div class="section">
