@@ -2621,10 +2621,27 @@ function renderCategoryHeatmap(records) {
   });
   kpiHtml += '</div>';
 
+  // Build Legend
+  var legendHtml = '<div class="city-heat-legend" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; justify-content: flex-start; align-items: center; background: rgba(0,0,0,0.02); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.05);">';
+  legendHtml += '  <span style="font-family:\'Outfit\', system-ui, sans-serif; font-size:10px; font-weight:700; color:var(--g600); text-transform:uppercase; margin-right:4px;">Standing :</span>';
+  STANDING_CATEGORIES.forEach(function(cat) {
+    if (cat.key === 'SANS_CATEGORIE') return;
+    legendHtml += '  <span style="font-family:\'JetBrains Mono\',monospace; font-size:9px; font-weight:700; color:#fff; padding:3px 6px; border-radius:4px; background:hsl(' + cat.hue + ',' + cat.sat + '%,' + cat.light + '%);">' + esc(cat.label) + '</span>';
+  });
+  legendHtml += '  <span style="font-family:\'Outfit\', system-ui, sans-serif; font-size:9.5px; font-weight:500; color:var(--g600); display:flex; align-items:center; gap:6px; margin-left:auto;">';
+  legendHtml += '    <span>Intensité (Volume) :</span>';
+  legendHtml += '    <span style="width:10px; height:10px; border-radius:2px; background:rgba(15,23,42,0.15); display:inline-block;"></span>';
+  legendHtml += '    <span>faible</span>';
+  legendHtml += '    <span style="width:10px; height:10px; border-radius:2px; background:rgba(15,23,42,0.85); display:inline-block;"></span>';
+  legendHtml += '    <span>fort</span>';
+  legendHtml += '  </span>';
+  legendHtml += '</div>';
+
   // Build Matrix 1: Pipeline vs Category
   var matrix1Html = '<div class="chart" style="margin-bottom: 24px;">';
   matrix1Html += '  <h3>📊 Funnel de Prospection <span class="it">par Catégorie</span></h3>';
   matrix1Html += '  <div class="desc">Chaque cellule montre le nombre d’écoles et est colorée selon le code couleur de la catégorie. L’intensité reflète la densité des prospects à cette étape.</div>';
+  matrix1Html += '  ' + legendHtml;
   matrix1Html += '  <div class="table-scroll"><table class="tbl" style="width:100%; border-collapse:collapse; margin-top:10px;">';
   matrix1Html += '    <thead><tr><th>Catégorie</th>';
   PIPELINE_STAGES.forEach(function(stage) {
@@ -2663,6 +2680,7 @@ function renderCategoryHeatmap(records) {
   var matrix2Html = '<div class="chart">';
   matrix2Html += '  <h3>🗺️ Répartition Géographique <span class="it">par Catégorie</span></h3>';
   matrix2Html += '  <div class="desc">Visualisation des standings par ville et par quartier (zones avec ≥ 5 prospects) pour orienter la prospection terrain.</div>';
+  matrix2Html += '  ' + legendHtml;
   matrix2Html += '  <div class="table-scroll"><table class="tbl" style="width:100%; border-collapse:collapse; margin-top:10px;">';
   matrix2Html += '    <thead><tr><th>Ville / Secteur</th>';
   STANDING_CATEGORIES.forEach(function(cat) {
