@@ -2598,11 +2598,27 @@ function renderCategoryHeatmap(records) {
     });
   });
 
+  // Build Guide Card
+  var guideHtml = '<div class="heatmap-guide" style="background: var(--paper); border: 1.5px solid var(--g200); border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow);">';
+  guideHtml += '  <h4 style="margin: 0 0 8px; color: var(--ink); display: flex; align-items: center; gap: 8px; font-size: 14px; font-family:\'Outfit\', system-ui, sans-serif;">';
+  guideHtml += '    <span>💡</span> Guide de lecture de la Heatmap';
+  guideHtml += '  </h4>';
+  guideHtml += '  <p style="margin: 0; font-size: 12.5px; color: var(--g700); line-height: 1.6; font-family:\'Outfit\', system-ui, sans-serif;">';
+  guideHtml += '    Cette heatmap croise le <b>standing (potentiel financier)</b> avec l\'<b>état d\'avancement (funnel)</b> et la <b>localisation (ville/quartier)</b> de nos écoles :';
+  guideHtml += '  </p>';
+  guideHtml += '  <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--g700); line-height: 1.65; font-family:\'Outfit\', system-ui, sans-serif;">';
+  guideHtml += '    <li><b>Couleur de ligne = Catégorie de standing :</b> Chaque ligne est associée à un code couleur spécifique (Violet pour Très Haute Standing, Bleu pour Haute, Vert pour Moyen, etc.).</li>';
+  guideHtml += '    <li><b>Opacité = Densité d\'écoles :</b> Plus la cellule est <b>foncée</b>, plus elle contient d\'écoles actives dans ce croisement.</li>';
+  guideHtml += '    <li><b>Zéros masqués (·) :</b> Les cellules vides avec un simple point gris (<b>·</b>) indiquent qu\'il n\'y a aucun prospect dans ce croisement, ce qui permet aux zones chaudes de sauter instantanément aux yeux.</li>';
+  guideHtml += '    <li><b>Focus Closing :</b> Pour optimiser l\'effort terrain et télé, ciblez les cellules <b>foncées</b> situées dans les colonnes <b>🏆 Gagné</b>, <b>🔥 Chaud</b> et <b>⚡ Tiède</b>.</li>';
+  guideHtml += '  </ul>';
+  guideHtml += '</div>';
+
   // Build KPIs
   var kpiHtml = '<div class="kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">';
   STANDING_CATEGORIES.forEach(function(cat) {
     var total = catTotals[cat.key];
-    if (total === 0 && cat.key === 'SANS_CATEGORIE') return; // Hide empty undefined category card
+    if (total === 0 && cat.key === 'SANS_CATEGORIE') return; // Hide empty category card
     
     var won = catStageMatrix[cat.key]['gagne'] || 0;
     var hot = catStageMatrix[cat.key]['chaud'] || 0;
@@ -2628,12 +2644,15 @@ function renderCategoryHeatmap(records) {
     if (cat.key === 'SANS_CATEGORIE') return;
     legendHtml += '  <span style="font-family:\'JetBrains Mono\',monospace; font-size:9px; font-weight:700; color:#fff; padding:3px 6px; border-radius:4px; background:hsl(' + cat.hue + ',' + cat.sat + '%,' + cat.light + '%);">' + esc(cat.label) + '</span>';
   });
-  legendHtml += '  <span style="font-family:\'Outfit\', system-ui, sans-serif; font-size:9.5px; font-weight:500; color:var(--g600); display:flex; align-items:center; gap:6px; margin-left:auto;">';
-  legendHtml += '    <span>Intensité (Volume) :</span>';
-  legendHtml += '    <span style="width:10px; height:10px; border-radius:2px; background:rgba(15,23,42,0.15); display:inline-block;"></span>';
-  legendHtml += '    <span>faible</span>';
-  legendHtml += '    <span style="width:10px; height:10px; border-radius:2px; background:rgba(15,23,42,0.85); display:inline-block;"></span>';
-  legendHtml += '    <span>fort</span>';
+  legendHtml += '  <span style="font-family:\'Outfit\', system-ui, sans-serif; font-size:9.5px; font-weight:600; color:var(--g600); display:flex; align-items:center; gap:6px; margin-left:auto;">';
+  legendHtml += '    <span>Légende Intensité :</span>';
+  legendHtml += '    <span style="display: inline-flex; align-items: center; border: 1px solid var(--g200); border-radius: 4px; padding: 2px 6px; background: #fff; gap: 4px; font-size: 9px; font-weight: 700;">';
+  legendHtml += '      <span style="color: var(--g400);">· (zéro)</span>';
+  legendHtml += '      <span style="width:10px; height:10px; border-radius:2px; background:rgba(0,0,0,0.1); display:inline-block;"></span>';
+  legendHtml += '      <span style="color: var(--g600);">clair (faible)</span>';
+  legendHtml += '      <span style="width:10px; height:10px; border-radius:2px; background:rgba(0,0,0,0.7); display:inline-block; margin-left:4px;"></span>';
+  legendHtml += '      <span style="color: var(--g600);">foncé (fort volume)</span>';
+  legendHtml += '    </span>';
   legendHtml += '  </span>';
   legendHtml += '</div>';
 
@@ -2661,11 +2680,11 @@ function renderCategoryHeatmap(records) {
       var val = catStageMatrix[cat.key][stage.key] || 0;
       var opacity = val ? 0.08 + (val / maxStageCellVal) * 0.92 : 0.03;
       var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
-      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g300); opacity:0.4;';
       var cellBgStyle = val ? 'background: ' + bg + ';' : '';
       
       matrix1Html += '      <td class="num" style="text-align:center; transition: all 0.2s; ' + cellBgStyle + textStyle + '" title="' + val + ' écoles dans ' + stage.label + ' / ' + cat.label + '">';
-      matrix1Html += '        ' + val;
+      matrix1Html += '        ' + (val || '<span style="color:var(--g300); opacity:0.3;">·</span>');
       matrix1Html += '      </td>';
     });
     matrix1Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + total + '</td>';
@@ -2703,11 +2722,11 @@ function renderCategoryHeatmap(records) {
       
       var opacity = val ? 0.08 + (val / maxCityCellVal) * 0.92 : 0.03;
       var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
-      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+      var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g300); opacity:0.4;';
       var cellBgStyle = val ? 'background: ' + bg + ';' : '';
       
       matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '">';
-      matrix2Html += '        ' + val;
+      matrix2Html += '        ' + (val || '<span style="color:var(--g300); opacity:0.3;">·</span>');
       matrix2Html += '      </td>';
     });
     
@@ -2728,11 +2747,11 @@ function renderCategoryHeatmap(records) {
         
         var opacity = val ? 0.08 + (val / maxZoneCellVal) * 0.92 : 0.03;
         var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
-        var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+        var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g300); opacity:0.4;';
         var cellBgStyle = val ? 'background: ' + bg + ';' : '';
         
         matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '" title="' + val + ' à ' + zone + ' dans la catégorie ' + cat.label + '">';
-        matrix2Html += '        ' + (val || '-');
+        matrix2Html += '        ' + (val || '<span style="color:var(--g300); opacity:0.3;">·</span>');
         matrix2Html += '      </td>';
       });
       
@@ -2778,6 +2797,7 @@ function renderCategoryHeatmap(records) {
 
   // Return the combined HTML
   return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
+         guideHtml +
          kpiHtml +
          '  <div class="two">' +
          matrix1Html +
