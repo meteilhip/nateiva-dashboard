@@ -2486,49 +2486,6 @@ function renderPieCard(title, desc, segments, centerValue, centerLabel, insights
   </div>`;
 }
 
-function heatLevelByRatio(value,maxValue){
-  if(!value || !maxValue)return 'h-0';
-  const ratio=value/maxValue;
-  if(ratio>=0.85)return 'h-4';
-  if(ratio>=0.6)return 'h-3';
-  if(ratio>=0.35)return 'h-2';
-  return 'h-1';
-}
-
-function getCityFocusMeta(city,maxCount){
-  const volumeHeavy=city.count>=Math.max(20,Math.round(maxCount*0.65));
-  if(city.hotRate>=40 && city.hot>=Math.max(3,Math.round(city.count*0.2))){
-    return {
-      tone:'good',
-      label:'Closer maintenant',
-      stat:`${city.hotRate}% hot rate`,
-      note:`${city.hot} écoles sont déjà chaudes ou gagnées. Il faut pousser les suivis et les décideurs sur ${city.topZone||city.city}.`
-    };
-  }
-  if(volumeHeavy && city.backlog>=city.engaged){
-    return {
-      tone:'alert',
-      label:'Requalifier vite',
-      stat:`${city.backlog} à reprendre`,
-      note:`Le portefeuille est lourd mais encore froid ou nouveau. Repassage terrain, relances et recadrage du pitch en priorité.`
-    };
-  }
-  if(city.hotRate>=30){
-    return {
-      tone:'warn',
-      label:'Accélérer volume',
-      stat:`${city.engaged} engagées`,
-      note:`La ville répond correctement. On peut ouvrir plus de couches autour de ${city.topZone||city.city} sans dégrader la qualité.`
-    };
-  }
-  return {
-    tone:'neutral',
-    label:'Construire prudemment',
-    stat:`${city.avgRate||0}% moyen`,
-    note:`La traction reste moyenne. Continuer à tester les approches, qualifier les décideurs et sécuriser les documents.`
-  };
-}
-
 function renderCategoryHeatmap(records) {
   var items = records || [];
   if (!items.length) return '';
@@ -2555,13 +2512,17 @@ function renderCategoryHeatmap(records) {
   var catTotals = {};
   var catStageMatrix = {};
   var catCitiesMatrix = {};
+  var catZonesMatrix = {};
   var catExperts = {};
+  var zoneTotals = {};
+  var zoneCities = {};
 
   // Initialize
   STANDING_CATEGORIES.forEach(function(cat) {
     catTotals[cat.key] = 0;
     catStageMatrix[cat.key] = {};
     catCitiesMatrix[cat.key] = {};
+    catZonesMatrix[cat.key] = {};
     catExperts[cat.key] = new Set();
     PIPELINE_STAGES.forEach(function(stage) {
       catStageMatrix[cat.key][stage.key] = 0;
@@ -2590,9 +2551,27 @@ function renderCategoryHeatmap(records) {
     if (rec.expert) {
       catExperts[cat].add(rec.expert);
     }
+
+    var zone = rec.zone || 'Sans zone';
+    var normZone = zone.toUpperCase().trim();
+    if (normZone && normZone !== 'SANS ZONE') {
+      zoneCities[normZone] = city;
+      zoneTotals[normZone] = (zoneTotals[normZone] || 0) + 1;
+      catZonesMatrix[cat][normZone] = (catZonesMatrix[cat][normZone] || 0) + 1;
+    }
   });
 
   var citiesArr = Array.from(citiesList).sort();
+
+  // Filter active zones with >= 5 prospects
+  var activeZones = Object.keys(zoneTotals).filter(function(z) {
+    return zoneTotals[z] >= 5;
+  });
+
+  var doualaZones = activeZones.filter(function(z) { return zoneCities[z] === 'DOUALA'; })
+    .sort(function(a,b) { return zoneTotals[b] - zoneTotals[a]; });
+  var yaoundeZones = activeZones.filter(function(z) { return zoneCities[z] === 'YAOUNDE'; })
+    .sort(function(a,b) { return zoneTotals[b] - zoneTotals[a]; });
 
   // Find max cell count for matrices to calculate shading
   var maxStageCellVal = 1;
@@ -2611,6 +2590,14 @@ function renderCategoryHeatmap(records) {
     });
   });
 
+  var maxZoneCellVal = 1;
+  STANDING_CATEGORIES.forEach(function(cat) {
+    activeZones.forEach(function(zone) {
+      var val = catZonesMatrix[cat.key][zone] || 0;
+      if (val > maxZoneCellVal) maxZoneCellVal = val;
+    });
+  });
+
   // Build KPIs
   var kpiHtml = '<div class="kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">';
   STANDING_CATEGORIES.forEach(function(cat) {
@@ -2619,7 +2606,6 @@ function renderCategoryHeatmap(records) {
     
     var won = catStageMatrix[cat.key]['gagne'] || 0;
     var hot = catStageMatrix[cat.key]['chaud'] || 0;
-    var warm = catStageMatrix[cat.key]['tiede'] || 0;
     
     var hotRate = total ? Math.round(((won + hot) / total) * 100) : 0;
     var experts = catExperts[cat.key].size;
@@ -2673,12 +2659,12 @@ function renderCategoryHeatmap(records) {
   matrix1Html += '  </table></div>';
   matrix1Html += '</div>';
 
-  // Build Matrix 2: City vs Category
+  // Build Matrix 2: City & Zone vs Category
   var matrix2Html = '<div class="chart">';
   matrix2Html += '  <h3>🗺️ Répartition Géographique <span class="it">par Catégorie</span></h3>';
-  matrix2Html += '  <div class="desc">Visualisation croisée des villes et des standings pour équilibrer la couverture régionale des équipes terrain.</div>';
+  matrix2Html += '  <div class="desc">Visualisation des standings par ville et par quartier (zones avec ≥ 5 prospects) pour orienter la prospection terrain.</div>';
   matrix2Html += '  <div class="table-scroll"><table class="tbl" style="width:100%; border-collapse:collapse; margin-top:10px;">';
-  matrix2Html += '    <thead><tr style="background:var(--g50);"><th>Ville / Région</th>';
+  matrix2Html += '    <thead><tr style="background:var(--g50);"><th>Ville / Secteur</th>';
   STANDING_CATEGORIES.forEach(function(cat) {
     if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
     matrix2Html += '      <th class="num" style="text-align:center; padding:10px; font-size:12px;">' + esc(cat.label) + '</th>';
@@ -2688,8 +2674,9 @@ function renderCategoryHeatmap(records) {
 
   citiesArr.forEach(function(city) {
     var cityTotal = 0;
-    matrix2Html += '    <tr>';
-    matrix2Html += '      <td style="font-weight:700;">📍 ' + esc(city) + '</td>';
+    // Render City Total Row
+    matrix2Html += '    <tr style="background:var(--g100); font-weight:700;">';
+    matrix2Html += '      <td style="font-weight:700; color:var(--ink);">🏙️ ' + esc(city) + ' (Total)</td>';
     
     STANDING_CATEGORIES.forEach(function(cat) {
       if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
@@ -2701,13 +2688,39 @@ function renderCategoryHeatmap(records) {
       var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
       var cellBgStyle = val ? 'background: ' + bg + ';' : '';
       
-      matrix2Html += '      <td class="num" style="text-align:center; transition: all 0.2s; ' + cellBgStyle + textStyle + '" title="' + val + ' écoles à ' + city + ' dans la catégorie ' + cat.label + '">';
+      matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '">';
       matrix2Html += '        ' + val;
       matrix2Html += '      </td>';
     });
     
-    matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + cityTotal + '</td>';
+    matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g200); color:var(--ink);">' + cityTotal + '</td>';
     matrix2Html += '    </tr>';
+
+    // Render Zone Rows in this city
+    var cityZones = city === 'DOUALA' ? doualaZones : yaoundeZones;
+    cityZones.forEach(function(zone) {
+      var zoneTotal = 0;
+      matrix2Html += '    <tr>';
+      matrix2Html += '      <td style="padding-left:24px; color:var(--g700); font-size:12px;">📍 ' + esc(zone) + '</td>';
+      
+      STANDING_CATEGORIES.forEach(function(cat) {
+        if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
+        var val = catZonesMatrix[cat.key][zone] || 0;
+        zoneTotal += val;
+        
+        var opacity = val ? 0.08 + (val / maxZoneCellVal) * 0.92 : 0.03;
+        var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
+        var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g400); opacity:0.4;';
+        var cellBgStyle = val ? 'background: ' + bg + ';' : '';
+        
+        matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '" title="' + val + ' à ' + zone + ' dans la catégorie ' + cat.label + '">';
+        matrix2Html += '        ' + (val || '-');
+        matrix2Html += '      </td>';
+      });
+      
+      matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + zoneTotal + '</td>';
+      matrix2Html += '    </tr>';
+    });
   });
 
   matrix2Html += '    </tbody>';
@@ -2723,6 +2736,38 @@ function renderCategoryHeatmap(records) {
                       (catStageMatrix['HAUTE STANDING']['gagne'] || 0) + (catStageMatrix['HAUTE STANDING']['chaud'] || 0);
   var premiumHotRate = premiumTotal ? Math.round((premiumActive / premiumTotal) * 100) : 0;
   if (premiumTotal > 0) {
+    insightsArr.push('🎯 <b>Closing Premium:</b> Le segment haut de gamme (Très Haute + Haute Standing) compte <b>' + premiumTotal + '</b> écoles avec un taux de conversion ou intérêt chaud de <b>' + premiumHotRate + '%</b> (<b>' + premiumActive + '</b> écoles). C’est ici que les efforts de closing doivent se concentrer pour maximiser la valeur contractuelle.');
+  }
+  
+  // Qualification volume insight (Moyen)
+  var moyenTotal = catTotals['STANDIG MOYEN'] || 0;
+  var moyenNewOrCold = (catStageMatrix['STANDIG MOYEN']['nouveau'] || 0) + (catStageMatrix['STANDIG MOYEN']['froid'] || 0);
+  var moyenPct = moyenTotal ? Math.round((moyenNewOrCold / moyenTotal) * 100) : 0;
+  if (moyenTotal > 0) {
+    insightsArr.push('⚡ <b>Volume Moyen Standing:</b> C’est notre plus gros segment de marché avec <b>' + moyenTotal + '</b> écoles (soit ' + Math.round((moyenTotal / items.length) * 100) + '% du portefeuille). Cependant, <b>' + moyenNewOrCold + '</b> écoles (<b>' + moyenPct + '%</b>) sont encore neuves ou froides. Une campagne de relance téléphonique et de repassage terrain structurée est essentielle sur cette catégorie.');
+  }
+
+  // Geographic comparison insight
+  var dlaPremium = (catCitiesMatrix['TRES HAUTE STANDING']['DOUALA'] || 0) + (catCitiesMatrix['HAUTE STANDING']['DOUALA'] || 0);
+  var ydePremium = (catCitiesMatrix['TRES HAUTE STANDING']['YAOUNDE'] || 0) + (catCitiesMatrix['HAUTE STANDING']['YAOUNDE'] || 0);
+  insightsArr.push('🗺️ <b>Couverture Régionale:</b> Douala concentre un plus grand nombre d\'écoles Premium (<b>' + dlaPremium + '</b>) par rapport à Yaoundé (<b>' + ydePremium + '</b>). Yaoundé représente une opportunité sous-exploitée pour cibler les établissements à fort potentiel.');
+
+  var insightsHtml = '<div class="pie-insights" style="margin-top: 18px;">';
+  insightsArr.forEach(function(insight) {
+    insightsHtml += '  <div class="pie-insight">' + insight + '</div>';
+  });
+  insightsHtml += '</div>';
+
+  // Return the combined HTML
+  return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
+         kpiHtml +
+         '  <div class="two">' +
+         matrix1Html +
+         matrix2Html +
+         '  </div>' +
+         insightsHtml +
+         '</div>';
+}al > 0) {
     insightsArr.push('🎯 <b>Closing Premium:</b> Le segment haut de gamme (Très Haute + Haute Standing) compte <b>' + premiumTotal + '</b> écoles avec un taux de conversion ou intérêt chaud de <b>' + premiumHotRate + '%</b> (<b>' + premiumActive + '</b> écoles). C’est ici que les efforts de closing doivent se concentrer pour maximiser la valeur contractuelle.');
   }
   
@@ -3143,6 +3188,10 @@ function rHome(){
   ` : ''}
 
   <div class="section">
+    <div class="sec-head">
+      <h2>📋 Heatmap & Focus <span class="it">par Catégories</span></h2>
+      <span class="anno">Distribution de l'effort et du potentiel commercial. Les cellules s'intensifient selon le nombre d'écoles.</span>
+    </div>
     ${renderCategoryHeatmap(dashboard.records)}
   </div>
 
