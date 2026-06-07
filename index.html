@@ -1645,7 +1645,6 @@ body{
     <div class="brand">
       <span class="eyebrow">🇨🇲 Nateiva Sale Analytic · v9.1</span>
       <h1>NATEIVA<span class="accent">.</span></h1>
-      <div class="sub"><b>Nateiva Sale Analytic</b> centralise le tracking commercial NATEIVA SCHOOL: prospection, appels, pipeline, KPI, BI, NLP, concurrents, playbook et progression par zone, ville et expert.</div>
     </div>
     <div class="meta-block">
       <span class="meta-pill red">v9.1 · KPI + BI</span>
@@ -2955,36 +2954,7 @@ function renderCategoryHeatmap(records) {
   matrix2Html += '  </table></div>';
   matrix2Html += '</div>';
 
-  // Build Insights
-  var insightsArr = [];
-  
-  // Closing potential insight (Très Haute / Haute)
-  var premiumTotal = (catTotals['TRES HAUTE STANDING'] || 0) + (catTotals['HAUTE STANDING'] || 0);
-  var premiumActive = (catStageMatrix['TRES HAUTE STANDING']['gagne'] || 0) + (catStageMatrix['TRES HAUTE STANDING']['chaud'] || 0) +
-                      (catStageMatrix['HAUTE STANDING']['gagne'] || 0) + (catStageMatrix['HAUTE STANDING']['chaud'] || 0);
-  var premiumHotRate = premiumTotal ? Math.round((premiumActive / premiumTotal) * 100) : 0;
-  if (premiumTotal > 0) {
-    insightsArr.push('🎯 <b>Closing Premium:</b> Le segment haut de gamme (Très Haute + Haute Standing) compte <b>' + premiumTotal + '</b> écoles avec un taux de conversion ou intérêt chaud de <b>' + premiumHotRate + '%</b> (<b>' + premiumActive + '</b> écoles). C’est ici que les efforts de closing doivent se concentrer pour maximiser la valeur contractuelle.');
-  }
-  
-  // Qualification volume insight (Moyen)
-  var moyenTotal = catTotals['STANDIG MOYEN'] || 0;
-  var moyenNewOrCold = (catStageMatrix['STANDIG MOYEN']['nouveau'] || 0) + (catStageMatrix['STANDIG MOYEN']['froid'] || 0);
-  var moyenPct = moyenTotal ? Math.round((moyenNewOrCold / moyenTotal) * 100) : 0;
-  if (moyenTotal > 0) {
-    insightsArr.push('⚡ <b>Volume Moyen Standing:</b> C’est notre plus gros segment de marché avec <b>' + moyenTotal + '</b> écoles (soit ' + Math.round((moyenTotal / items.length) * 100) + '% du portefeuille). Cependant, <b>' + moyenNewOrCold + '</b> écoles (<b>' + moyenPct + '%</b>) sont encore neuves ou froides. Une campagne de relance téléphonique et de repassage terrain structurée est essentielle sur cette catégorie.');
-  }
-
-  // Geographic comparison insight
-  var dlaPremium = (catCitiesMatrix['TRES HAUTE STANDING']['DOUALA'] || 0) + (catCitiesMatrix['HAUTE STANDING']['DOUALA'] || 0);
-  var ydePremium = (catCitiesMatrix['TRES HAUTE STANDING']['YAOUNDE'] || 0) + (catCitiesMatrix['HAUTE STANDING']['YAOUNDE'] || 0);
-  insightsArr.push('🗺️ <b>Couverture Régionale:</b> Douala concentre un plus grand nombre d\'écoles Premium (<b>' + dlaPremium + '</b>) par rapport à Yaoundé (<b>' + ydePremium + '</b>). Yaoundé représente une opportunité sous-exploitée pour cibler les établissements à fort potentiel.');
-
-  var insightsHtml = '<div class="pie-insights" style="margin-top: 18px;">';
-  insightsArr.forEach(function(insight) {
-    insightsHtml += '  <div class="pie-insight">' + insight + '</div>';
-  });
-  insightsHtml += '</div>';
+  var insightsHtml = '';
 
   // Return the combined HTML
   return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
@@ -3328,9 +3298,7 @@ function rHome(){
     userCanAccessPane(currentUser,'intel') ? '<a href="#" data-jump="intel">🧠 NLP & Insights</a>' : '',
     userCanAccessPane(currentUser,'glossary') ? '<a href="#" data-jump="glossary">📘 Glossaire</a>' : ''
   ].filter(Boolean).join('');
-  const introCopy = showAll
-    ? 'Dashboard premium de prospection pour suivre <b>' + dashboard.sourceProspectionRows + '</b> lignes source de prospection, <b>' + dashboard.sourceProspectionCount + '</b> prospections utiles, <b>' + dashboard.sourceCallCount + '</b> appels, la vélocité sur <b>jours actifs distincts</b>, le pipeline, les insights concurrents, la BI, le NLP et la progression par zone, ville et expert.'
-    : 'Dashboard personnel pour suivre <b>' + totalProspections + '</b> prospections de votre portefeuille, <b>' + dashboard.callInputs + '</b> appels liés à vos écoles, votre vélocité sur <b>jours actifs distincts</b>, vos relances et votre progression.';
+  const introCopy = '';
   const summaryTags = showAll
     ? [
         '🏫 ' + dashboard.sourceProspectionRows + ' lignes source',
@@ -3352,7 +3320,6 @@ function rHome(){
   let h=`
   <div class="page-intro" data-num="01">
     <h2>Nateiva <span class="it">Sale Analytic</span></h2>
-    <p>${introCopy}</p>
     <div class="quick-links">${quickLinks}</div>
     <div class="summary-tags">
       ${summaryTags.map(function(tag){ return '<span>' + tag + '</span>'; }).join('')}
@@ -3446,7 +3413,6 @@ function rHome(){
         prospectionAnalytics.insights
       )}
     </div>
-    <div class="note teal"><b>Lecture utile:</b> le camembert terrain est <b>exclusif</b> pour rester honnête, mais les insights NLP ci-dessous gardent les chevauchements réels: une même école peut demander des documents <i>et</i> être bloquée en hiérarchie.</div>
   </div>
 
   <div class="section">
@@ -3546,7 +3512,6 @@ function rHome(){
         </table></div>
       </div>
     </div>
-    <div class="note teal"><b>Vérification source:</b> les <b>105 appels</b> visibles viennent aujourd’hui de <b>Kendo Fabiola (95)</b> et <b>Kessi Taylor (10)</b>. Les compteurs source ci-dessus lisent directement les colonnes du fichier appels; la partie NLP n’interprète que les <b>${callQuality.summaryFilled}</b> résumés réellement remplis.</div>
   </div>
 
   <div class="section">
@@ -3660,7 +3625,7 @@ function rHome(){
           ${dashboard.wonDeals.map(record=>`<tr><td><b>${esc(record.schoolName)}</b></td><td>${esc(record.city||'—')}</td><td>${esc(record.zone||'—')}</td><td>${esc(record.closeContact||record.contactName||'—')}</td><td>${esc(record.closedBy||record.expert||'—')}</td><td>${esc(record.closeStatus||'Deal clos')}</td><td>${record.closedAt ? record.closedAt.toISOString().slice(0,10) : '—'}</td><td class="num">${moneyFCFA(record.amount)}</td></tr>`).join('')}
         </tbody>
       </table>
-    ` : `<div class="note red"><b>⏳ Aucun deal gagné confirmé dans les suivis pour ce scope.</b> Le revenu gagné reste à zéro tant qu’un suivi ne ferme pas explicitement le deal.</div>`}
+    ` : ''}
   </div>
   ` : ''}
 
@@ -3672,7 +3637,6 @@ function rHome(){
       <h2>🇨🇲 Pourquoi <span class="it">NATEIVA</span> gagne</h2>
       <span class="anno">Compétiteurs, offre et différenciation</span>
     </div>
-    <div class="note red"><b>⚠️ Angle concurrentiel gardé:</b> l’analyse compétiteurs, le playbook, la BI, le NLP et le glossaire restent présents dans leurs onglets d’origine, avec le même esprit structuré que l’ancienne version.</div>
     <div class="two">
       <div class="strat" style="margin-bottom:0">
         <h4>🤝 Programme <span class="it">Ambassadeur 40%</span></h4>
