@@ -1015,6 +1015,24 @@ body{
   text-transform:uppercase;letter-spacing:.1em;font-weight:600;
 }
 
+.filters-toggle {
+  display: none;
+}
+.kpi .val-cat {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -.045em;
+}
+.kpi .val-cat small {
+  font-size: 12px;
+  color: var(--g500);
+  margin-left: 4px;
+  font-weight: 500;
+}
+
 /* RESPONSIVE */
 @media (max-width:1100px){
   .two,.three,.four{grid-template-columns:1fr 1fr}
@@ -1024,19 +1042,182 @@ body{
 }
 @media (max-width:768px){
   .app{padding:18px}
-  .brand h1{font-size:54px}
+  .brand h1{font-size:42px; line-height:0.95}
+  .brand .sub{font-size:13.5px; margin-top:6px}
   .sec-head h2{font-size:24px}
   .two,.three,.four{grid-template-columns:1fr}
   .hero-content{flex-direction:column;align-items:flex-start;gap:16px}
   .meta-block{align-items:flex-start}
   .tip-body{grid-template-columns:1fr}
-  .nav-main{gap:8px}
-  .nav-btn{min-width:100px;padding:10px 12px;flex:1 1 calc(50% - 8px)}
+  
+  .nav-main {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 12px;
+  }
+  .nav-main::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-btn {
+    flex: 0 0 auto;
+    min-width: 115px;
+    padding: 10px 12px;
+  }
   .nav-btn .nav-icon{font-size:18px}
   .nav-btn .nav-label{font-size:11px}
   .nav-btn .nav-desc{font-size:8px}
-  .filters{padding:14px}
+  
+  .page-intro {
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+  }
+  .page-intro h2 {
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+  .page-intro p {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .page-intro::after {
+    font-size: 80px;
+    top: 10px;
+    right: 15px;
+  }
+  .page-intro .quick-links {
+    margin-top: 10px;
+    gap: 6px;
+  }
+  .page-intro .quick-links a {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+
+  .filters-toggle {
+    display: flex;
+    width: 100%;
+    padding: 14px 18px;
+    background: var(--paper);
+    border: 1.5px solid var(--g200);
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+    margin: 16px 0 8px;
+  }
+  .filters-toggle:hover {
+    background: var(--bg-warm);
+  }
+  .filters-toggle .toggle-icon {
+    font-size: 14px;
+    transition: transform 0.25s;
+  }
+  .filters-toggle.active .toggle-icon {
+    transform: rotate(180deg);
+  }
+  .filters-summary-badge {
+    background: var(--red-soft);
+    color: var(--red);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-weight: 700;
+  }
+  .filters {
+    display: none !important;
+    margin-top: 8px;
+    padding: 14px;
+  }
+  .filters.active {
+    display: flex !important;
+  }
   .fld{min-width:100%}
+  
+  .kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .kpi {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .kpi .lbl {
+    font-size: 8.5px;
+    margin-bottom: 6px;
+    letter-spacing: .08em;
+  }
+  .kpi .lbl::before {
+    width: 10px;
+  }
+  .kpi .val {
+    font-size: 28px;
+  }
+  .kpi .val small {
+    font-size: 13px;
+  }
+  .kpi .val-cat {
+    font-size: 24px;
+  }
+  .kpi .val-cat small {
+    font-size: 10px;
+  }
+  .kpi .delta {
+    font-size: 9px;
+    margin-top: 6px;
+    gap: 4px;
+  }
+
+  .tbl th {
+    padding: 8px 10px;
+    font-size: 9.5px;
+  }
+  .tbl td {
+    padding: 8px 10px;
+    font-size: 11.5px;
+  }
+  .table-scroll {
+    border-radius: 12px;
+    border: 1.5px solid var(--g200);
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .table-scroll .tbl {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .subnav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .subnav::-webkit-scrollbar {
+    display: none;
+  }
+  .subnav-btn {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
   .tracking-toolbar{align-items:center}
   .tracking-toggle{width:100%;justify-content:center}
   .tracking-toggle button{flex:1}
@@ -1518,6 +1699,16 @@ body{
     <span class="nav-desc">Définitions</span>
   </button>
 </nav>
+
+<!-- FILTERS BAR TOGGLE FOR MOBILE -->
+<button class="filters-toggle" id="fToggleBtn" onclick="toggleMobileFilters()">
+  <span style="display:inline-flex; align-items:center; gap:8px;">
+    <span>🔍</span>
+    <span style="font-weight:700">Filtres &amp; Tri</span>
+    <span id="activeFiltersSummary" class="filters-summary-badge" style="display:none"></span>
+  </span>
+  <span class="toggle-icon">▼</span>
+</button>
 
 <!-- FILTERS BAR -->
 <div class="filters">
@@ -2615,7 +2806,7 @@ function renderCategoryHeatmap(records) {
   guideHtml += '</div>';
 
   // Build KPIs
-  var kpiHtml = '<div class="kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">';
+  var kpiHtml = '<div class="kpis">';
   STANDING_CATEGORIES.forEach(function(cat) {
     var total = catTotals[cat.key];
     if (total === 0 && cat.key === 'SANS_CATEGORIE') return; // Hide empty category card
@@ -2629,7 +2820,7 @@ function renderCategoryHeatmap(records) {
     // Style card using category theme
     kpiHtml += '<div class="kpi" style="border-left: 5px solid hsl(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%); background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(247,244,238,.96)); box-shadow: var(--shadow);">';
     kpiHtml += '  <div class="lbl" style="color: hsl(' + cat.hue + ', ' + cat.sat + '%, ' + (cat.light - 10) + '%); font-weight: 700;">' + esc(cat.label) + '</div>';
-    kpiHtml += '  <div class="val" style="font-size: 32px; color: var(--ink);">' + total + '<small style="font-size: 12px; margin-left: 4px;">écoles</small></div>';
+    kpiHtml += '  <div class="val val-cat">' + total + '<small>écoles</small></div>';
     kpiHtml += '  <div class="delta" style="font-size: 11px; color: var(--g600); margin-top: 4px;">';
     kpiHtml += '    <b>' + hotRate + '%</b> hot/won rate · ' + (won + hot) + ' actifs · ' + experts + ' expert' + (experts > 1 ? 's' : '');
     kpiHtml += '  </div>';
@@ -2948,6 +3139,39 @@ function resetDashboardFilters(){
   }
   const rateLabel=document.getElementById('rngVal');
   if(rateLabel)rateLabel.textContent='0%';
+}
+
+function toggleMobileFilters() {
+  const btn = document.getElementById('fToggleBtn');
+  const panel = document.querySelector('.filters');
+  if (btn && panel) {
+    panel.classList.toggle('active');
+    btn.classList.toggle('active');
+    const icon = btn.querySelector('.toggle-icon');
+    if (icon) {
+      icon.textContent = panel.classList.contains('active') ? '▲' : '▼';
+    }
+  }
+}
+
+function updateFilterSummary() {
+  let activeCount = 0;
+  let summaryParts = [];
+  if (ST.city) { activeCount++; summaryParts.push(ST.city); }
+  if (ST.expert) { activeCount++; summaryParts.push(ST.expert.split(' ')[0]); }
+  if (ST.sec) { activeCount++; summaryParts.push(ST.sec.substring(0, 8) + '...'); }
+  if (ST.cat) { activeCount++; summaryParts.push(ST.cat.substring(0, 6) + '.'); }
+  if (ST.rate > 0) { activeCount++; summaryParts.push(ST.rate + '%'); }
+  
+  const badge = document.getElementById('activeFiltersSummary');
+  if (badge) {
+    if (activeCount > 0) {
+      badge.textContent = activeCount + ' (' + summaryParts.join(', ') + ')';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 }
 
 // POPULATE FILTERS
@@ -3445,58 +3669,11 @@ function rHome(){
   ${showAll ? `
   <div class="section">
     <div class="sec-head">
-      <h2>🧭 Guide <span class="it">de Navigation</span></h2>
-      <span class="anno">Tous les tabs historiques sont conservés</span>
-    </div>
-    <div class="toc-grid">
-      <a href="#" data-jump="metrics" class="toc-item"><div class="toc-num">📊</div><div class="toc-name">BI & KPI</div><div class="toc-desc">Sources · métriques · formules</div></a>
-      <a href="#" data-jump="team" class="toc-item"><div class="toc-num">👥</div><div class="toc-name">Équipe</div><div class="toc-desc">Experts · pipeline · velocity</div></a>
-      <a href="#" data-jump="market" class="toc-item"><div class="toc-num">🗺️</div><div class="toc-name">Marché</div><div class="toc-desc">Concurrents · régions · chaînes</div></a>
-      <a href="#" data-jump="playbook" class="toc-item"><div class="toc-num">🎯</div><div class="toc-name">Playbook</div><div class="toc-desc">Objections · closing · pitches</div></a>
-      <a href="#" data-jump="intel" class="toc-item"><div class="toc-num">🧠</div><div class="toc-name">NLP</div><div class="toc-desc">Signaux · décideurs · insights</div></a>
-      <a href="#" data-jump="glossary" class="toc-item"><div class="toc-num">📖</div><div class="toc-name">Glossaire</div><div class="toc-desc">Définitions rapides</div></a>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="sec-head">
-      <h2>🔗 Business <span class="it">Intelligence</span></h2>
-      <span class="anno">Sources online, scope, synchronisation</span>
-    </div>
-    <div class="three">
-      <div class="chart">
-        <h3>🏫 Source <span class="it">prospection</span></h3>
-        <div class="desc">${dashboard.sourceProspectionRows} lignes source · ${dashboard.sourceProspectionCount} prospections utiles</div>
-        <p style="font-size:13px;line-height:1.7;color:var(--g700)">La feuille terrain reste la source principale du jour. Elle alimente automatiquement les KPI, l’entonnoir et les matrices par ville / zone.</p>
-        ${dashboard.sources.prospectionSheet ? `<a class="source-link" href="${attrEsc(dashboard.sources.prospectionSheet)}" target="_blank" rel="noreferrer">📎 Ouvrir la feuille prospection</a>` : ''}
-      </div>
-      <div class="chart">
-        <h3>📞 Source <span class="it">appels</span></h3>
-        <div class="desc">${dashboard.sourceCallCount} appels importés</div>
-        <p style="font-size:13px;line-height:1.7;color:var(--g700)">Les appels sont rattachés aux écoles et aux semaines pour montrer la vraie tendance: hausse saine, baisse saine ou baisse dangereuse.</p>
-        ${dashboard.sources.callsSheet ? `<a class="source-link" href="${attrEsc(dashboard.sources.callsSheet)}" target="_blank" rel="noreferrer">📎 Ouvrir la feuille appels</a>` : ''}
-      </div>
-      <div class="chart">
-        <h3>🔐 Scope <span class="it">accès</span></h3>
-        <div class="desc">Règles d’accès combiné</div>
-        <p style="font-size:13px;line-height:1.7;color:var(--g700)"><b>Noah</b>, <b>Mbeuka brice</b> et <b>Ntsa Guy</b> voient toute la donnée. Les revenus restent réservés à eux. Tous les autres experts voient uniquement leur propre pipeline, leurs propres écoles, leurs propres appels et leur propre progression.</p>
-        <div class="summary-tags">
-          <span>👤 Expert = vue personnelle</span>
-          <span>👥 Admin = vue combinée</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  ` : ''}
-
-  ${showAll ? `
-  <div class="section">
-    <div class="sec-head">
       <h2>🇨🇲 Pourquoi <span class="it">NATEIVA</span> gagne</h2>
       <span class="anno">Compétiteurs, offre et différenciation</span>
     </div>
     <div class="note red"><b>⚠️ Angle concurrentiel gardé:</b> l’analyse compétiteurs, le playbook, la BI, le NLP et le glossaire restent présents dans leurs onglets d’origine, avec le même esprit structuré que l’ancienne version.</div>
-    <div class="three">
+    <div class="two">
       <div class="strat" style="margin-bottom:0">
         <h4>🤝 Programme <span class="it">Ambassadeur 40%</span></h4>
         <div class="when"><b>Différenciation réelle:</b> unique au Cameroun</div>
@@ -3506,11 +3683,6 @@ function rHome(){
         <h4>📱 <span class="it">Mobile + Terrain</span></h4>
         <div class="when"><b>Vrai tracking:</b> prospection + appels + zone</div>
         <p style="font-size:13px;color:var(--g700);line-height:1.65">Le dashboard croise désormais le terrain, les appels, les jours actifs, la vélocité et la progression par semaine pour savoir si l’équipe avance vraiment.</p>
-      </div>
-      <div class="strat" style="margin-bottom:0">
-        <h4>🧠 <span class="it">BI + NLP + KPI</span></h4>
-        <div class="when"><b>Pilotage:</b> pas seulement affichage</div>
-        <p style="font-size:13px;color:var(--g700);line-height:1.65">On garde la lecture business complète: formules, glossaire, insights NLP, analyses de concurrence, matrices par zone, et KPI commerciaux pour organiser l’action.</p>
       </div>
     </div>
   </div>
@@ -5002,6 +5174,7 @@ function rGlossary(){
 // =============================================================
 function renderAll(){
   refreshFilters();
+  updateFilterSummary();
   const f=gF();
   document.getElementById('fCount').textContent=f.length;
   document.getElementById('fTotal').textContent='/ ' + getVisibleRaw().length + ' prospections';
