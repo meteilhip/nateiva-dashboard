@@ -1634,6 +1634,63 @@ body{
   display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:var(--paper);
   border:1px solid var(--g200);font-size:12px;font-weight:700;color:var(--g700)
 }
+
+/* === HEADER AUTH STYLE === */
+.header-auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--paper);
+  border: 1.5px solid var(--g200);
+  padding: 6px 16px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.auth-user {
+  font-size: 13px;
+  color: var(--g800);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+}
+.btn-logout-header, .btn-login-header {
+  background: transparent;
+  border: 1.5px solid var(--g300);
+  color: var(--g700);
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+}
+.btn-logout-header:hover {
+  background: var(--red-glow);
+  color: var(--red);
+  border-color: var(--red);
+}
+.btn-login-header {
+  background: linear-gradient(135deg, var(--red), var(--saffron));
+  color: white;
+  border: none;
+  box-shadow: 0 2px 6px rgba(220,38,38,0.2);
+}
+.btn-login-header:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+@media (max-width: 768px) {
+  .auth-status {
+    width: 100%;
+    justify-content: space-between;
+    padding: 8px 16px;
+  }
+}
 </style>
 </head>
 <body>
@@ -1650,6 +1707,7 @@ body{
       <span class="meta-pill saffron">05 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
+    <div id="headerAuth" class="header-auth"></div>
   </div>
 </header>
 
@@ -5160,6 +5218,7 @@ function renderAll(){
   rGlossary();
   rSuivi();
   applyNavigationAccess();
+  updateHeaderAuth();
   setTimeout(()=>{
     document.querySelectorAll('.pane.act .bar-row').forEach(b=>b.classList.add('animate'));
   },100);
@@ -5300,7 +5359,7 @@ function canSeeAllData(user) {
 
 function canManageUsers(user) {
   if (!user) return false;
-  return isSuperAdmin(user) || !!normalizePermissions(user).manageUsers;
+  return isSuperAdmin(user) || isSubAdmin(user) || !!normalizePermissions(user).manageUsers;
 }
 
 function canManageUserAccess(user) {
@@ -5519,7 +5578,11 @@ function localFallback(action, params) {
       if (!canManageUsers(currentUser)) return { success: false, error: 'Accès réservé à la gestion utilisateurs' };
       var exists = getAllUsers().find(function(x) { return x.username === params.username; });
       if (exists) return { success: false, error: 'Ce nom d\'utilisateur existe déjà' };
-      var newUser = { username: params.username, password: params.password, fullName: canonicalPersonName(params.fullName), role: params.role || 'Expert', city: params.city || 'DOUALA', permissions: params.permissions || null };
+      var role = params.role || 'Expert';
+      if (role !== 'Expert' && !isSuperAdmin(currentUser)) {
+        return { success: false, error: 'Seul le Super Admin peut créer des rôles Sub Admin ou Super Admin' };
+      }
+      var newUser = { username: params.username, password: params.password, fullName: canonicalPersonName(params.fullName), role: role, city: params.city || 'DOUALA', permissions: params.permissions || null };
       invitedUsers.push(newUser);
       localStorage.setItem('nateiva_invited_users', JSON.stringify(invitedUsers));
       return { success: true, message: 'Utilisateur ' + params.fullName + ' ajouté avec succès' };
@@ -5542,6 +5605,23 @@ function localFallback(action, params) {
       return { success: true, message: 'Accès utilisateur mis à jour' };
     }
     default: return { success: false, error: 'Local fallback: ' + action };
+  }
+}
+
+// --- Header Auth ---
+function updateHeaderAuth() {
+  var el = document.getElementById('headerAuth');
+  if (!el) return;
+  if (currentUser) {
+    var badge = roleBadgeLabel(currentUser);
+    el.innerHTML = '<div class="auth-status">' +
+      '<span class="auth-user">👤 <strong>' + esc(currentUser.fullName) + '</strong> (' + esc(badge) + ')</span>' +
+      '<button class="btn-logout-header" onclick="doLogout()">Déconnexion</button>' +
+      '</div>';
+  } else {
+    el.innerHTML = '<div class="auth-status">' +
+      '<button class="btn-login-header" onclick="showLogin()">Connexion</button>' +
+      '</div>';
   }
 }
 
@@ -5976,7 +6056,12 @@ function rSuivi() {
     h += '<div class="form-field"><label>Nom d\'utilisateur</label><input type="text" id="invUsername" placeholder="Ex: jean"></div>';
     h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPassword" placeholder="Ex: jean123"></div>';
     h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-    h += '<div class="form-field"><label>Rôle</label><select id="invRole"><option value="Expert">Expert (voit ses données uniquement)</option><option value="SubAdmin">Sub Admin (voit toute la donnée)</option><option value="SuperAdmin">Super Admin (voit tout + contrôle accès)</option></select></div>';
+    var roleOptions = '<option value="Expert">Expert (voit ses données uniquement)</option>';
+    if (isSuperAdmin(currentUser)) {
+      roleOptions += '<option value="SubAdmin">Sub Admin (voit toute la donnée)</option>';
+      roleOptions += '<option value="SuperAdmin">Super Admin (voit tout + contrôle accès)</option>';
+    }
+    h += '<div class="form-field"><label>Rôle</label><select id="invRole">' + roleOptions + '</select></div>';
     h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter l\'utilisateur</button></div>';
 
     if (canManageUserAccess(currentUser)) {
@@ -6152,6 +6237,10 @@ async function submitInvite() {
   var city = document.getElementById('invCity').value;
   var role = document.getElementById('invRole').value;
   if (!fullName || !username || !password) { showToast('Remplissez tous les champs', true); return; }
+  if (role !== 'Expert' && !isSuperAdmin(currentUser)) {
+    showToast('Seul le Super Admin peut créer des rôles Sub Admin ou Super Admin', true);
+    return;
+  }
   var res = await apiPost({ action: 'addUser', fullName: fullName, username: username, password: password, city: city, role: role, requestedBy: currentUser ? currentUser.username : '' });
   if (res.success) {
     showToast(res.message);
