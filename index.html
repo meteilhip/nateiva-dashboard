@@ -1691,6 +1691,16 @@ body{
     padding: 8px 16px;
   }
 }
+
+/* Vercel Toolbar Control */
+vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-widget"], .vercel-live-feedback-container, iframe[src*="vercel"] {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 </style>
 </head>
 <body>
@@ -5395,9 +5405,81 @@ function applyNavigationAccess() {
 
 currentUser = currentUser && currentUser.username ? (getUserByUsername(currentUser.username) || mergeUserRecord(currentUser)) : null;
 
-function getAllRawRows() {
+function getBaseRawRows() {
   var imported = LIVE_DATA && Array.isArray(LIVE_DATA.prospection) ? LIVE_DATA.prospection : null;
   return imported && imported.length ? imported : RAW;
+}
+
+function buildNewSchoolsFromFollowups() {
+  var base = getBaseRawRows();
+  var seen = {};
+  for (var i = 0; i < base.length; i++) {
+    var key = schoolKey(base[i].n);
+    if (key) seen[key] = true;
+  }
+  
+  var newSchoolsMap = {};
+  var allFollowups = getAllFollowups();
+  for (var j = 0; j < allFollowups.length; j++) {
+    var f = allFollowups[j];
+    var sName = f.SchoolName || '';
+    var sKey = schoolKey(sName);
+    if (!sKey || seen[sKey]) continue;
+    
+    if (!newSchoolsMap[sKey]) {
+      newSchoolsMap[sKey] = {
+        t: f.Timestamp || new Date().toISOString(),
+        e: f.Expert || '',
+        n: sName,
+        ty: f.SchoolType || 'Primaire',
+        rn: f.ContactName || '',
+        rp: f.ContactRole || 'DIRECTEUR (TRICE)',
+        pw: f.ContactPhone || '',
+        pn: '',
+        co: f.Notes || '',
+        tx: f.Status === 'Converti' ? '1.0' : '0.1',
+        r: f.Status === 'Converti' ? 100 : 10,
+        ef: f.Effectif || '',
+        ca: f.Category || 'STANDIG MOYEN',
+        v: f.City || '',
+        sy: (f.City === 'YAOUNDE') ? (f.Sector || '') : '',
+        sd: (f.City === 'DOUALA') ? (f.Sector || '') : '',
+        lo: f.Location || '',
+        re: '',
+        isNewSchool: true
+      };
+    } else {
+      var entry = newSchoolsMap[sKey];
+      if (f.SchoolType) entry.ty = f.SchoolType;
+      if (f.Category) entry.ca = f.Category;
+      if (f.Effectif) entry.ef = f.Effectif;
+      if (f.Location) entry.lo = f.Location;
+      if (f.ContactRole) entry.rp = f.ContactRole;
+      if (f.ContactName && !entry.rn) entry.rn = f.ContactName;
+      if (f.ContactPhone && !entry.pw) entry.pw = f.ContactPhone;
+      if (f.City) {
+        entry.v = f.City;
+        if (f.City === 'YAOUNDE') entry.sy = f.Sector || '';
+        if (f.City === 'DOUALA') entry.sd = f.Sector || '';
+      }
+      if (f.Status === 'Converti') {
+        entry.tx = '1.0';
+        entry.r = 100;
+      }
+    }
+  }
+  
+  var list = [];
+  for (var k in newSchoolsMap) {
+    if (Object.prototype.hasOwnProperty.call(newSchoolsMap, k)) {
+      list.push(newSchoolsMap[k]);
+    }
+  }
+  return list;
+}
+
+function getAllRawRows() {
+  return getBaseRawRows().concat(buildNewSchoolsFromFollowups());
 }
 
 function getVisibleRaw() {
@@ -5420,7 +5502,7 @@ function buildImportedSheetFollowups() {
 
   var schoolMeta = {};
   var phoneMeta = {};
-  getAllRawRows().forEach(function(r) {
+  getBaseRawRows().forEach(function(r) {
     var schoolKey = normalizeText(r.n);
     if (schoolKey) {
       if (!schoolMeta[schoolKey]) schoolMeta[schoolKey] = { key: schoolKey, school: r.n || '', city: r.v || '', sector: zoneLabel(r) || '', experts: [] };
@@ -5568,7 +5650,12 @@ function localFallback(action, params) {
         Cost: params.cost || 0,
         Status: params.status || 'En cours',
         City: params.city || '',
-        Sector: params.sector || ''
+        Sector: params.sector || '',
+        SchoolType: params.schoolType || '',
+        Category: params.category || '',
+        Effectif: params.effectif || '',
+        Location: params.location || '',
+        ContactRole: params.contactRole || ''
       };
       suiviFollowups.push(fu);
       localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
@@ -5657,6 +5744,7 @@ async function doLogin() {
     resetDashboardFilters();
     ST.expert = canSeeAllData(currentUser) ? '' : currentUser.fullName;
     renderAll();
+    updateVercelToolbarVisibility();
   } else {
     errEl.textContent = res.error || 'Erreur de connexion';
     errEl.style.display = 'block';
@@ -5669,6 +5757,7 @@ function doLogout() {
   resetDashboardFilters();
   renderAll();
   showLogin();
+  updateVercelToolbarVisibility();
 }
 
 function showToast(msg, isError) {
@@ -5922,7 +6011,8 @@ function rSuivi() {
 
   // Sub-tabs
   h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab act" data-stab="add">+ Ajouter</button>';
+  h += '<button class="suivi-tab act" data-stab="add">+ Nouveau suivi</button>';
+  h += '<button class="suivi-tab" data-stab="addschool">+ Nouvelle École</button>';
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
@@ -5936,6 +6026,16 @@ function rSuivi() {
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
   h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école"></div>';
+  h += '<div class="form-field full" id="newSchoolInfoWrap" style="display:none;background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
+  h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Détails de la nouvelle école</h4>';
+  h += '<div class="form-grid" style="grid-gap:14px;display:grid;grid-template-columns:1fr 1fr;margin:0">';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option></select></div>';
+  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
+  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="fuContactRole" placeholder="Ex: Principal, Directeur"></div>';
+  h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="fuLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
+  h += '</div>';
+  h += '</div>';
   h += '<div class="form-field full"><div id="fuSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
   h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option></select></div>';
   h += '<div class="form-field"><label>Nom du contact</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor"></div>';
@@ -5964,6 +6064,23 @@ function rSuivi() {
     h += '</div></div>';
   });
   h += '</div></div></div>';
+
+  // Panel: Add school directly
+  h += '<div class="suivi-panel" id="stab-addschool">';
+  h += '<div class="form-card" id="newSchoolForm"><h3>Nouvelle <span class="it">école</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Enregistrez directement une nouvelle école dans le portefeuille. Elle apparaîtra ensuite dans la liste des écoles et pourra faire l\'objet de suivis.</p>';
+  h += '<div class="form-grid">';
+  h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option></select></div>';
+  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
+  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Ville</label><select id="nsCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Secteur</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="nsLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
+  h += '<div class="form-field"><label>Nom du contact principal</label><input type="text" id="nsContactName" placeholder="Ex: M. Nkoum"></div>';
+  h += '<div class="form-field"><label>Téléphone du contact</label><input type="text" id="nsContactPhone" placeholder="Ex: 677 889 900"></div>';
+  h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="nsContactRole" placeholder="Ex: Proviseur, Censeur"></div>';
+  h += '</div><div class="form-submit"><button class="btn-save" onclick="submitNewSchoolDirect()">Enregistrer l\'école</button></div></div></div>';
 
   // Panel: History
   h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique des <span class="it">follow-ups</span>' + (isSuper ? ' (toute l\'équipe)' : '') + '</h3>';
@@ -6136,11 +6253,14 @@ function rSuivi() {
 function prefillSchool() {
   var sel = document.getElementById('fuSchool');
   var cw = document.getElementById('fuSchoolCustomWrap');
+  var nw = document.getElementById('newSchoolInfoWrap');
   if (sel.value === '__other__') {
     cw.style.display = '';
+    if (nw) nw.style.display = '';
     document.getElementById('fuSchoolCustom').focus();
   } else {
     cw.style.display = 'none';
+    if (nw) nw.style.display = 'none';
     var school = getVisibleRaw().find(function(r) { return r.n === sel.value; }) || getAllRawRows().find(function(r) { return r.n === sel.value; });
     if (school) {
       document.getElementById('fuContact').value = school.rn || '';
@@ -6154,6 +6274,8 @@ function prefillSchool() {
 
 function prefillFromSchool(name, contact, phone, city, sector) {
   var sel = document.getElementById('fuSchool');
+  var nw = document.getElementById('newSchoolInfoWrap');
+  if (nw) nw.style.display = 'none';
   if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === name) { sel.selectedIndex = i; break; } } }
   if (document.getElementById('fuContact')) document.getElementById('fuContact').value = contact || '';
   if (document.getElementById('fuPhone')) document.getElementById('fuPhone').value = phone || '';
@@ -6207,7 +6329,12 @@ async function submitFollowup() {
     cost: document.getElementById('fuType').value === 'VISIT' ? (Number(document.getElementById('fuCost').value) || 0) : 0,
     status: document.getElementById('fuStatus').value,
     city: document.getElementById('fuCity').value,
-    sector: document.getElementById('fuSector').value.trim()
+    sector: document.getElementById('fuSector').value.trim(),
+    schoolType: schoolSel === '__other__' ? document.getElementById('fuSchoolType').value : '',
+    category: schoolSel === '__other__' ? document.getElementById('fuCategory').value : '',
+    effectif: schoolSel === '__other__' ? document.getElementById('fuEffectif').value.trim() : '',
+    location: schoolSel === '__other__' ? document.getElementById('fuLocation').value.trim() : '',
+    contactRole: schoolSel === '__other__' ? document.getElementById('fuContactRole').value.trim() : ''
   };
   var res = await apiPost(data);
   if (res.success) {
@@ -6215,6 +6342,12 @@ async function submitFollowup() {
     document.getElementById('fuSchool').selectedIndex = 0;
     if (document.getElementById('fuSchoolCustom')) document.getElementById('fuSchoolCustom').value = '';
     if (document.getElementById('fuSchoolCustomWrap')) document.getElementById('fuSchoolCustomWrap').style.display = 'none';
+    if (document.getElementById('fuSchoolType')) document.getElementById('fuSchoolType').selectedIndex = 0;
+    if (document.getElementById('fuCategory')) document.getElementById('fuCategory').selectedIndex = 2; // STANDIG MOYEN
+    if (document.getElementById('fuEffectif')) document.getElementById('fuEffectif').value = '';
+    if (document.getElementById('fuLocation')) document.getElementById('fuLocation').value = '';
+    if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = '';
+    if (document.getElementById('newSchoolInfoWrap')) document.getElementById('newSchoolInfoWrap').style.display = 'none';
     document.getElementById('fuContact').value = '';
     document.getElementById('fuPhone').value = '';
     document.getElementById('fuNotes').value = '';
@@ -6227,6 +6360,77 @@ async function submitFollowup() {
     updateSchoolOwnershipNotice();
     rSuivi();
   } else { showToast(res.error || 'Erreur', true); }
+}
+
+function updateVercelToolbarVisibility() {
+  var isSuper = isSuperAdmin(currentUser);
+  var styleEl = document.getElementById('vercel-toolbar-control');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'vercel-toolbar-control';
+    document.head.appendChild(styleEl);
+  }
+  if (isSuper) {
+    styleEl.innerHTML = '';
+  } else {
+    styleEl.innerHTML = 'vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-widget"], .vercel-live-feedback-container, iframe[src*="vercel"] { display: none !important; pointer-events: none !important; opacity: 0 !important; visibility: hidden !important; width: 0 !important; height: 0 !important; }';
+    var feedbackNode = document.querySelector('vercel-live-feedback');
+    if (feedbackNode) {
+      feedbackNode.remove();
+    }
+  }
+}
+
+async function submitNewSchoolDirect() {
+  if (!currentUser) { showToast('Veuillez vous connecter', true); return; }
+  var schoolName = document.getElementById('nsSchoolName').value.trim();
+  if (!schoolName) { showToast('Veuillez entrer le nom de l\'école', true); return; }
+  
+  var validation = validateSchoolSelectionForUser(schoolName);
+  if (validation && !validation.ok) {
+    showToast(validation.message, true);
+    return;
+  }
+  
+  var data = {
+    action: 'addFollowup',
+    expert: currentUser.fullName,
+    schoolName: schoolName,
+    contactName: document.getElementById('nsContactName').value.trim(),
+    contactPhone: document.getElementById('nsContactPhone').value.trim(),
+    followupType: 'CREATION',
+    notes: 'Création de la fiche école',
+    outcome: 'Intéressé',
+    nextAction: '',
+    nextDate: '',
+    cost: 0,
+    status: 'En cours',
+    city: document.getElementById('nsCity').value,
+    sector: document.getElementById('nsSector').value.trim(),
+    schoolType: document.getElementById('nsSchoolType').value,
+    category: document.getElementById('nsCategory').value,
+    effectif: document.getElementById('nsEffectif').value.trim(),
+    location: document.getElementById('nsLocation').value.trim(),
+    contactRole: document.getElementById('nsContactRole').value.trim()
+  };
+  
+  var res = await apiPost(data);
+  if (res.success) {
+    showToast('Nouvelle école enregistrée!');
+    document.getElementById('nsSchoolName').value = '';
+    document.getElementById('nsSchoolType').selectedIndex = 0;
+    document.getElementById('nsCategory').selectedIndex = 2; // Standing Moyen
+    document.getElementById('nsEffectif').value = '';
+    document.getElementById('nsSector').value = '';
+    document.getElementById('nsLocation').value = '';
+    document.getElementById('nsContactName').value = '';
+    document.getElementById('nsContactPhone').value = '';
+    document.getElementById('nsContactRole').value = '';
+    
+    rSuivi();
+  } else {
+    showToast(res.error || 'Erreur', true);
+  }
 }
 
 async function submitInvite() {
@@ -6283,6 +6487,8 @@ async function submitUserAccess(username) {
 rSuivi();
 renderAll();
 if (!currentUser) showLogin();
+updateVercelToolbarVisibility();
+setInterval(updateVercelToolbarVisibility, 1000);
 </script>
 </body>
 </html>
