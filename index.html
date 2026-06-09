@@ -183,6 +183,7 @@ body{
   box-shadow:var(--shadow);
 }
 .nav-btn.priority-workspace{
+  order:-1;
   border:2px solid rgba(220,38,38,.45);
   background:linear-gradient(135deg, rgba(254,226,226,.95), rgba(255,245,245,.98));
   color:var(--red-deep);
@@ -1544,6 +1545,32 @@ body{
 .planner-card:last-child{margin-bottom:0}
 .planner-card strong{display:block;font-size:13px;color:var(--ink);margin-bottom:4px}
 .planner-card .planner-meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.planner-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.planner-action-btn{
+  border:none;border-radius:999px;padding:8px 12px;font-size:11px;font-family:'JetBrains Mono',monospace;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease
+}
+.planner-action-btn:hover{transform:translateY(-1px)}
+.planner-action-btn.edit{background:rgba(13,148,136,.12);color:var(--teal-deep);box-shadow:0 10px 18px rgba(13,148,136,.12)}
+.planner-action-btn.continue{background:rgba(220,38,38,.1);color:var(--red-deep);box-shadow:0 10px 18px rgba(220,38,38,.12)}
+.planner-calendar-shell{margin-top:22px;display:grid;gap:16px}
+.planner-month{
+  border:1px solid var(--g200);border-radius:18px;background:rgba(255,255,255,.94);padding:18px;
+  box-shadow:0 12px 24px rgba(15,23,42,.04)
+}
+.planner-month h4{margin:0 0 12px;font-size:15px;color:var(--ink)}
+.planner-entry{
+  display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--g150)
+}
+.planner-entry:first-of-type{border-top:none;padding-top:0}
+.planner-entry-main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.planner-entry-main strong{font-size:13px;color:var(--ink)}
+.planner-entry-main span{font-size:12px;color:var(--g600);line-height:1.5}
+.planner-entry-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.planner-edit-note{
+  margin:0 0 14px;padding:10px 12px;border-radius:14px;background:rgba(220,38,38,.06);
+  border:1px solid rgba(220,38,38,.15);font-size:12px;color:var(--red-deep);line-height:1.5
+}
 .planner-chip.overdue,.timeline-pill.overdue{background:rgba(220,38,38,.1);color:var(--red);border-color:rgba(220,38,38,.2)}
 .planner-chip.urgent,.timeline-pill.urgent{background:rgba(217,119,6,.12);color:var(--saffron-deep);border-color:rgba(217,119,6,.18)}
 .planner-chip.soon,.timeline-pill.soon{background:rgba(13,148,136,.1);color:var(--teal-deep);border-color:rgba(13,148,136,.18)}
@@ -1561,6 +1588,8 @@ body{
   .workspace-action-center{padding:20px 16px}
   .workspace-primary-actions{flex-direction:column}
   .workspace-cta{width:min(100%,420px);max-width:420px;flex:none;margin:0 auto}
+  .planner-entry{flex-direction:column}
+  .planner-entry-side{align-items:flex-start}
 }
 
 .suivi-tabs{
@@ -1850,12 +1879,12 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
 
 <!-- MAIN NAVIGATION — 7 LOGICAL SECTIONS -->
 <nav class="nav-main">
-  <button class="nav-btn act" data-pane="home">
+  <button class="nav-btn" data-pane="home">
     <span class="nav-icon">🏠</span>
     <span class="nav-label">Dashboard</span>
     <span class="nav-desc">KPI & Progression</span>
   </button>
-  <button class="nav-btn priority-workspace" data-pane="suivi">
+  <button class="nav-btn priority-workspace act" data-pane="suivi">
     <span class="nav-icon">📋</span>
     <span class="nav-label">Workspace</span>
     <span class="nav-desc">New Entry · Follow Up</span>
@@ -1933,14 +1962,14 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
 </div>
 
 <!-- PANES -->
-<div class="pane act" id="p-home"></div>
+<div class="pane" id="p-home"></div>
 <div class="pane" id="p-metrics"></div>
 <div class="pane" id="p-team"></div>
 <div class="pane" id="p-market"></div>
 <div class="pane" id="p-playbook"></div>
 <div class="pane" id="p-intel"></div>
 <div class="pane" id="p-glossary"></div>
-<div class="pane" id="p-suivi"></div>
+<div class="pane act" id="p-suivi"></div>
 
 <div id="loginOverlay" class="login-overlay" style="display:none">
   <div class="login-box">
@@ -2059,6 +2088,25 @@ function countDistinctDays(rows,key){
 function parseCount(value){
   const num=parseInt(String(value||'').replace(/\D/g,''),10);
   return Number.isFinite(num) ? num : 0;
+}
+function parseStudentCount(value){
+  var text = normalizeText(value);
+  if (!text) return 0;
+  var matches = String(value || '').match(/\d+/g);
+  if (!matches || !matches.length) return 0;
+  var numbers = matches.map(function(part) { return parseInt(part, 10); }).filter(function(num) {
+    return Number.isFinite(num) && num > 0;
+  });
+  if (!numbers.length) return 0;
+  var hasRangePattern = /\bentre\b/.test(text) || /\d+\s*[-/aà]\s*\d+/.test(text);
+  var hasMultiSectionPattern = /(primaire|secondaire|college|coll[eè]ge|lyc[eé]e|universit[eé]|maternelle|campus)/.test(text) && numbers.length > 1;
+  if (hasMultiSectionPattern) {
+    return numbers.reduce(function(sum, num) { return sum + num; }, 0);
+  }
+  if (hasRangePattern && numbers.length === 2) {
+    return Math.round((numbers[0] + numbers[1]) / 2);
+  }
+  return numbers.length > 1 ? Math.max.apply(null, numbers) : numbers[0];
 }
 function isYesFlag(value){
   const text=normalizeText(value);
@@ -2257,6 +2305,8 @@ function buildSchoolRecords(rawRows, followups){
         budgetTiming:'',
         preferredChannel:'',
         campusCount:'',
+        contactRole:'',
+        location:'',
         contactName:'',
         phone:'',
         rate:null,
@@ -2290,13 +2340,15 @@ function buildSchoolRecords(rawRows, followups){
     rec.zone=zoneLabel(r)||rec.zone;
     rec.standing=r.ca||rec.standing;
     rec.type=r.ty||rec.type;
+    rec.contactRole=r.rp||rec.contactRole;
+    rec.location=r.lo||rec.location;
     if(r.e){rec.expert=rec.expert||r.e;rec._experts.add(r.e);}
     if(r.rn){rec.contactName=rec.contactName||r.rn;rec._contacts.add(r.rn);}
     [r.pw,r.pn].forEach(function(phone){
       const clean=digitsOnly(phone);
       if(clean){rec.phone=rec.phone||clean;rec._phones.add(clean);}
     });
-    const effectif=parseInt(String(r.ef||'').replace(/\D/g,''),10);
+    const effectif=parseStudentCount(r.ef);
     if(Number.isFinite(effectif))rec.effectif=Math.max(rec.effectif,effectif);
     const dt=parseEntryDate(r.t);
     if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
@@ -2323,6 +2375,10 @@ function buildSchoolRecords(rawRows, followups){
     rec.schoolName=item.SchoolName||rec.schoolName;
     rec.city=item.City||rec.city;
     rec.zone=item.Sector||rec.zone;
+    if(item.Category)rec.standing=item.Category||rec.standing;
+    if(item.SchoolType)rec.type=item.SchoolType||rec.type;
+    if(item.ContactRole)rec.contactRole=item.ContactRole||rec.contactRole;
+    if(item.Location)rec.location=item.Location||rec.location;
     if(meta.institutionLevel)rec.type=meta.institutionLevel||rec.type;
     if(meta.quartier)rec.quartier=rec.quartier||meta.quartier;
     if(meta.productType)rec.productType=rec.productType||meta.productType;
@@ -2341,6 +2397,8 @@ function buildSchoolRecords(rawRows, followups){
     if(item.ContactName){rec.contactName=rec.contactName||item.ContactName;rec._contacts.add(item.ContactName);}
     const cleanPhone=digitsOnly(item.ContactPhone);
     if(cleanPhone){rec.phone=rec.phone||cleanPhone;rec._phones.add(cleanPhone);}
+    const followupEffectif=parseStudentCount(item.Effectif);
+    if(Number.isFinite(followupEffectif))rec.effectif=Math.max(rec.effectif,followupEffectif);
     if(item.FollowupType==='CALL')rec.callCount++;
     if(item.FollowupType==='VISIT')rec.visitCount++;
     if(meta.rate && !Number.isNaN(Number(meta.rate)))rec.rate=Number(meta.rate);
@@ -2350,6 +2408,9 @@ function buildSchoolRecords(rawRows, followups){
       rec.notes=[item.Outcome||'',item.Status||'',cleanNotes||'',item.NextAction||''].filter(Boolean).join(' · ');
       if(meta.rate && !Number.isNaN(Number(meta.rate)))rec.rate=Number(meta.rate);
       if(meta.institutionLevel)rec.type=meta.institutionLevel;
+      if(item.Category)rec.standing=item.Category;
+      if(item.ContactRole)rec.contactRole=item.ContactRole;
+      if(item.Location)rec.location=item.Location;
       if(meta.quartier)rec.quartier=meta.quartier;
       if(meta.productType)rec.productType=meta.productType;
       if(meta.appMode)rec.appMode=meta.appMode;
@@ -4422,7 +4483,7 @@ function rTeam(){
     const avg=er.length?er.reduce((s,r)=>s+r.r,0)/er.length:0;
     const hot=ef.filter(r=>r.r>=60).length;
     const phoneCap=ef.filter(r=>r.pw||r.pn).length;
-    const eff=ef.map(r=>{const x=parseInt(String(r.ef||'').replace(/\D/g,''));return isFinite(x)&&x<10000?x:0}).reduce((a,b)=>a+b,0);
+    const eff=ef.map(function(r){const x=parseStudentCount(r.ef);return isFinite(x)&&x<10000?x:0}).reduce((a,b)=>a+b,0);
     const blocked=ef.filter(r=>/fondateur|absent|hi[ée]rarchie|d[ée]cision/i.test((r.co||'')+(r.re||''))).length;
     const cities=[...new Set(ef.map(r=>r.v).filter(Boolean))];
     stats[e]={count:ef.length,avg,hot,phoneCap,eff,blocked,cities};
@@ -5435,9 +5496,11 @@ var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
 var FOLLOWUP_META_MARKER = '[NATEIVA_META]';
 var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
 var suiviPreferredTab = 'planner';
+var followupEditId = '';
+var followupEditMode = 'create';
 var PANE_ACCESS_CONFIG = [
-  { key: 'home', label: 'Dashboard' },
   { key: 'suivi', label: 'Workspace' },
+  { key: 'home', label: 'Dashboard' },
   { key: 'metrics', label: 'BI & KPI' },
   { key: 'team', label: 'Équipe' },
   { key: 'market', label: 'Marché' },
@@ -5485,8 +5548,8 @@ function setServerUsers(users) {
 }
 
 function setSyncedFollowups(followups) {
-  suiviFollowups = Array.isArray(followups) ? followups.map(hydrateFollowupRecord) : [];
-  localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+  suiviFollowups = dedupeFollowupRecords(Array.isArray(followups) ? followups : []);
+  persistFollowupStore();
 }
 
 function persistEntryImpacts() {
@@ -5738,6 +5801,33 @@ function getWorkspaceRawForUser(expertName) {
   return getAllRawRows().filter(function(r) { return samePerson(r.e, expertName); });
 }
 
+function getKnownSchoolKeySet() {
+  var keys = new Set();
+  getAllRawRows().forEach(function(row) {
+    var key = schoolKey(row && row.n);
+    if (key) keys.add(key);
+  });
+  return keys;
+}
+
+function getOwnedSchoolKeySetForUser(expertName) {
+  var keys = new Set();
+  if (!expertName) return keys;
+  getWorkspaceRawForUser(expertName).forEach(function(row) {
+    var key = schoolKey(row && row.n);
+    if (key) keys.add(key);
+  });
+  return keys;
+}
+
+function schoolBelongsToUserPortfolio(expertName, schoolName) {
+  var key = schoolKey(schoolName);
+  if (!key) return false;
+  var ownedKeys = getOwnedSchoolKeySetForUser(expertName);
+  if (ownedKeys.has(key)) return true;
+  return !getKnownSchoolKeySet().has(key);
+}
+
 function getVisibleRaw() {
   var allRows = getAllRawRows();
   if (!currentUser) return [];
@@ -5827,14 +5917,16 @@ function getAllFollowups() {
 
 function getWorkspaceFollowupsForUser(expertName) {
   if (!expertName) return [];
-  return getAllFollowups().filter(function(f) { return samePerson(f.Expert, expertName); });
+  return getAllFollowups().filter(function(f) {
+    return samePerson(f.Expert, expertName) && schoolBelongsToUserPortfolio(expertName, f.SchoolName);
+  });
 }
 
 function getVisibleFollowups() {
   var allFollowups = getAllFollowups();
   if (!currentUser) return [];
   if (canSeeAllData(currentUser)) return allFollowups;
-  return allFollowups.filter(function(f) { return samePerson(f.Expert, currentUser.fullName); });
+  return getWorkspaceFollowupsForUser(currentUser.fullName);
 }
 
 function applyBackendBootstrap(payload) {
@@ -5851,6 +5943,7 @@ function applyBackendBootstrap(payload) {
 }
 
 importedSheetFollowups = buildImportedSheetFollowups();
+sanitizeFollowupStore();
 renderAll();
 
 // =============================================================
@@ -5868,7 +5961,7 @@ function getDaysOnField(expertName) {
       if (day) daySet.add(day);
     }
   }
-  var allFollowups = getAllFollowups();
+  var allFollowups = getWorkspaceFollowupsForUser(expertName);
   for (var j = 0; j < allFollowups.length; j++) {
     var fu = allFollowups[j];
     if (samePerson(fu.Expert, expertName) && fu.Timestamp) {
@@ -6031,15 +6124,71 @@ function localFallback(action, params) {
         ProspectionYear: params.prospectionYear || params.ProspectionYear || ''
       });
       suiviFollowups.push(fu);
-      localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+      sanitizeFollowupStore();
       return { success: true, id: fu.ID, followup: fu, message: 'Suivi ajouté avec succès' };
+    }
+    case 'updateFollowup': {
+      if (!params.id) return { success: false, error: 'Entrée introuvable' };
+      var existing = (Array.isArray(suiviFollowups) ? suiviFollowups : []).find(function(item) {
+        return String(item.ID || '') === String(params.id || '');
+      });
+      if (!existing) return { success: false, error: 'Entrée non modifiable' };
+      var updateValidation = validateSchoolSelectionForUser(params.schoolName || existing.SchoolName);
+      if (!updateValidation.ok) return { success: false, error: updateValidation.message };
+      var updated = hydrateFollowupRecord(Object.assign({}, existing, {
+        SchoolName: params.schoolName || existing.SchoolName,
+        ContactName: params.contactName || '',
+        ContactPhone: params.contactPhone || '',
+        FollowupType: params.followupType || existing.FollowupType,
+        Notes: params.notes || '',
+        Outcome: params.outcome || '',
+        NextAction: params.nextAction || '',
+        NextDate: params.nextDate || '',
+        Cost: params.cost || 0,
+        Status: params.status || 'En cours',
+        City: params.city || '',
+        Sector: params.sector || '',
+        SchoolType: params.schoolType || '',
+        Category: params.category || '',
+        Effectif: params.effectif || '',
+        Location: params.location || '',
+        ContactRole: params.contactRole || '',
+        Rate: params.rate || params.Rate || '',
+        Quartier: params.quartier || params.Quartier || '',
+        ProductType: params.productType || params.ProductType || '',
+        AppMode: params.appMode || params.AppMode || '',
+        CurrentSystem: params.currentSystem || params.CurrentSystem || '',
+        DecisionReach: params.decisionReach || params.DecisionReach || '',
+        DecisionMaker: params.decisionMaker || params.DecisionMaker || '',
+        InternetQuality: params.internetQuality || params.InternetQuality || '',
+        PowerQuality: params.powerQuality || params.PowerQuality || '',
+        SupportRequest: params.supportRequest || params.SupportRequest || '',
+        RequestedModules: params.requestedModules || params.RequestedModules || '',
+        BudgetTiming: params.budgetTiming || params.BudgetTiming || '',
+        PreferredChannel: params.preferredChannel || params.PreferredChannel || '',
+        CampusCount: params.campusCount || params.CampusCount || '',
+        CallStart: params.callStart || params.CallStart || existing.CallStart || '',
+        CallDuration: params.callDuration || params.CallDuration || '',
+        CallRating: params.callRating || params.CallRating || '',
+        CallTimesCalled: params.timesCalled || params.CallTimesCalled || '',
+        CallSecondCall: params.secondCall || params.CallSecondCall || '',
+        CallWhatsappDocs: params.whatsappDocs || params.CallWhatsappDocs || '',
+        CallToSuperior: params.toSuperior || params.CallToSuperior || '',
+        CallVisit: params.visit || params.CallVisit || '',
+        ProspectionYear: params.prospectionYear || params.ProspectionYear || ''
+      }));
+      suiviFollowups = (Array.isArray(suiviFollowups) ? suiviFollowups : []).map(function(item) {
+        return String(item.ID || '') === String(params.id || '') ? updated : item;
+      });
+      sanitizeFollowupStore();
+      return { success: true, id: updated.ID, followup: updated, message: 'Suivi mis à jour avec succès' };
     }
     case 'deleteFollowup': {
       if (!canDeleteFollowups(currentUser)) return { success: false, error: 'Seul Noah peut supprimer une entrée' };
       suiviFollowups = (Array.isArray(suiviFollowups) ? suiviFollowups : []).filter(function(item) {
         return String(item.ID || '') !== String(params.id || '');
       });
-      localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+      persistFollowupStore();
       return { success: true, message: 'Entrée supprimée' };
     }
     case 'addUser': {
@@ -6163,7 +6312,7 @@ function showToast(msg, isError) {
 // --- Expert stats from RAW + followups ---
 function computeExpertStats(expertName) {
   var rawData = getAllRawRows().filter(function(r) { return samePerson(r.e, expertName); });
-  var fuData = getAllFollowups().filter(function(f) { return samePerson(f.Expert, expertName); });
+  var fuData = getWorkspaceFollowupsForUser(expertName);
   var daysOnField = getDaysOnField(expertName);
   var totalProspections = rawData.length;
   var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
@@ -6342,6 +6491,44 @@ function hydrateFollowupRecord(record) {
   return hydrated;
 }
 
+function followupDedupeKey(record) {
+  var item = hydrateFollowupRecord(record);
+  return [
+    String(item.ID || '').trim(),
+    canonicalPersonKey(item.Expert),
+    schoolKey(item.SchoolName),
+    String(item.Timestamp || '').trim(),
+    normalizeText(getFollowupPlainNotes(item)),
+    normalizeText(item.Outcome),
+    normalizeText(item.NextAction),
+    String(item.NextDate || '').trim()
+  ].join('|');
+}
+
+function dedupeFollowupRecords(records) {
+  var map = new Map();
+  (Array.isArray(records) ? records : []).forEach(function(record) {
+    var item = hydrateFollowupRecord(record);
+    var key = item && item.ID ? ('id:' + String(item.ID).trim()) : ('sig:' + followupDedupeKey(item));
+    var current = map.get(key);
+    var itemTime = parseEntryDate(item && item.Timestamp);
+    var currentTime = current ? parseEntryDate(current.Timestamp) : null;
+    if (!current || (itemTime && (!currentTime || itemTime > currentTime))) {
+      map.set(key, item);
+    }
+  });
+  return Array.from(map.values());
+}
+
+function persistFollowupStore() {
+  localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+}
+
+function sanitizeFollowupStore() {
+  suiviFollowups = dedupeFollowupRecords(suiviFollowups);
+  persistFollowupStore();
+}
+
 function incrementBucket(map, label) {
   var key = cleanMetaValue(label);
   if (!key) return;
@@ -6430,20 +6617,175 @@ function formatAutoEntryTime(dateValue) {
 
 function updateEntryAutoFields() {
   var now = new Date();
-  ['fuRecordedAt', 'nsRecordedAt'].forEach(function(id) {
-    var input = document.getElementById(id);
-    if (input) input.value = formatAutoEntryStamp(now);
-  });
-  ['fuCallStart', 'nsCallStart'].forEach(function(id) {
-    var input = document.getElementById(id);
-    if (input) input.value = formatAutoEntryTime(now);
-  });
+  var editEntry = followupEditMode === 'edit' ? getEditableLocalFollowupById(followupEditId) : null;
+  var editMeta = editEntry ? readFollowupMeta(editEntry) : null;
+  var recordedValue = editEntry ? formatAutoEntryStamp(editEntry.Timestamp || now) : formatAutoEntryStamp(now);
+  var callValue = editEntry
+    ? (cleanMetaValue(editMeta && editMeta.callStart) || formatAutoEntryTime(editEntry.Timestamp || now))
+    : formatAutoEntryTime(now);
+  var fuRecordedAt = document.getElementById('fuRecordedAt');
+  if (fuRecordedAt) fuRecordedAt.value = recordedValue;
+  var fuCallStart = document.getElementById('fuCallStart');
+  if (fuCallStart) fuCallStart.value = callValue;
+  var nsRecordedAt = document.getElementById('nsRecordedAt');
+  if (nsRecordedAt) nsRecordedAt.value = formatAutoEntryStamp(now);
+  var nsCallStart = document.getElementById('nsCallStart');
+  if (nsCallStart) nsCallStart.value = formatAutoEntryTime(now);
 }
 
 function startEntryAutoClock() {
   if (entryAutoClockTimer) clearInterval(entryAutoClockTimer);
   updateEntryAutoFields();
   entryAutoClockTimer = setInterval(updateEntryAutoFields, 1000);
+}
+
+function getEditableLocalFollowupById(id) {
+  return (Array.isArray(suiviFollowups) ? suiviFollowups : []).find(function(item) {
+    return String(item.ID || '') === String(id || '');
+  }) || null;
+}
+
+function getAnyFollowupById(id) {
+  return getAllFollowups().find(function(item) {
+    return String(item.ID || '') === String(id || '');
+  }) || null;
+}
+
+function canEditStoredFollowup(item) {
+  return !!(item && item.ID && !item.Imported && item.Source !== 'calls-sheet' && getEditableLocalFollowupById(item.ID));
+}
+
+function setFollowupSelectValue(id, value) {
+  var select = document.getElementById(id);
+  if (!select) return;
+  var target = cleanMetaValue(value);
+  for (var i = 0; i < select.options.length; i++) {
+    if (cleanMetaValue(select.options[i].value) === target) {
+      select.selectedIndex = i;
+      return;
+    }
+  }
+}
+
+function setFollowupFormMode(mode, entry) {
+  followupEditMode = mode || 'create';
+  followupEditId = followupEditMode === 'edit' && entry ? String(entry.ID || '') : '';
+  var title = document.getElementById('followupFormTitle');
+  var hint = document.getElementById('followupFormModeHint');
+  var button = document.getElementById('followupSubmitBtn');
+  if (title) {
+    title.innerHTML = followupEditMode === 'edit'
+      ? 'Modifier le <span class="it">rappel</span>'
+      : (followupEditMode === 'continue'
+          ? 'Nouveau <span class="it">suivi</span> de rappel'
+          : 'Nouveau <span class="it">suivi</span>');
+  }
+  if (hint) {
+    if (followupEditMode === 'edit' && entry) {
+      hint.style.display = '';
+      hint.textContent = 'Vous modifiez ce rappel sans créer de doublon. L’horodatage original reste visible dans l’historique.';
+    } else if (followupEditMode === 'continue') {
+      hint.style.display = '';
+      hint.textContent = 'Vous préparez une nouvelle action à partir d’un rappel existant. Cela créera une nouvelle trace dans votre historique.';
+    } else {
+      hint.style.display = 'none';
+      hint.textContent = '';
+    }
+  }
+  if (button) {
+    button.textContent = followupEditMode === 'edit' ? 'Mettre à jour le rappel' : 'Enregistrer le suivi';
+  }
+  updateEntryAutoFields();
+}
+
+function resetFollowupFormMode() {
+  setFollowupFormMode('create', null);
+}
+
+function populateFollowupFormFromRecord(entry, mode) {
+  if (!entry) return;
+  var meta = readFollowupMeta(entry);
+  activateSuiviPanel('add', { scroll: true });
+  setFollowupFormMode(mode || 'continue', entry);
+  var schoolSelect = document.getElementById('fuSchool');
+  if (schoolSelect) {
+    var matched = false;
+    for (var i = 0; i < schoolSelect.options.length; i++) {
+      if (schoolSelect.options[i].value === entry.SchoolName) {
+        schoolSelect.selectedIndex = i;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      schoolSelect.value = '__other__';
+      var customWrap = document.getElementById('fuSchoolCustomWrap');
+      if (customWrap) customWrap.style.display = '';
+      var customInput = document.getElementById('fuSchoolCustom');
+      if (customInput) customInput.value = entry.SchoolName || '';
+    }
+  }
+  prefillSchool();
+  if (document.getElementById('fuContact')) document.getElementById('fuContact').value = entry.ContactName || '';
+  if (document.getElementById('fuPhone')) document.getElementById('fuPhone').value = entry.ContactPhone || '';
+  if (document.getElementById('fuType')) setFollowupSelectValue('fuType', entry.FollowupType || 'CALL');
+  if (document.getElementById('fuOutcome')) setFollowupSelectValue('fuOutcome', entry.Outcome || '');
+  if (document.getElementById('fuStatus')) setFollowupSelectValue('fuStatus', entry.Status || 'En cours');
+  if (document.getElementById('fuCity') && entry.City) document.getElementById('fuCity').value = entry.City;
+  if (document.getElementById('fuSector')) document.getElementById('fuSector').value = entry.Sector || '';
+  if (document.getElementById('fuSchoolType')) document.getElementById('fuSchoolType').value = meta.institutionLevel || entry.SchoolType || '';
+  if (document.getElementById('fuCategory')) document.getElementById('fuCategory').value = entry.Category || '';
+  if (document.getElementById('fuEffectif')) document.getElementById('fuEffectif').value = entry.Effectif || '';
+  if (document.getElementById('fuRate')) document.getElementById('fuRate').value = meta.rate || entry.Rate || '';
+  if (document.getElementById('fuQuartier')) document.getElementById('fuQuartier').value = meta.quartier || entry.Quartier || '';
+  if (document.getElementById('fuLocation')) document.getElementById('fuLocation').value = entry.Location || '';
+  if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = entry.ContactRole || '';
+  if (document.getElementById('fuCurrentSystem')) document.getElementById('fuCurrentSystem').value = meta.currentSystem || entry.CurrentSystem || '';
+  if (document.getElementById('fuProductType')) setFollowupSelectValue('fuProductType', meta.productType || entry.ProductType || '');
+  if (document.getElementById('fuAppMode')) setFollowupSelectValue('fuAppMode', meta.appMode || entry.AppMode || '');
+  if (document.getElementById('fuInternetQuality')) setFollowupSelectValue('fuInternetQuality', meta.internetQuality || entry.InternetQuality || '');
+  if (document.getElementById('fuPowerQuality')) setFollowupSelectValue('fuPowerQuality', meta.powerQuality || entry.PowerQuality || '');
+  if (document.getElementById('fuCampusCount')) document.getElementById('fuCampusCount').value = meta.campusCount || entry.CampusCount || '';
+  if (document.getElementById('fuRequestedModules')) document.getElementById('fuRequestedModules').value = meta.requestedModules || entry.RequestedModules || '';
+  if (document.getElementById('fuSupportRequest')) document.getElementById('fuSupportRequest').value = meta.supportRequest || entry.SupportRequest || '';
+  if (document.getElementById('fuCallDuration')) document.getElementById('fuCallDuration').value = meta.callDuration || entry.CallDuration || '';
+  if (document.getElementById('fuCallRating')) document.getElementById('fuCallRating').value = meta.callRating || entry.CallRating || '';
+  if (document.getElementById('fuTimesCalled')) document.getElementById('fuTimesCalled').value = meta.callTimesCalled || entry.CallTimesCalled || '';
+  if (document.getElementById('fuDecisionReach')) setFollowupSelectValue('fuDecisionReach', meta.decisionReach || entry.DecisionReach || '');
+  if (document.getElementById('fuDecisionMaker')) document.getElementById('fuDecisionMaker').value = meta.decisionMaker || entry.DecisionMaker || '';
+  if (document.getElementById('fuSecondCall')) setFollowupSelectValue('fuSecondCall', meta.callSecondCall || entry.CallSecondCall || '');
+  if (document.getElementById('fuWhatsappDocs')) setFollowupSelectValue('fuWhatsappDocs', meta.callWhatsappDocs || entry.CallWhatsappDocs || '');
+  if (document.getElementById('fuToSuperior')) setFollowupSelectValue('fuToSuperior', meta.callToSuperior || entry.CallToSuperior || '');
+  if (document.getElementById('fuVisitFlag')) setFollowupSelectValue('fuVisitFlag', meta.callVisit || entry.CallVisit || '');
+  if (document.getElementById('fuCost')) document.getElementById('fuCost').value = entry.Cost || 0;
+  if (document.getElementById('fuNextAction')) document.getElementById('fuNextAction').value = entry.NextAction || '';
+  if (document.getElementById('fuNextDate')) document.getElementById('fuNextDate').value = entry.NextDate || '';
+  if (document.getElementById('fuPreferredChannel')) setFollowupSelectValue('fuPreferredChannel', meta.preferredChannel || entry.PreferredChannel || '');
+  if (document.getElementById('fuBudgetTiming')) setFollowupSelectValue('fuBudgetTiming', meta.budgetTiming || entry.BudgetTiming || '');
+  if (document.getElementById('fuProspectionYear')) document.getElementById('fuProspectionYear').value = meta.prospectionYear || entry.ProspectionYear || '';
+  if (document.getElementById('fuNotes')) document.getElementById('fuNotes').value = getFollowupPlainNotes(entry);
+  updateSchoolOwnershipNotice();
+}
+
+function editFollowupEntry(id) {
+  var entry = getEditableLocalFollowupById(id);
+  if (!entry) { showToast('Ce rappel ne peut pas être modifié ici', true); return; }
+  populateFollowupFormFromRecord(entry, 'edit');
+}
+
+function continueFollowupEntry(id) {
+  var entry = getAnyFollowupById(id);
+  if (!entry) { showToast('Rappel introuvable', true); return; }
+  populateFollowupFormFromRecord(entry, 'continue');
+}
+
+function renderPlannerActions(followup) {
+  if (!followup || !followup.ID) return '';
+  var safeId = esc(String(followup.ID || '')).replace(/'/g, "\\'");
+  if (canEditStoredFollowup(followup)) {
+    return '<div class="planner-actions"><button class="planner-action-btn edit" onclick="editFollowupEntry(\'' + safeId + '\')">Modifier rappel</button></div>';
+  }
+  return '<div class="planner-actions"><button class="planner-action-btn continue" onclick="continueFollowupEntry(\'' + safeId + '\')">Préparer la suite</button></div>';
 }
 
 function getStageMeta(stageKey) {
@@ -6563,6 +6905,7 @@ function renderReminderChip(nextDate) {
 function buildPlannerModel(followups) {
   var latestBySchool = {};
   var undated = [];
+  var windowDays = 14;
   (Array.isArray(followups) ? followups : []).forEach(function(item) {
     if (!item || item.Status === 'Converti' || item.Status === 'Terminé') return;
     var hasReminder = !!(String(item.NextDate || '').trim() || String(item.NextAction || '').trim());
@@ -6586,9 +6929,10 @@ function buildPlannerModel(followups) {
     return new Date(a.followup.Timestamp).getTime() - new Date(b.followup.Timestamp).getTime();
   });
   var days = [];
+  var monthMap = {};
   var start = new Date();
   start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  for (var offset = 0; offset < 7; offset++) {
+  for (var offset = 0; offset < windowDays; offset++) {
     var currentDay = new Date(start);
     currentDay.setDate(start.getDate() + offset);
     days.push({
@@ -6597,12 +6941,28 @@ function buildPlannerModel(followups) {
       items: items.filter(function(item) { return item.reminder.days === offset; })
     });
   }
+  items.forEach(function(item) {
+    var reminderDate = parseDateOnly(item.followup.NextDate);
+    if (!reminderDate) return;
+    var monthKey = reminderDate.getFullYear() + '-' + String(reminderDate.getMonth() + 1).padStart(2, '0');
+    if (!monthMap[monthKey]) {
+      monthMap[monthKey] = {
+        key: monthKey,
+        label: reminderDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+        items: []
+      };
+    }
+    monthMap[monthKey].items.push(item);
+  });
   return {
     overdue: items.filter(function(item) { return item.reminder.days < 0; }),
     urgent: items.filter(function(item) { return item.reminder.days >= 0 && item.reminder.days <= 2; }),
-    upcoming: items.filter(function(item) { return item.reminder.days >= 0 && item.reminder.days <= 6; }),
+    upcoming: items.filter(function(item) { return item.reminder.days >= 0 && item.reminder.days < windowDays; }),
     undated: undated,
-    days: days
+    days: days,
+    windowDays: windowDays,
+    allItems: items,
+    months: Object.keys(monthMap).sort().map(function(key) { return monthMap[key]; })
   };
 }
 
@@ -6630,44 +6990,20 @@ function buildRankings() {
 }
 
 function getSchoolSuggestions(expert) {
-  var map = new Map();
-
-  function ensureSchool(name) {
-    var key = schoolKey(name);
-    if (!key) return null;
-    if (!map.has(key)) {
-      map.set(key, { name: name || '', contact: '', phone: '', city: '', sector: '', rate: null, expert: '', followups: 0 });
-    }
-    return map.get(key);
-  }
-
-  getAllRawRows().forEach(function(r) {
-    if (expert && !samePerson(r.e, expert)) return;
-    var entry = ensureSchool(r.n);
-    if (!entry) return;
-    if (r.n) entry.name = r.n;
-    if (r.rn && !entry.contact) entry.contact = r.rn;
-    if ((r.pw || r.pn) && !entry.phone) entry.phone = r.pw || r.pn;
-    if (r.v && !entry.city) entry.city = r.v;
-    if (!entry.sector) entry.sector = r.v === 'YAOUNDE' ? r.sy : r.sd;
-    if (entry.rate == null && typeof r.r === 'number') entry.rate = r.r;
-    if (r.e && !entry.expert) entry.expert = r.e;
-  });
-
-  getAllFollowups().forEach(function(item) {
-    if (expert && !samePerson(item.Expert, expert)) return;
-    var entry = ensureSchool(item.SchoolName);
-    if (!entry) return;
-    if (item.SchoolName) entry.name = item.SchoolName;
-    if (item.ContactName && !entry.contact) entry.contact = item.ContactName;
-    if (item.ContactPhone && !entry.phone) entry.phone = item.ContactPhone;
-    if (item.City && !entry.city) entry.city = item.City;
-    if (item.Sector && !entry.sector) entry.sector = item.Sector;
-    if (item.Expert && !entry.expert) entry.expert = item.Expert;
-    entry.followups += 1;
-  });
-
-  return Array.from(map.values()).sort(function(a, b) {
+  var rawRows = expert ? getWorkspaceRawForUser(expert) : getVisibleRaw();
+  var followups = expert ? getWorkspaceFollowupsForUser(expert) : getVisibleFollowups();
+  return buildSchoolRecords(rawRows, followups).map(function(record) {
+    return {
+      name: record.schoolName || '',
+      contact: record.contactName || '',
+      phone: record.phone || '',
+      city: record.city || '',
+      sector: record.zone || '',
+      rate: Number.isFinite(record.rate) ? record.rate : null,
+      expert: record.expert || '',
+      followups: record.followupCount || 0
+    };
+  }).sort(function(a, b) {
     if ((b.rate || 0) !== (a.rate || 0)) return (b.rate || 0) - (a.rate || 0);
     return (b.followups || 0) - (a.followups || 0);
   });
@@ -6896,7 +7232,7 @@ function rSuivi() {
 
   // Sub-tabs
   h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab" data-stab="planner">Rappels & semaine</button>';
+  h += '<button class="suivi-tab" data-stab="planner">Rappels & 2 semaines</button>';
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
@@ -6905,11 +7241,12 @@ function rSuivi() {
   h += '</div>';
 
   // Panel: Add followup
-  h += '<div class="suivi-panel" id="stab-add"><div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
+  h += '<div class="suivi-panel" id="stab-add"><div class="form-card" id="followupForm"><h3 id="followupFormTitle">Nouveau <span class="it">suivi</span></h3>';
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Le formulaire suit maintenant la logique de vos deux questionnaires d\'origine. Pour un <b>appel</b>, on reprend le statut, l\'heure, la durée, le rating, les docs WhatsApp et la prochaine relance. Pour une <b>descente terrain</b>, on garde le type d\'établissement, le taux, l\'effectif, le standing, la zone et les remarques. ' + (isSuper ? 'Les admins peuvent débloquer une école déjà prise si besoin.' : 'Vous restez limité à votre propre portefeuille.') + '</p>';
+  h += '<div id="followupFormModeHint" class="planner-edit-note" style="display:none"></div>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
-  h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école"></div>';
+  h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école" oninput="updateSchoolOwnershipNotice()"></div>';
   h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
   h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
   h += '<div class="form-grid" style="grid-gap:14px;display:grid;grid-template-columns:1fr 1fr;margin:0">';
@@ -6956,7 +7293,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Timing budget / décision</label><select id="fuBudgetTiming"><option value="">-- À préciser --</option><option value="Immédiat">Immédiat</option><option value="Cette semaine">Cette semaine</option><option value="Ce mois">Ce mois</option><option value="Rentrée">Rentrée</option><option value="Trimestre prochain">Trimestre prochain</option></select></div>';
   h += '<div class="form-field"><label>Année / historique de prospection</label><input type="text" id="fuProspectionYear" placeholder="Ex: prospecté les années antérieures"></div>';
   h += '<div class="form-field full"><label>Notes / Détails</label><textarea id="fuNotes" placeholder="Décrivez ce qui s\'est passé..."></textarea></div>';
-  h += '</div><div class="form-submit"><button class="btn-save" onclick="submitFollowup()">Enregistrer le suivi</button></div></div>';
+  h += '</div><div class="form-submit"><button class="btn-save" id="followupSubmitBtn" onclick="submitFollowup()">Enregistrer le suivi</button></div></div>';
 
   // Quick school list
   h += '<div class="form-card"><h3>Écoles à <span class="it">relancer</span></h3>';
@@ -6978,7 +7315,7 @@ function rSuivi() {
   h += '<div class="form-card" id="newSchoolForm"><h3>Nouvelle <span class="it">école</span></h3>';
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, que ce soit <b>par téléphone</b> ou <b>sur le terrain</b>. On reprend ici les questions clés du questionnaire original pour bien classer l\'école dès le premier contact.</p>';
   h += '<div class="form-grid">';
-  h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem"></div>';
+  h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem" oninput="updateNewSchoolOwnershipNotice()"></div>';
   h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
@@ -6997,6 +7334,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="nsAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option><option value="Hybride">Hybride</option><option value="Mobile only">Mobile only</option></select></div>';
   h += '<div class="form-field"><label>Qualité internet</label><select id="nsInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
   h += '<div class="form-field"><label>Qualité électricité</label><select id="nsPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
+  h += '<div class="form-field"><label>Nombre de campus</label><input type="number" id="nsCampusCount" placeholder="Ex: 1" min="1"></div>';
   h += '<div class="form-field"><label>Décideur atteint ?</label><select id="nsDecisionReach"><option value="">-- À préciser --</option><option value="Décideur joint">Décideur joint</option><option value="Relais joint">Relais joint</option><option value="Aucun contact">Aucun contact</option></select></div>';
   h += '<div class="form-field"><label>Décideur final / hiérarchie</label><input type="text" id="nsDecisionMaker" placeholder="Ex: Fondateur, Rectorat, Principal"></div>';
   h += '<div class="form-field"><label>Modules demandés</label><input type="text" id="nsRequestedModules" placeholder="Ex: bulletins, Mobile Money, communication parents"></div>';
@@ -7022,26 +7360,26 @@ function rSuivi() {
 
   // Panel: Planner
   h += '<div class="suivi-panel" id="stab-planner"><div class="form-card"><h3>🗓️ Rappels <span class="it">& planning</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Votre agenda de relance met en avant ce qui approche, ce qui est en retard et les dossiers sans date. Les urgences proches clignotent pour éviter les oublis.</p>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Votre agenda couvre maintenant <b>2 semaines glissantes</b> et un <b>calendrier complet</b> pour voir, modifier et préparer chaque relance. Les urgences proches clignotent pour éviter les oublis.</p>';
   h += '<div class="planner-shell"><div class="planner-summary">';
   h += '<div class="planner-alerts">';
   h += '<div class="planner-stat"><strong>' + planner.overdue.length + '</strong><span>en retard</span></div>';
   h += '<div class="planner-stat"><strong>' + planner.urgent.length + '</strong><span>à traiter sous 72h</span></div>';
-  h += '<div class="planner-stat"><strong>' + planner.upcoming.length + '</strong><span>dans les 7 jours</span></div>';
+  h += '<div class="planner-stat"><strong>' + planner.upcoming.length + '</strong><span>dans les 14 jours</span></div>';
   h += '<div class="planner-stat"><strong>' + planner.undated.length + '</strong><span>sans date fixée</span></div>';
   h += '</div>';
   if (planner.overdue.length) {
     h += '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">';
     planner.overdue.slice(0, 5).forEach(function(item) {
       var f = item.followup;
-      h += '<div class="planner-card overdue"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance en attente') + '</span></div>';
+      h += '<div class="planner-card overdue"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance en attente') + '</span>' + renderPlannerActions(f) + '</div>';
     });
     h += '</div>';
   }
   if (planner.undated.length) {
-    h += '<div style="margin-top:16px"><h4 style="margin-bottom:10px;font-size:13px">📌 Actions sans date</h4><div style="display:flex;flex-wrap:wrap;gap:8px">';
+    h += '<div style="margin-top:16px"><h4 style="margin-bottom:10px;font-size:13px">📌 Actions sans date</h4><div style="display:flex;flex-direction:column;gap:10px">';
     planner.undated.slice(0, 8).forEach(function(item) {
-      h += '<span class="planner-chip future">' + esc(item.SchoolName) + ' · ' + esc(item.NextAction || 'À dater') + '</span>';
+      h += '<div class="planner-card future"><strong>' + esc(item.SchoolName) + '</strong><span>' + esc(item.NextAction || 'À dater') + '</span>' + renderPlannerActions(item) + '</div>';
     });
     h += '</div></div>';
   }
@@ -7055,11 +7393,26 @@ function rSuivi() {
         var f = item.followup;
         h += '<div class="planner-card ' + item.reminder.tone + (item.reminder.blink ? ' reminder-blink' : '') + '"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance à préparer') + '</span>';
         if (f.ContactName || (isSuper && f.Expert)) h += '<span>' + (f.ContactName ? '👤 ' + esc(f.ContactName) : '') + (isSuper && f.Expert ? (f.ContactName ? ' · ' : '') + esc(f.Expert) : '') + '</span>';
+        h += renderPlannerActions(f);
         h += '</div>';
       });
     }
     h += '</div>';
   });
+  h += '</div>';
+  h += '<div class="planner-calendar-shell"><h4 style="margin:18px 0 12px;font-size:15px">🗂️ Calendrier complet</h4>';
+  if (!planner.months.length) {
+    h += '<div class="empty-mini">Aucun rappel daté pour le moment.</div>';
+  } else {
+    planner.months.forEach(function(month) {
+      h += '<div class="planner-month"><div class="planner-month-title">' + esc(month.label) + '</div>';
+      month.items.forEach(function(item) {
+        var f = item.followup;
+        h += '<div class="planner-entry"><div class="planner-entry-main"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(f.NextAction || f.Outcome || 'Relance à préparer') + '</span></div><div class="planner-entry-side"><span>' + esc(item.reminder.displayDate) + '</span>' + renderPlannerActions(f) + '</div></div>';
+      });
+      h += '</div>';
+    });
+  }
   h += '</div></div></div></div></div>';
 
   // Panel: History
@@ -7122,7 +7475,7 @@ function rSuivi() {
     if (f.Status) h += '<span>Statut: <b>' + esc(f.Status) + '</b></span>';
     if (Number(f.Cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(f.Cost) + ' FCFA</span>';
     if (f.NextAction) h += '<span>Suite: <b>' + esc(f.NextAction) + '</b></span>';
-    h += '</div></div>';
+    h += '</div>' + renderPlannerActions(f) + '</div>';
   });
   h += '</div></div></div>';
 
@@ -7285,45 +7638,71 @@ function prefillSchool() {
   var expertName = currentUser ? currentUser.fullName : '';
   var workspaceRaw = expertName ? getWorkspaceRawForUser(expertName) : getVisibleRaw();
   var workspaceFollowups = expertName ? getWorkspaceFollowupsForUser(expertName) : getVisibleFollowups();
+  function setValue(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.value = value == null ? '' : String(value);
+  }
   if (sel.value === '__other__') {
     cw.style.display = '';
     if (nw) nw.style.display = '';
+    setValue('fuContact', '');
+    setValue('fuPhone', '');
+    setValue('fuCity', 'DOUALA');
+    setValue('fuSector', '');
+    setValue('fuSchoolType', 'Primaire');
+    setValue('fuCategory', 'STANDIG MOYEN');
+    setValue('fuEffectif', '');
+    setValue('fuRate', '');
+    setValue('fuQuartier', '');
+    setValue('fuLocation', '');
+    setValue('fuContactRole', '');
+    setValue('fuCurrentSystem', '');
+    setValue('fuProductType', '');
+    setValue('fuAppMode', '');
+    setValue('fuDecisionReach', '');
+    setValue('fuDecisionMaker', '');
+    setValue('fuInternetQuality', '');
+    setValue('fuPowerQuality', '');
+    setValue('fuRequestedModules', '');
+    setValue('fuSupportRequest', '');
+    setValue('fuPreferredChannel', '');
+    setValue('fuBudgetTiming', '');
+    setValue('fuCampusCount', '');
     document.getElementById('fuSchoolCustom').focus();
   } else {
     cw.style.display = 'none';
     if (nw) nw.style.display = '';
     var school = workspaceRaw.find(function(r) { return r.n === sel.value; });
     var record = getHistorySchoolRecordMap(workspaceRaw, workspaceFollowups)[schoolKey(sel.value)] || null;
-    if (school) {
-      document.getElementById('fuContact').value = school.rn || '';
-      document.getElementById('fuPhone').value = school.pw || school.pn || '';
-      document.getElementById('fuCity').value = school.v || 'DOUALA';
-      document.getElementById('fuSector').value = (school.v === 'YAOUNDE' ? school.sy : school.sd) || '';
-      if (document.getElementById('fuSchoolType')) document.getElementById('fuSchoolType').value = school.ty || 'Primaire';
-      if (document.getElementById('fuCategory')) document.getElementById('fuCategory').value = school.ca || 'STANDIG MOYEN';
-      if (document.getElementById('fuEffectif')) document.getElementById('fuEffectif').value = school.ef || '';
-      if (document.getElementById('fuRate')) document.getElementById('fuRate').value = typeof school.r === 'number' ? Math.round(school.r) : '';
-      if (document.getElementById('fuLocation')) document.getElementById('fuLocation').value = school.lo || '';
-      if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = school.rp || '';
-    }
-    if (record) {
-      if (document.getElementById('fuRate') && !document.getElementById('fuRate').value && record.rate != null) document.getElementById('fuRate').value = Math.round(record.rate);
-      if (document.getElementById('fuQuartier') && !document.getElementById('fuQuartier').value) document.getElementById('fuQuartier').value = record.quartier || (school ? school.lo || '' : '');
-      if (document.getElementById('fuCurrentSystem') && !document.getElementById('fuCurrentSystem').value) document.getElementById('fuCurrentSystem').value = record.currentSystem || '';
-      if (document.getElementById('fuProductType') && !document.getElementById('fuProductType').value) document.getElementById('fuProductType').value = record.productType || '';
-      if (document.getElementById('fuAppMode') && !document.getElementById('fuAppMode').value) document.getElementById('fuAppMode').value = record.appMode || '';
-      if (document.getElementById('fuDecisionReach') && !document.getElementById('fuDecisionReach').value) document.getElementById('fuDecisionReach').value = record.decisionReach || '';
-      if (document.getElementById('fuDecisionMaker') && !document.getElementById('fuDecisionMaker').value) document.getElementById('fuDecisionMaker').value = record.decisionMaker || '';
-      if (document.getElementById('fuInternetQuality') && !document.getElementById('fuInternetQuality').value) document.getElementById('fuInternetQuality').value = record.internetQuality || '';
-      if (document.getElementById('fuPowerQuality') && !document.getElementById('fuPowerQuality').value) document.getElementById('fuPowerQuality').value = record.powerQuality || '';
-      if (document.getElementById('fuRequestedModules') && !document.getElementById('fuRequestedModules').value) document.getElementById('fuRequestedModules').value = record.requestedModules || '';
-      if (document.getElementById('fuSupportRequest') && !document.getElementById('fuSupportRequest').value) document.getElementById('fuSupportRequest').value = record.supportRequest || '';
-      if (document.getElementById('fuPreferredChannel') && !document.getElementById('fuPreferredChannel').value) document.getElementById('fuPreferredChannel').value = record.preferredChannel || '';
-      if (document.getElementById('fuBudgetTiming') && !document.getElementById('fuBudgetTiming').value) document.getElementById('fuBudgetTiming').value = record.budgetTiming || '';
-      if (document.getElementById('fuCampusCount') && !document.getElementById('fuCampusCount').value) document.getElementById('fuCampusCount').value = record.campusCount || '';
-    } else if (document.getElementById('fuQuartier') && !document.getElementById('fuQuartier').value && school) {
-      document.getElementById('fuQuartier').value = school.lo || '';
-    }
+    var effectifValue = school && cleanMetaValue(school.ef)
+      ? school.ef
+      : ((record && Number(record.effectif) > 0) ? String(record.effectif) : '');
+    var rateValue = school && typeof school.r === 'number'
+      ? Math.round(school.r)
+      : (record && record.rate != null ? Math.round(record.rate) : '');
+    setValue('fuContact', (school && school.rn) || (record && record.contactName) || '');
+    setValue('fuPhone', (school && (school.pw || school.pn)) || (record && record.phone) || '');
+    setValue('fuCity', (school && school.v) || (record && record.city) || 'DOUALA');
+    setValue('fuSector', (school ? ((school.v === 'YAOUNDE' ? school.sy : school.sd) || '') : '') || (record && record.zone) || '');
+    setValue('fuSchoolType', (school && school.ty) || (record && record.type) || 'Primaire');
+    setValue('fuCategory', (school && school.ca) || (record && record.standing) || 'STANDIG MOYEN');
+    setValue('fuEffectif', effectifValue);
+    setValue('fuRate', rateValue);
+    setValue('fuQuartier', (record && record.quartier) || '');
+    setValue('fuLocation', (school && school.lo) || (record && record.location) || '');
+    setValue('fuContactRole', (school && school.rp) || (record && record.contactRole) || '');
+    setValue('fuCurrentSystem', (record && record.currentSystem) || '');
+    setValue('fuProductType', (record && record.productType) || '');
+    setValue('fuAppMode', (record && record.appMode) || '');
+    setValue('fuDecisionReach', (record && record.decisionReach) || '');
+    setValue('fuDecisionMaker', (record && record.decisionMaker) || '');
+    setValue('fuInternetQuality', (record && record.internetQuality) || '');
+    setValue('fuPowerQuality', (record && record.powerQuality) || '');
+    setValue('fuRequestedModules', (record && record.requestedModules) || '');
+    setValue('fuSupportRequest', (record && record.supportRequest) || '');
+    setValue('fuPreferredChannel', (record && record.preferredChannel) || '');
+    setValue('fuBudgetTiming', (record && record.budgetTiming) || '');
+    setValue('fuCampusCount', (record && record.campusCount) || '');
   }
   updateSchoolOwnershipNotice();
 }
@@ -7363,8 +7742,10 @@ function prefillFromSchool(name, contact, phone, city, sector) {
 }
 
 function showFollowupForm() {
+  resetFollowupFormMode();
   activateSuiviPanel('add', { scroll: true });
   updateEntryAutoFields();
+  updateSchoolOwnershipNotice();
   if (document.getElementById('fuSchool')) document.getElementById('fuSchool').focus();
 }
 
@@ -7409,6 +7790,8 @@ async function submitFollowup() {
   var beforeSnapshot = buildVisibleFunnelSnapshot();
   var capturedAt = new Date();
   var entryTimestamp = capturedAt.toISOString();
+  var editableExisting = followupEditMode === 'edit' ? getEditableLocalFollowupById(followupEditId) : null;
+  var existingMeta = editableExisting ? readFollowupMeta(editableExisting) : null;
   var questionnaireMeta = {
     rate: document.getElementById('fuRate').value.trim(),
     institutionLevel: document.getElementById('fuSchoolType').value,
@@ -7425,7 +7808,9 @@ async function submitFollowup() {
     budgetTiming: document.getElementById('fuBudgetTiming').value,
     preferredChannel: document.getElementById('fuPreferredChannel').value,
     campusCount: document.getElementById('fuCampusCount').value.trim(),
-    callStart: formatAutoEntryTime(capturedAt),
+    callStart: editableExisting
+      ? (cleanMetaValue(existingMeta && existingMeta.callStart) || editableExisting.CallStart || formatAutoEntryTime(editableExisting.Timestamp || capturedAt))
+      : formatAutoEntryTime(capturedAt),
     callDuration: document.getElementById('fuCallDuration').value,
     callRating: document.getElementById('fuCallRating').value.trim(),
     callTimesCalled: document.getElementById('fuTimesCalled').value.trim(),
@@ -7436,8 +7821,9 @@ async function submitFollowup() {
     prospectionYear: document.getElementById('fuProspectionYear').value.trim()
   };
   var data = {
-    action: 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
-    timestamp: entryTimestamp,
+    action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
+    id: editableExisting ? editableExisting.ID : '',
+    timestamp: editableExisting ? (editableExisting.Timestamp || entryTimestamp) : entryTimestamp,
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
@@ -7557,6 +7943,7 @@ async function submitFollowup() {
     document.getElementById('fuProspectionYear').value = '';
     document.getElementById('fuQuartier').value = '';
     document.getElementById('fuSector').value = '';
+    resetFollowupFormMode();
     updateSchoolOwnershipNotice();
     suiviPreferredTab = 'history';
     rSuivi();
@@ -7607,6 +7994,7 @@ async function submitNewSchoolDirect() {
     decisionMaker: document.getElementById('nsDecisionMaker').value.trim(),
     internetQuality: document.getElementById('nsInternetQuality').value,
     powerQuality: document.getElementById('nsPowerQuality').value,
+    campusCount: document.getElementById('nsCampusCount').value.trim(),
     supportRequest: document.getElementById('nsSupportRequest').value.trim(),
     requestedModules: document.getElementById('nsRequestedModules').value.trim(),
     budgetTiming: document.getElementById('nsBudgetTiming').value,
@@ -7669,6 +8057,8 @@ async function submitNewSchoolDirect() {
     budgetTiming: questionnaireMeta.budgetTiming,
     PreferredChannel: questionnaireMeta.preferredChannel,
     preferredChannel: questionnaireMeta.preferredChannel,
+    CampusCount: questionnaireMeta.campusCount,
+    campusCount: questionnaireMeta.campusCount,
     CallStart: questionnaireMeta.callStart,
     callStart: questionnaireMeta.callStart,
     CallDuration: questionnaireMeta.callDuration,
@@ -7722,6 +8112,7 @@ async function submitNewSchoolDirect() {
     document.getElementById('nsAppMode').selectedIndex = 0;
     document.getElementById('nsInternetQuality').selectedIndex = 0;
     document.getElementById('nsPowerQuality').selectedIndex = 0;
+    document.getElementById('nsCampusCount').value = '';
     document.getElementById('nsDecisionReach').selectedIndex = 0;
     document.getElementById('nsDecisionMaker').value = '';
     document.getElementById('nsRequestedModules').value = '';
