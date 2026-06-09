@@ -5386,7 +5386,7 @@ function mergeUserRecord(user) {
 }
 
 function getAllUsers() {
-  var sourceUsers = Array.isArray(serverUsers) && serverUsers.length ? serverUsers : DEFAULT_USERS.concat(invitedUsers);
+  var sourceUsers = Array.isArray(serverUsers) && serverUsers.length ? serverUsers : DEFAULT_USERS.concat(Array.isArray(invitedUsers) ? invitedUsers : []);
   return sourceUsers.map(mergeUserRecord);
 }
 
@@ -5611,7 +5611,7 @@ function buildImportedSheetFollowups() {
 }
 
 function getAllFollowups() {
-  return importedSheetFollowups.concat(suiviFollowups);
+  return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
 }
 
 function getVisibleFollowups() {
