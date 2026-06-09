@@ -1,0 +1,17 @@
+[Unit]
+Description=Nateiva Sale Analytic API
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/nateiva-sale-analytic-api
+EnvironmentFile=/etc/nateiva-sale-analytic/nateiva-sale-analytic-api.env
+ExecStart=/usr/bin/node /var/www/nateiva-sale-analytic-api/src/server.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/nateiva-sale-analytic/api.log
+StandardError=append:/var/log/nateiva-sale-analytic/api-error.log
+
+[Install]
+WantedBy=multi-user.target
