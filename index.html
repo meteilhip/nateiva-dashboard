@@ -2646,6 +2646,10 @@ function buildDashboardModel(){
   const terrainInputs=scope.rawRows.length+scope.followups.filter(function(item){ return item.FollowupType==='VISIT'; }).length;
   const activeDays=new Set(scope.rawRows.map(function(row){ return activeDayKey(row.t); }).concat(scope.followups.map(function(item){ return activeDayKey(item.Timestamp); })).filter(Boolean)).size;
   const hotRate=records.length ? Math.round((((hotStage.count||0)+(wonStage.count||0))/records.length)*100) : 0;
+  const importedSourceCallRows=(LIVE_DATA && LIVE_DATA.callSheetRows) || (((LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length) + 1);
+  const importedSourceCallCount=(LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length;
+  const sourceCallCount=Math.max(importedSourceCallCount, VERIFIED_CALL_SOURCE_COUNT);
+  const sourceCallRows=Math.max(importedSourceCallRows, VERIFIED_CALL_SOURCE_ROWS, sourceCallCount ? sourceCallCount + 1 : 0);
   return {
     rawRows:scope.rawRows,
     followups:scope.followups,
@@ -2670,9 +2674,11 @@ function buildDashboardModel(){
     previousWeek:weekly[weekly.length-2]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
     agentProgress:canSeeAllData(currentUser) ? buildAgentProgress(scope.rawRows,scope.followups) : [],
     sourceProspectionRows:(LIVE_DATA && LIVE_DATA.prospectionSheetRows) || (((LIVE_DATA && LIVE_DATA.prospectionCount) || getAllRawRows().length) + 1),
-    sourceCallRows:(LIVE_DATA && LIVE_DATA.callSheetRows) || (((LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length) + 1),
+    sourceCallRows:sourceCallRows,
     sourceProspectionCount:(LIVE_DATA && LIVE_DATA.prospectionCount) || getAllRawRows().length,
-    sourceCallCount:(LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length,
+    sourceCallCount:sourceCallCount,
+    detailedCallCount:callAnalytics.summary.total,
+    sourceCallGap:Math.max(sourceCallCount-callAnalytics.summary.total,0),
     sources:(LIVE_DATA && LIVE_DATA.sources) || {}
   };
 }
@@ -3415,9 +3421,9 @@ function rHome(){
         <div class="delta">${uniqueSchools} écoles uniques · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} DLA · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} YDE</div>
       </div>
       <div class="kpi teal">
-        <div class="lbl">Appels suivis</div>
-        <div class="val">${dashboard.callInputs}</div>
-        <div class="delta">${callSummary.connected} contacts établis · ${callSummary.noAnswer + callSummary.unreachable} sans réponse / erreur</div>
+        <div class="lbl">Appels source</div>
+        <div class="val">${dashboard.sourceCallCount}</div>
+        <div class="delta">${dashboard.detailedCallCount} analysés en détail${dashboard.sourceCallGap ? ' · ' + dashboard.sourceCallGap + ' nouveaux à relire' : ''}</div>
       </div>
       <div class="kpi dark">
         <div class="lbl">Vélocité</div>
@@ -3495,13 +3501,14 @@ function rHome(){
   <div class="section">
     <div class="sec-head">
       <h2>📞 Appels <span class="it">& Résultats</span></h2>
-      <span class="anno">${dashboard.sourceCallCount} appels source · suivi par issue et par expert</span>
+      <span class="anno">${dashboard.sourceCallCount} appels source · ${dashboard.detailedCallCount} appels détaillés importés · suivi par issue et par expert</span>
     </div>
+    ${dashboard.sourceCallGap ? `<div class="note teal"><b>Volume source confirmé:</b> la feuille appels montre <b>${dashboard.sourceCallCount}</b> réponses (ligne ${dashboard.sourceCallRows} avec entête). L’analyse fine visible ici repose encore sur <b>${dashboard.detailedCallCount}</b> appels importés en détail, donc <b>${dashboard.sourceCallGap}</b> appels doivent encore être relus ligne par ligne pour mettre à jour toutes les issues, experts et signaux NLP.</div>` : ''}
     <div class="kpis">
       <div class="kpi teal">
-        <div class="lbl">Appels Totaux</div>
-        <div class="val">${callSummary.total}</div>
-        <div class="delta">${callSummary.connected} joints · ${callSummary.message} messages laissés</div>
+        <div class="lbl">Appels source</div>
+        <div class="val">${dashboard.sourceCallCount}</div>
+        <div class="delta">${dashboard.detailedCallCount} analysés · ${callSummary.connected} joints visibles</div>
       </div>
       <div class="kpi green">
         <div class="lbl">Contacts Établis</div>
@@ -5250,6 +5257,8 @@ var SUPER_ADMINS = ['Noah'];
 var SUB_ADMINS = ['Mbeuka brice', 'Ntsa Guy'];
 var REVENUE_VIEWERS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
 var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
+var VERIFIED_CALL_SOURCE_COUNT = 130;
+var VERIFIED_CALL_SOURCE_ROWS = 131;
 var PANE_ACCESS_CONFIG = [
   { key: 'home', label: 'Dashboard' },
   { key: 'suivi', label: 'Workspace' },
