@@ -1301,7 +1301,7 @@ body{
 }
 .suivi-name{font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--ink)}
 .suivi-role{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g500);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-.suivi-actions{display:flex;gap:10px}
+.suivi-actions{display:flex;gap:10px;align-items:center}
 .suivi-actions button{
   padding:10px 18px;border:1.5px solid var(--g200);background:var(--paper);
   color:var(--ink);border-radius:10px;cursor:pointer;font-family:'JetBrains Mono',monospace;
@@ -1313,6 +1313,50 @@ body{
   color:var(--paper);border-color:var(--red-deep);box-shadow:var(--shadow-red);
 }
 .suivi-actions button.primary:hover{transform:translateY(-2px)}
+.workspace-action-center{
+  margin:22px auto 20px;max-width:980px;padding:24px 26px;border-radius:24px;
+  border:1.5px solid rgba(220,38,38,.14);
+  background:linear-gradient(135deg, rgba(255,245,245,.98), rgba(255,255,255,.98));
+  box-shadow:0 18px 40px rgba(15,23,42,.08);text-align:center
+}
+.workspace-action-copy{
+  max-width:720px;margin:0 auto 18px
+}
+.workspace-action-copy h3{
+  margin:0 0 8px;font-family:'Fraunces',serif;font-size:28px;color:var(--ink)
+}
+.workspace-action-copy p{
+  margin:0;font-size:14px;line-height:1.7;color:var(--g600)
+}
+.workspace-primary-actions{
+  display:flex;justify-content:center;gap:16px;flex-wrap:wrap
+}
+.workspace-cta{
+  min-width:280px;max-width:360px;flex:1 1 280px;border:none;border-radius:22px;
+  padding:22px 20px;background:linear-gradient(135deg, var(--red), var(--red-deep));
+  color:var(--paper);box-shadow:0 16px 36px rgba(220,38,38,.26);cursor:pointer;
+  transition:transform .2s ease, box-shadow .2s ease;text-align:center
+}
+.workspace-cta:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(220,38,38,.32)}
+.workspace-cta .eyebrow{
+  display:block;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;opacity:.82;margin-bottom:10px
+}
+.workspace-cta strong{
+  display:block;font-size:24px;line-height:1.1;margin-bottom:8px;color:var(--paper)
+}
+.workspace-cta small{
+  display:block;font-size:13px;line-height:1.55;color:rgba(255,255,255,.9)
+}
+.workspace-cta.alt{
+  background:linear-gradient(135deg, #ef4444, #991b1b);
+}
+.workspace-action-note{
+  margin-top:16px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap
+}
+.workspace-action-note .timeline-pill{
+  background:rgba(255,255,255,.82)
+}
 
 .suivi-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
 .suivi-kpi{
@@ -1514,6 +1558,9 @@ body{
 }
 @media (max-width: 900px){
   .planner-shell{grid-template-columns:1fr}
+  .workspace-action-center{padding:20px 16px}
+  .workspace-primary-actions{flex-direction:column}
+  .workspace-cta{max-width:none;width:100%}
 }
 
 .suivi-tabs{
@@ -5341,6 +5388,7 @@ var VERIFIED_CALL_SOURCE_COUNT = 130;
 var VERIFIED_CALL_SOURCE_ROWS = 131;
 var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
 var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
+var suiviPreferredTab = 'planner';
 var PANE_ACCESS_CONFIG = [
   { key: 'home', label: 'Dashboard' },
   { key: 'suivi', label: 'Workspace' },
@@ -6064,6 +6112,47 @@ function computeExpertStats(expertName) {
   return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
+function computeVisibleWorkspaceStats() {
+  var rawData = getVisibleRaw();
+  var fuData = getVisibleFollowups();
+  var daySet = new Set();
+  rawData.forEach(function(r) {
+    var day = activeDayKey(r.t);
+    if (day) daySet.add(day);
+  });
+  fuData.forEach(function(f) {
+    var day = activeDayKey(f.Timestamp);
+    if (day) daySet.add(day);
+  });
+  var totalProspections = rawData.length;
+  var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
+  var avgRate = rawData.length ? Math.round(rawData.reduce(function(s, r) { return s + (r.r || 0); }, 0) / rawData.length) : 0;
+  var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
+  var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
+  var converted = 0, inProgress = 0, relance = 0;
+  var schoolsFollowed = new Set();
+  fuData.forEach(function(f) {
+    if (f.FollowupType === 'CALL') {
+      calls++;
+      var callBucket = categorizeCallStatus(f);
+      if (callBucket === 'connected') callConnected++;
+      else if (callBucket === 'message') callMessage++;
+      else if (callBucket === 'no_answer') callNoAnswer++;
+      else if (callBucket === 'unreachable') callUnreachable++;
+      else callOther++;
+    } else if (f.FollowupType === 'WHATSAPP') whatsapp++;
+    else if (f.FollowupType === 'SMS') sms++;
+    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
+    if (f.Status === 'Converti') converted++;
+    else if (f.Status === 'En cours') inProgress++;
+    else if (f.Status === 'Relance') relance++;
+    schoolsFollowed.add(f.SchoolName);
+  });
+  var totalFollowups = calls + whatsapp + sms + visits;
+  var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
+  return { daysOnField: daySet.size, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+}
+
 function canDeleteFollowups(user) {
   if (!user) return false;
   var username = typeof user === 'string' ? user : (user.username || '');
@@ -6400,7 +6489,7 @@ function rSuivi() {
   var isSuper = canSeeAllData(currentUser);
   var canAdminUsers = canManageUsers(currentUser);
   var roleLabel = roleBadgeLabel(currentUser);
-  var stats = computeExpertStats(me);
+  var stats = isSuper ? computeVisibleWorkspaceStats() : computeExpertStats(me);
   var myRank = suiviRankings.find(function(r) { return samePerson(r.expert, me); });
   var myFollowups = getVisibleFollowups().sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
   var rankingRows = isSuper ? suiviRankings : suiviRankings.filter(function(r) { return samePerson(r.expert, me); });
@@ -6423,9 +6512,8 @@ function rSuivi() {
   h += '<div class="suivi-avatar">' + me.charAt(0).toUpperCase() + '</div>';
   h += '<div><div class="suivi-name">' + esc(me) + '</div>';
   h += '<div class="suivi-role">' + roleLabel + ' · ' + esc(currentUser.city) + '</div></div>';
-  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
+  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> ' + (isSuper ? 'jours actifs scope' : 'jours sur le terrain') + '</div>';
   h += '</div><div class="suivi-actions">';
-  h += '<button class="primary" onclick="showFollowupForm()">+ Nouveau suivi</button>';
   if (canAdminUsers) h += '<button onclick="showInviteForm()">+ Inviter</button>';
   h += '<button onclick="doLogout()">Déconnexion</button>';
   h += '</div></div>';
@@ -6441,6 +6529,18 @@ function rSuivi() {
   h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
   h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
   h += '</div>';
+
+  h += '<div class="workspace-action-center">';
+  h += '<div class="workspace-action-copy"><h3>🎯 Actions principales</h3><p>Les deux actions les plus importantes restent seules au centre: créer un nouveau suivi ou enregistrer une nouvelle école. Chaque saisie remonte ensuite dans l’historique, le rappel calendrier et l’impact funnel.</p></div>';
+  h += '<div class="workspace-primary-actions">';
+  h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l’effet sur le funnel.</small></button>';
+  h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle école</strong><small>Créez une fiche école claire avec contact, zone, standing et base de relance.</small></button>';
+  h += '</div>';
+  h += '<div class="workspace-action-note">';
+  h += '<span class="timeline-pill">🧭 Process map · saisie → historique → rappel → funnel</span>';
+  h += '<span class="timeline-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '">⏰ ' + planner.urgent.length + ' rappels proches</span>';
+  h += '<span class="timeline-pill">🗂️ ' + myFollowups.length + ' entrées visibles</span>';
+  h += '</div></div>';
 
   if (lastImpact) {
     h += '<div class="impact-summary"><div><h3>🧭 Dernier impact enregistré</h3><p>Chaque saisie vous montre l’école touchée, le moment exact, la suite commerciale et la conséquence sur votre entonnoir.</p></div>';
@@ -6461,8 +6561,6 @@ function rSuivi() {
 
   // Sub-tabs
   h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab act" data-stab="add">+ Nouveau suivi</button>';
-  h += '<button class="suivi-tab" data-stab="addschool">+ Nouvelle École</button>';
   h += '<button class="suivi-tab" data-stab="planner">Rappels & semaine</button>';
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
@@ -6472,7 +6570,7 @@ function rSuivi() {
   h += '</div>';
 
   // Panel: Add followup
-  h += '<div class="suivi-panel act" id="stab-add"><div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
+  h += '<div class="suivi-panel" id="stab-add"><div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">' + (isSuper ? 'Vous pouvez traiter tous les portefeuilles autorisés et débloquer les écoles déjà prises.' : 'Vous voyez seulement vos écoles. Si une école existe déjà chez un autre expert, le système vous bloquera et vous guidera vers un sous-admin ou le super admin.') + '</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
@@ -6742,11 +6840,7 @@ function rSuivi() {
   // Bind sub-tab clicks
   el.querySelectorAll('.suivi-tab').forEach(function(tab) {
     tab.onclick = function() {
-      el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-      el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-      tab.classList.add('act');
-      var panel = el.querySelector('#stab-' + tab.dataset.stab);
-      if (panel) panel.classList.add('act');
+      activateSuiviPanel(tab.dataset.stab);
     };
   });
 
@@ -6766,6 +6860,7 @@ function rSuivi() {
     customSchoolInput.onblur = updateSchoolOwnershipNotice;
   }
   updateSchoolOwnershipNotice();
+  activateSuiviPanel(suiviPreferredTab || 'planner');
 }
 
 function prefillSchool() {
@@ -6790,6 +6885,28 @@ function prefillSchool() {
   updateSchoolOwnershipNotice();
 }
 
+function activateSuiviPanel(panelKey, options) {
+  var el = document.getElementById('p-suivi');
+  if (!el) return;
+  var config = options || {};
+  var target = panelKey || 'planner';
+  var panel = el.querySelector('#stab-' + target);
+  var tab = el.querySelector('.suivi-tab[data-stab="' + target + '"]');
+  if (!panel) {
+    target = 'planner';
+    panel = el.querySelector('#stab-planner');
+    tab = el.querySelector('.suivi-tab[data-stab="planner"]');
+  }
+  suiviPreferredTab = target;
+  el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
+  el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
+  if (tab) tab.classList.add('act');
+  if (panel) panel.classList.add('act');
+  if (config.scroll && panel) {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 function prefillFromSchool(name, contact, phone, city, sector) {
   var sel = document.getElementById('fuSchool');
   var nw = document.getElementById('newSchoolInfoWrap');
@@ -6800,29 +6917,22 @@ function prefillFromSchool(name, contact, phone, city, sector) {
   if (document.getElementById('fuCity')) document.getElementById('fuCity').value = city || 'DOUALA';
   if (document.getElementById('fuSector')) document.getElementById('fuSector').value = sector || '';
   updateSchoolOwnershipNotice();
-  document.getElementById('stab-add').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  activateSuiviPanel('add', { scroll: true });
 }
 
 function showFollowupForm() {
-  var el = document.getElementById('p-suivi');
-  el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-  el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-  var at = el.querySelector('.suivi-tab[data-stab="add"]');
-  var ap = el.querySelector('#stab-add');
-  if (at) at.classList.add('act');
-  if (ap) ap.classList.add('act');
-  document.getElementById('followupForm').scrollIntoView({ behavior: 'smooth' });
+  activateSuiviPanel('add', { scroll: true });
+  if (document.getElementById('fuSchool')) document.getElementById('fuSchool').focus();
+}
+
+function showNewSchoolForm() {
+  activateSuiviPanel('addschool', { scroll: true });
+  if (document.getElementById('nsSchoolName')) document.getElementById('nsSchoolName').focus();
 }
 
 function showInviteForm() {
   if (!canManageUsers(currentUser)) { showToast('Accès réservé à la gestion utilisateurs', true); return; }
-  var el = document.getElementById('p-suivi');
-  el.querySelectorAll('.suivi-tab').forEach(function(t) { t.classList.remove('act'); });
-  el.querySelectorAll('.suivi-panel').forEach(function(p) { p.classList.remove('act'); });
-  var t = el.querySelector('.suivi-tab[data-stab="invite"]');
-  var p = el.querySelector('#stab-invite');
-  if (t) t.classList.add('act');
-  if (p) p.classList.add('act');
+  activateSuiviPanel('invite', { scroll: true });
 }
 
 async function deleteFollowupEntry(id) {
@@ -6835,6 +6945,7 @@ async function deleteFollowupEntry(id) {
       await refreshSyncedState();
     }
     setEntryImpactForUser(currentUser && currentUser.username, null);
+    suiviPreferredTab = 'history';
     rSuivi();
   } else {
     showToast((res && res.error) || 'Suppression impossible', true);
@@ -6909,7 +7020,9 @@ async function submitFollowup() {
     document.getElementById('fuStatus').selectedIndex = 0;
     document.getElementById('fuSector').value = '';
     updateSchoolOwnershipNotice();
+    suiviPreferredTab = 'history';
     rSuivi();
+    activateSuiviPanel('history', { scroll: true });
   } else { showToast(res.error || 'Erreur', true); }
 }
 
@@ -6995,7 +7108,9 @@ async function submitNewSchoolDirect() {
     document.getElementById('nsContactPhone').value = '';
     document.getElementById('nsContactRole').value = '';
     
+    suiviPreferredTab = 'history';
     rSuivi();
+    activateSuiviPanel('history', { scroll: true });
   } else {
     showToast(res.error || 'Erreur', true);
   }
