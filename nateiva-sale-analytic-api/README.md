@@ -25,6 +25,7 @@ Core names to preserve:
 - `POST /api/auth/login`
 - `GET /api/bootstrap`
 - `POST /api/followups`
+- `DELETE /api/followups/:id` (Noah only)
 - `POST /api/users`
 - `POST /api/users/access`
 - `POST /api/sync/local-state`

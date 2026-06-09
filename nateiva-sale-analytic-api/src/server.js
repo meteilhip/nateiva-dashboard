@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
@@ -47,6 +47,10 @@ function canManageUsers(viewer) {
 
 function canManageAccess(viewer) {
   return !!viewer && viewer.role === "SuperAdmin";
+}
+
+function canDeleteFollowup(viewer) {
+  return !!viewer && viewer.role === "SuperAdmin" && String(viewer.username || "").trim().toLowerCase() === "noah";
 }
 
 app.get("/health", function healthHandler(req, res) {
@@ -98,6 +102,7 @@ app.post("/api/followups", authRequired, async function createFollowupHandler(re
     const viewer = await loadViewer(req);
     const followup = await upsertFollowup({
       ...req.body,
+      Timestamp: req.body.timestamp || req.body.Timestamp || new Date().toISOString(),
       Expert: req.body.expert || req.body.Expert || viewer.fullName,
       SchoolName: req.body.schoolName || req.body.SchoolName || "",
       ContactName: req.body.contactName || req.body.ContactName || "",
@@ -120,6 +125,22 @@ app.post("/api/followups", authRequired, async function createFollowupHandler(re
       DeviceId: req.body.deviceId || ""
     });
     return res.json({ success: true, followup });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/followups/:id", authRequired, async function deleteFollowupHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    if (!canDeleteFollowup(viewer)) {
+      return res.status(403).json({ success: false, error: "Seul Noah peut supprimer une entrÃ©e" });
+    }
+    const deleted = await deleteFollowup(String(req.params.id || "").trim(), viewer.username);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: "EntrÃ©e introuvable" });
+    }
+    return res.json({ success: true, message: "EntrÃ©e supprimÃ©e", followup: deleted });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

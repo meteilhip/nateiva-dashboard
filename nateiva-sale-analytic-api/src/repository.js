@@ -113,8 +113,8 @@ async function updateUserAccess(username, patch) {
 
 async function listVisibleFollowups(viewer) {
   const sql = viewer.permissions.dataScope === "all"
-    ? `SELECT * FROM followups ORDER BY event_timestamp DESC, id DESC`
-    : `SELECT * FROM followups WHERE LOWER(expert) = LOWER(?) OR LOWER(created_by_username) = LOWER(?) ORDER BY event_timestamp DESC, id DESC`;
+    ? `SELECT * FROM followups WHERE deleted_at IS NULL ORDER BY event_timestamp DESC, id DESC`
+    : `SELECT * FROM followups WHERE deleted_at IS NULL AND (LOWER(expert) = LOWER(?) OR LOWER(created_by_username) = LOWER(?)) ORDER BY event_timestamp DESC, id DESC`;
   const params = viewer.permissions.dataScope === "all" ? [] : [viewer.fullName, viewer.username];
   const rows = await query(sql, params);
   return rows.map(mapFollowup);
@@ -176,6 +176,25 @@ async function upsertFollowup(input) {
   return mapFollowup(rows[0]);
 }
 
+async function deleteFollowup(serverUid, deletedByUsername) {
+  const rows = await query(
+    `SELECT * FROM followups
+     WHERE server_uid = ?
+     LIMIT 1`,
+    [serverUid]
+  );
+  if (!rows.length) return null;
+  await query(
+    `UPDATE followups
+     SET deleted_at = CURRENT_TIMESTAMP,
+         deleted_by_username = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE server_uid = ?`,
+    [deletedByUsername || "", serverUid]
+  );
+  return mapFollowup(rows[0]);
+}
+
 async function logSyncEvent(entry) {
   await query(
     `INSERT INTO sync_events (username, device_id, sync_type, payload_json)
@@ -206,6 +225,7 @@ module.exports = {
   createUser,
   updateUserAccess,
   upsertFollowup,
+  deleteFollowup,
   logSyncEvent,
   getBootstrapPayload
 };

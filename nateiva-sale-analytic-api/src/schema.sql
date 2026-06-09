@@ -44,12 +44,15 @@ CREATE TABLE IF NOT EXISTS followups (
   device_id VARCHAR(120) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  deleted_by_username VARCHAR(120) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
   UNIQUE KEY followups_server_uid_unique (server_uid),
   UNIQUE KEY followups_fingerprint_unique (fingerprint),
   KEY followups_legacy_id_idx (legacy_id),
   KEY followups_expert_idx (expert),
-  KEY followups_school_idx (school_name)
+  KEY followups_school_idx (school_name),
+  KEY followups_deleted_at_idx (deleted_at)
 );
 
 CREATE TABLE IF NOT EXISTS sync_events (

@@ -1435,6 +1435,86 @@ body{
 .fu-footer{display:flex;gap:16px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g500)}
 .fu-footer b{color:var(--ink)}
 .fu-cost{color:var(--red);font-weight:700}
+.fu-impact{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.impact-pill,.timeline-pill,.delete-entry-btn,.planner-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.04em;
+  border:1px solid var(--g200);background:var(--g50);color:var(--g700)
+}
+.impact-pill strong,.timeline-pill strong,.planner-chip strong{color:var(--ink)}
+.impact-pill.stage{background:var(--teal-soft);color:var(--teal-deep);border-color:rgba(13,148,136,.18)}
+.impact-pill.delta{background:var(--saffron-soft);color:var(--saffron-deep);border-color:rgba(217,119,6,.18)}
+.impact-pill.meta{background:var(--green-soft);color:var(--green);border-color:rgba(5,150,105,.18)}
+.followup-process{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0 0
+}
+.process-box{
+  background:linear-gradient(135deg, rgba(255,255,255,.98), rgba(245,247,250,.95));
+  border:1.5px solid var(--g200);border-radius:14px;padding:12px 14px;min-height:94px
+}
+.process-box .eyebrow,.planner-day .eyebrow,.impact-summary .eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--g500);margin-bottom:8px
+}
+.process-box strong,.impact-summary strong{display:block;font-size:14px;color:var(--ink);margin-bottom:6px}
+.process-box p,.impact-summary p,.planner-card p{font-size:12px;color:var(--g600);line-height:1.55;margin:0}
+.impact-summary{
+  margin:18px 0;padding:18px 20px;border-radius:18px;border:1.5px solid rgba(13,148,136,.18);
+  background:linear-gradient(135deg, rgba(240,253,250,.96), rgba(255,255,255,.98));
+  box-shadow:var(--shadow-sm)
+}
+.impact-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:14px}
+.history-tools{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px
+}
+.history-tools .mini-note{font-size:12px;color:var(--g500);line-height:1.6}
+.timeline-pill.alert{background:rgba(220,38,38,.08);color:var(--red);border-color:rgba(220,38,38,.18)}
+.delete-entry-btn{
+  background:rgba(220,38,38,.08);color:var(--red);border-color:rgba(220,38,38,.16);
+  cursor:pointer;transition:all .2s
+}
+.delete-entry-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.planner-shell{
+  display:grid;grid-template-columns:1.2fr 1.8fr;gap:16px;margin-top:18px
+}
+.planner-summary,.planner-board{
+  background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;padding:18px 20px
+}
+.planner-alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0 18px}
+.planner-stat{
+  border:1.5px solid var(--g200);border-radius:14px;background:var(--bg-warm);
+  padding:12px 14px
+}
+.planner-stat .val{font-family:'Fraunces',serif;font-size:30px;line-height:1;color:var(--red)}
+.planner-stat .lbl{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--g500);margin-top:6px}
+.planner-week{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.planner-day{
+  border:1.5px solid var(--g200);border-radius:16px;background:linear-gradient(135deg, rgba(255,255,255,.98), rgba(248,250,252,.96));padding:14px;min-height:170px
+}
+.planner-day.today{border-color:rgba(13,148,136,.24);box-shadow:0 0 0 3px rgba(13,148,136,.08)}
+.planner-day.overdue{border-color:rgba(220,38,38,.2);background:linear-gradient(135deg, rgba(254,242,242,.98), rgba(255,255,255,.98))}
+.planner-day h4{font-size:14px;margin:0 0 6px;color:var(--ink)}
+.planner-day .count{font-family:'Fraunces',serif;font-size:26px;line-height:1;color:var(--ink);margin-bottom:10px}
+.planner-card{
+  border:1px solid var(--g200);border-radius:12px;background:var(--paper);padding:10px 11px;margin-bottom:10px
+}
+.planner-card:last-child{margin-bottom:0}
+.planner-card strong{display:block;font-size:13px;color:var(--ink);margin-bottom:4px}
+.planner-card .planner-meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.planner-chip.overdue,.timeline-pill.overdue{background:rgba(220,38,38,.1);color:var(--red);border-color:rgba(220,38,38,.2)}
+.planner-chip.urgent,.timeline-pill.urgent{background:rgba(217,119,6,.12);color:var(--saffron-deep);border-color:rgba(217,119,6,.18)}
+.planner-chip.soon,.timeline-pill.soon{background:rgba(13,148,136,.1);color:var(--teal-deep);border-color:rgba(13,148,136,.18)}
+.planner-chip.future,.timeline-pill.future{background:var(--g50);color:var(--g600)}
+.reminder-blink{
+  animation:reminderBlink 1.15s linear infinite;
+}
+@keyframes reminderBlink{
+  0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.0);opacity:1}
+  45%{box-shadow:0 0 0 7px rgba(220,38,38,.08);opacity:.82}
+  70%{opacity:1}
+}
+@media (max-width: 900px){
+  .planner-shell{grid-template-columns:1fr}
+}
 
 .suivi-tabs{
   display:flex;gap:8px;margin:20px 0;padding:6px;background:var(--g100);border-radius:14px;flex-wrap:wrap;
@@ -5259,6 +5339,8 @@ var REVENUE_VIEWERS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
 var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
 var VERIFIED_CALL_SOURCE_COUNT = 130;
 var VERIFIED_CALL_SOURCE_ROWS = 131;
+var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
+var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
 var PANE_ACCESS_CONFIG = [
   { key: 'home', label: 'Dashboard' },
   { key: 'suivi', label: 'Workspace' },
@@ -5311,6 +5393,23 @@ function setServerUsers(users) {
 function setSyncedFollowups(followups) {
   suiviFollowups = Array.isArray(followups) ? followups : [];
   localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+}
+
+function persistEntryImpacts() {
+  localStorage.setItem(ENTRY_IMPACT_STORAGE_KEY, JSON.stringify(entryImpactByUser || {}));
+}
+
+function getEntryImpactForUser(username) {
+  if (!username || !entryImpactByUser || typeof entryImpactByUser !== 'object') return null;
+  return entryImpactByUser[username] || null;
+}
+
+function setEntryImpactForUser(username, impact) {
+  if (!username) return;
+  entryImpactByUser = entryImpactByUser && typeof entryImpactByUser === 'object' ? entryImpactByUser : {};
+  if (impact) entryImpactByUser[username] = impact;
+  else delete entryImpactByUser[username];
+  persistEntryImpacts();
 }
 
 function allPaneKeys() { return PANE_ACCESS_CONFIG.map(function(item) { return item.key; }); }
@@ -5455,6 +5554,13 @@ function getBaseRawRows() {
   return imported && imported.length ? imported : RAW;
 }
 
+function shouldCreateSchoolFromFollowup(followup) {
+  if (!followup) return false;
+  if (followup.Source === 'calls-sheet' || followup.Imported) return false;
+  if (followup.FollowupType === 'CREATION') return true;
+  return !!(followup.SchoolType || followup.Category || followup.Effectif || followup.Location || followup.ContactRole);
+}
+
 function buildNewSchoolsFromFollowups() {
   var base = getBaseRawRows();
   var seen = {};
@@ -5467,6 +5573,7 @@ function buildNewSchoolsFromFollowups() {
   var allFollowups = getAllFollowups();
   for (var j = 0; j < allFollowups.length; j++) {
     var f = allFollowups[j];
+    if (!shouldCreateSchoolFromFollowup(f)) continue;
     var sName = f.SchoolName || '';
     var sKey = schoolKey(sName);
     if (!sKey || seen[sKey]) continue;
@@ -5722,6 +5829,15 @@ async function apiPost(data) {
   } catch (e) { return localFallback(data.action, data); }
 }
 
+async function apiDeleteFollowup(id) {
+  if (isBackendConfigured()) {
+    try {
+      return await backendRequest('/api/followups/' + encodeURIComponent(id), { method: 'DELETE' });
+    } catch (e) {}
+  }
+  return localFallback('deleteFollowup', { id: id });
+}
+
 async function refreshSyncedState() {
   if (!currentUser || !nateivaApiToken || !isBackendConfigured()) return { success: false };
   var res = await apiCall('bootstrap', {});
@@ -5762,7 +5878,7 @@ function localFallback(action, params) {
       if (!schoolValidation.ok) return { success: false, error: schoolValidation.message };
       var fu = {
         ID: 'FU-' + Date.now(),
-        Timestamp: new Date().toISOString(),
+        Timestamp: params.timestamp || params.Timestamp || new Date().toISOString(),
         Expert: params.expert,
         SchoolName: params.schoolName,
         ContactName: params.contactName || '',
@@ -5784,7 +5900,15 @@ function localFallback(action, params) {
       };
       suiviFollowups.push(fu);
       localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
-      return { success: true, id: fu.ID, message: 'Suivi ajouté avec succès' };
+      return { success: true, id: fu.ID, followup: fu, message: 'Suivi ajouté avec succès' };
+    }
+    case 'deleteFollowup': {
+      if (!canDeleteFollowups(currentUser)) return { success: false, error: 'Seul Noah peut supprimer une entrée' };
+      suiviFollowups = (Array.isArray(suiviFollowups) ? suiviFollowups : []).filter(function(item) {
+        return String(item.ID || '') !== String(params.id || '');
+      });
+      localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+      return { success: true, message: 'Entrée supprimée' };
     }
     case 'addUser': {
       if (!canManageUsers(currentUser)) return { success: false, error: 'Accès réservé à la gestion utilisateurs' };
@@ -5938,6 +6062,174 @@ function computeExpertStats(expertName) {
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
   return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+}
+
+function canDeleteFollowups(user) {
+  if (!user) return false;
+  var username = typeof user === 'string' ? user : (user.username || '');
+  return String(username || '').trim().toLowerCase() === 'noah';
+}
+
+function getStageMeta(stageKey) {
+  var found = DASHBOARD_STAGES.find(function(stage) { return stage.key === stageKey; });
+  return found || { key: 'nouveau', label: '🆕 Nouveau', desc: 'À qualifier', range: 'pas encore noté', color: 'dark' };
+}
+
+function formatFollowupDateTime(value) {
+  var parsed = parseEntryDate(value);
+  if (!parsed) return '—';
+  return parsed.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function buildVisibleFunnelSnapshot() {
+  var records = buildSchoolRecords(getVisibleRaw(), getVisibleFollowups());
+  var counts = {};
+  DASHBOARD_STAGES.forEach(function(stage) {
+    counts[stage.key] = 0;
+  });
+  records.forEach(function(record) {
+    counts[record.stage] = (counts[record.stage] || 0) + 1;
+  });
+  return { total: records.length, counts: counts, records: records };
+}
+
+function summarizeFunnelMovement(before, after) {
+  var movement = [];
+  if (!before || !after) return movement;
+  var totalDelta = (after.total || 0) - (before.total || 0);
+  if (totalDelta) {
+    movement.push({ key: 'portfolio', label: 'Portefeuille', delta: totalDelta });
+  }
+  DASHBOARD_STAGES.forEach(function(stage) {
+    var delta = (after.counts[stage.key] || 0) - (before.counts[stage.key] || 0);
+    if (delta) movement.push({ key: stage.key, label: stage.label.replace(/^[^\s]+\s/, ''), delta: delta });
+  });
+  return movement;
+}
+
+function buildEntryImpactPayload(entry, before, after) {
+  var entryKey = schoolKey(entry && entry.SchoolName);
+  var schoolRecord = after && Array.isArray(after.records)
+    ? after.records.find(function(record) { return record.key === entryKey; })
+    : null;
+  var stageMeta = getStageMeta(schoolRecord ? schoolRecord.stage : 'nouveau');
+  return {
+    entryId: (entry && (entry.ID || entry.LegacyID)) || '',
+    recordedAt: (entry && entry.Timestamp) || new Date().toISOString(),
+    schoolName: (entry && entry.SchoolName) || '',
+    followupType: (entry && entry.FollowupType) || '',
+    outcome: (entry && entry.Outcome) || '',
+    notes: (entry && entry.Notes) || '',
+    nextAction: (entry && entry.NextAction) || '',
+    nextDate: (entry && entry.NextDate) || '',
+    stageKey: schoolRecord ? schoolRecord.stage : 'nouveau',
+    stageLabel: stageMeta.label,
+    stageRange: stageMeta.range,
+    movement: summarizeFunnelMovement(before, after),
+    totalBefore: before ? before.total : 0,
+    totalAfter: after ? after.total : 0
+  };
+}
+
+function parseDateOnly(value) {
+  if (!value) return null;
+  var text = String(value).trim();
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return new Date(text + 'T00:00:00');
+  }
+  var parsed = parseEntryDate(text);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function getReminderMeta(nextDate) {
+  var target = parseDateOnly(nextDate);
+  if (!target) return null;
+  var today = new Date();
+  today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  var diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+  var tone = diff < 0 ? 'overdue' : (diff <= 2 ? 'urgent' : (diff <= 5 ? 'soon' : 'future'));
+  var label = diff < 0
+    ? 'En retard ' + Math.abs(diff) + 'j'
+    : diff === 0
+      ? 'Aujourd’hui'
+      : diff === 1
+        ? 'Demain'
+        : 'Dans ' + diff + 'j';
+  return {
+    days: diff,
+    tone: tone,
+    label: label,
+    displayDate: target.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+    blink: diff <= 2
+  };
+}
+
+function renderReminderChip(nextDate) {
+  var meta = getReminderMeta(nextDate);
+  if (!meta) return '';
+  return '<span class="planner-chip ' + meta.tone + (meta.blink ? ' reminder-blink' : '') + '">⏰ ' + meta.label + ' · ' + meta.displayDate + '</span>';
+}
+
+function buildPlannerModel(followups) {
+  var latestBySchool = {};
+  var undated = [];
+  (Array.isArray(followups) ? followups : []).forEach(function(item) {
+    if (!item || item.Status === 'Converti' || item.Status === 'Terminé') return;
+    var hasReminder = !!(String(item.NextDate || '').trim() || String(item.NextAction || '').trim());
+    if (!hasReminder) return;
+    var key = schoolKey(item.SchoolName) || ('item-' + Math.random());
+    var current = latestBySchool[key];
+    var itemTime = parseEntryDate(item.Timestamp);
+    var currentTime = current ? parseEntryDate(current.Timestamp) : null;
+    if (!current || ((itemTime && currentTime && itemTime > currentTime) || (itemTime && !currentTime))) {
+      latestBySchool[key] = item;
+    }
+  });
+  var items = Object.keys(latestBySchool).map(function(key) { return latestBySchool[key]; }).map(function(item) {
+    return { followup: item, reminder: getReminderMeta(item.NextDate) };
+  });
+  items.forEach(function(item) {
+    if (!item.reminder && item.followup.NextAction) undated.push(item.followup);
+  });
+  items = items.filter(function(item) { return !!item.reminder; }).sort(function(a, b) {
+    if (a.reminder.days !== b.reminder.days) return a.reminder.days - b.reminder.days;
+    return new Date(a.followup.Timestamp).getTime() - new Date(b.followup.Timestamp).getTime();
+  });
+  var days = [];
+  var start = new Date();
+  start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  for (var offset = 0; offset < 7; offset++) {
+    var currentDay = new Date(start);
+    currentDay.setDate(start.getDate() + offset);
+    days.push({
+      key: currentDay.toISOString().slice(0, 10),
+      label: currentDay.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' }),
+      items: items.filter(function(item) { return item.reminder.days === offset; })
+    });
+  }
+  return {
+    overdue: items.filter(function(item) { return item.reminder.days < 0; }),
+    urgent: items.filter(function(item) { return item.reminder.days >= 0 && item.reminder.days <= 2; }),
+    upcoming: items.filter(function(item) { return item.reminder.days >= 0 && item.reminder.days <= 6; }),
+    undated: undated,
+    days: days
+  };
+}
+
+function getHistorySchoolRecordMap() {
+  var map = {};
+  buildSchoolRecords(getVisibleRaw(), getVisibleFollowups()).forEach(function(record) {
+    map[record.key] = record;
+  });
+  return map;
 }
 
 function buildRankings() {
@@ -6114,9 +6406,13 @@ function rSuivi() {
   var rankingRows = isSuper ? suiviRankings : suiviRankings.filter(function(r) { return samePerson(r.expert, me); });
   var schools = getSchoolSuggestions(isSuper ? null : me);
   var schoolOpts = schools.map(function(s) { return '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>'; }).join('');
+  var lastImpact = currentUser ? getEntryImpactForUser(currentUser.username) : null;
+  var impactReminder = lastImpact ? getReminderMeta(lastImpact.nextDate) : null;
+  var planner = buildPlannerModel(myFollowups);
+  var schoolRecordMap = getHistorySchoolRecordMap();
 
-  var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : '🚶 VISITE'; };
-  var fuDate = function(ts) { return new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : t === 'VISIT' ? '🚶 VISITE' : '📝 CRÉATION'; };
+  var fuDate = function(ts) { return formatFollowupDateTime(ts); };
 
   var h = '';
   h += '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2>';
@@ -6146,10 +6442,28 @@ function rSuivi() {
   h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
   h += '</div>';
 
+  if (lastImpact) {
+    h += '<div class="impact-summary"><div><h3>🧭 Dernier impact enregistré</h3><p>Chaque saisie vous montre l’école touchée, le moment exact, la suite commerciale et la conséquence sur votre entonnoir.</p></div>';
+    h += '<div class="impact-summary-grid">';
+    h += '<div class="process-box"><small>École</small><strong>' + esc(lastImpact.schoolName || '—') + '</strong><span>' + esc(lastImpact.stageLabel || '🆕 Nouveau') + '</span></div>';
+    h += '<div class="process-box"><small>Entrée</small><strong>' + esc(fuTypeIcon(lastImpact.followupType || 'VISIT')) + '</strong><span>' + esc(fuDate(lastImpact.recordedAt)) + '</span></div>';
+    h += '<div class="process-box"><small>Rappel</small><strong>' + esc(lastImpact.nextAction || 'À préciser') + '</strong><span>' + (impactReminder ? esc(impactReminder.label + ' · ' + impactReminder.displayDate) : 'Pas de date fixée') + '</span></div>';
+    h += '</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">';
+    if (Array.isArray(lastImpact.movement) && lastImpact.movement.length) {
+      lastImpact.movement.forEach(function(item) {
+        h += '<span class="impact-pill ' + (item.delta > 0 ? 'up' : 'down') + '">' + esc(item.label) + ' ' + (item.delta > 0 ? '+' : '') + item.delta + '</span>';
+      });
+    } else {
+      h += '<span class="impact-pill steady">Historique renforcé · pas de changement de volume dans l’entonnoir</span>';
+    }
+    h += '</div></div>';
+  }
+
   // Sub-tabs
   h += '<div class="suivi-tabs">';
   h += '<button class="suivi-tab act" data-stab="add">+ Nouveau suivi</button>';
   h += '<button class="suivi-tab" data-stab="addschool">+ Nouvelle École</button>';
+  h += '<button class="suivi-tab" data-stab="planner">Rappels & semaine</button>';
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
@@ -6219,22 +6533,89 @@ function rSuivi() {
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="nsContactRole" placeholder="Ex: Proviseur, Censeur"></div>';
   h += '</div><div class="form-submit"><button class="btn-save" onclick="submitNewSchoolDirect()">Enregistrer l\'école</button></div></div></div>';
 
+  // Panel: Planner
+  h += '<div class="suivi-panel" id="stab-planner"><div class="form-card"><h3>🗓️ Rappels <span class="it">& planning</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Votre agenda de relance met en avant ce qui approche, ce qui est en retard et les dossiers sans date. Les urgences proches clignotent pour éviter les oublis.</p>';
+  h += '<div class="planner-shell"><div class="planner-summary">';
+  h += '<div class="planner-alerts">';
+  h += '<div class="planner-stat"><strong>' + planner.overdue.length + '</strong><span>en retard</span></div>';
+  h += '<div class="planner-stat"><strong>' + planner.urgent.length + '</strong><span>à traiter sous 72h</span></div>';
+  h += '<div class="planner-stat"><strong>' + planner.upcoming.length + '</strong><span>dans les 7 jours</span></div>';
+  h += '<div class="planner-stat"><strong>' + planner.undated.length + '</strong><span>sans date fixée</span></div>';
+  h += '</div>';
+  if (planner.overdue.length) {
+    h += '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">';
+    planner.overdue.slice(0, 5).forEach(function(item) {
+      var f = item.followup;
+      h += '<div class="planner-card overdue"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance en attente') + '</span></div>';
+    });
+    h += '</div>';
+  }
+  if (planner.undated.length) {
+    h += '<div style="margin-top:16px"><h4 style="margin-bottom:10px;font-size:13px">📌 Actions sans date</h4><div style="display:flex;flex-wrap:wrap;gap:8px">';
+    planner.undated.slice(0, 8).forEach(function(item) {
+      h += '<span class="planner-chip future">' + esc(item.SchoolName) + ' · ' + esc(item.NextAction || 'À dater') + '</span>';
+    });
+    h += '</div></div>';
+  }
+  h += '</div><div class="planner-board"><div class="planner-week">';
+  planner.days.forEach(function(day) {
+    h += '<div class="planner-day"><h4>' + esc(day.label) + '</h4>';
+    if (!day.items.length) {
+      h += '<div class="empty-mini">Aucune relance planifiée.</div>';
+    } else {
+      day.items.forEach(function(item) {
+        var f = item.followup;
+        h += '<div class="planner-card ' + item.reminder.tone + (item.reminder.blink ? ' reminder-blink' : '') + '"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance à préparer') + '</span>';
+        if (f.ContactName || (isSuper && f.Expert)) h += '<span>' + (f.ContactName ? '👤 ' + esc(f.ContactName) : '') + (isSuper && f.Expert ? (f.ContactName ? ' · ' : '') + esc(f.Expert) : '') + '</span>';
+        h += '</div>';
+      });
+    }
+    h += '</div>';
+  });
+  h += '</div></div></div></div></div>';
+
   // Panel: History
   h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique des <span class="it">follow-ups</span>' + (isSuper ? ' (toute l\'équipe)' : '') + '</h3>';
+  h += '<div class="history-tools">';
+  h += '<span class="timeline-pill">🗂️ ' + myFollowups.length + ' entrées visibles</span>';
+  h += '<span class="timeline-pill' + (planner.overdue.length ? ' overdue reminder-blink' : '') + '">⏳ ' + planner.overdue.length + ' en retard</span>';
+  h += '<span class="timeline-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '">📍 ' + planner.urgent.length + ' urgentes</span>';
+  h += '<span class="timeline-pill">🧱 Suppression ' + (canDeleteFollowups(currentUser) ? 'autorisée pour Noah' : 'verrouillée') + '</span>';
+  h += '</div>';
   if (myFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucun follow-up enregistré.</p>';
   h += '<div class="followup-list">';
   myFollowups.forEach(function(f) {
-    h += '<div class="fu-item type-' + f.FollowupType + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
-    h += '<div style="display:flex;gap:8px;align-items:center">';
+    var record = schoolRecordMap[schoolKey(f.SchoolName)] || null;
+    var stageMeta = getStageMeta(record ? record.stage : 'nouveau');
+    var reminder = getReminderMeta(f.NextDate);
+    var canDelete = canDeleteFollowups(currentUser) && !f.Imported && f.Source !== 'calls-sheet' && f.ID;
+    h += '<div class="fu-item type-' + esc(f.FollowupType || 'CALL') + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
     if (isSuper) h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
-    h += '<span class="fu-type ' + f.FollowupType + '">' + fuTypeIcon(f.FollowupType) + '</span></div></div>';
+    h += '<span class="fu-type ' + esc(f.FollowupType || 'CALL') + '">' + esc(fuTypeIcon(f.FollowupType)) + '</span>';
+    h += '<span class="impact-pill steady">' + esc(stageMeta.label) + '</span>';
+    if (canDelete) h += '<button class="delete-entry-btn" onclick="deleteFollowupEntry(\'' + esc(String(f.ID || '')).replace(/'/g, "\\'") + '\')">Supprimer</button>';
+    h += '</div></div>';
+    h += '<div class="history-tools" style="margin:0 0 12px">';
+    h += '<span class="timeline-pill">🕒 ' + esc(fuDate(f.Timestamp)) + '</span>';
+    if (reminder) h += '<span class="timeline-pill ' + reminder.tone + (reminder.blink ? ' reminder-blink' : '') + '">⏰ ' + esc(reminder.label + ' · ' + reminder.displayDate) + '</span>';
+    if (f.ContactName) h += '<span class="timeline-pill">👤 ' + esc(f.ContactName) + '</span>';
+    if (f.City || f.Sector) h += '<span class="timeline-pill">🗺️ ' + esc([f.City, f.Sector].filter(Boolean).join(' · ')) + '</span>';
+    if (f.Source === 'calls-sheet' || f.Imported) h += '<span class="timeline-pill">📥 Source appels</span>';
+    h += '</div>';
     h += '<div class="fu-body">' + (esc(f.Notes) || '<i style="color:var(--g400)">Pas de notes</i>') + '</div>';
-    h += '<div class="fu-footer"><span>Date: <b>' + fuDate(f.Timestamp) + '</b></span>';
-    if (f.ContactName) h += '<span>Contact: <b>' + esc(f.ContactName) + '</b></span>';
+    h += '<div class="followup-process">';
+    h += '<div class="process-box"><small>Résultat</small><strong>' + esc(f.Outcome || 'À qualifier') + '</strong><span>' + (f.ContactPhone ? '<a href="' + attrEsc(phoneHref(f.ContactPhone)) + '">📞 ' + esc(f.ContactPhone) + '</a>' : 'Pas de numéro') + '</span></div>';
+    h += '<div class="process-box"><small>Statut</small><strong>' + esc(f.Status || 'En cours') + '</strong><span>' + (record ? esc((record.followupCount || 0) + ' suivis · ' + (record.callCount || 0) + ' appels') : '1ère trace visible') + '</span></div>';
+    h += '<div class="process-box"><small>Action suivante</small><strong>' + esc(f.NextAction || 'À définir') + '</strong><span>' + (reminder ? esc(reminder.label + ' · ' + reminder.displayDate) : 'Pas de date fixée') + '</span></div>';
+    h += '<div class="process-box"><small>Impact funnel</small><strong>' + esc(stageMeta.label) + '</strong><span>' + esc(stageMeta.desc + ' · ' + stageMeta.range) + '</span></div>';
+    h += '</div>';
+    h += '<div class="fu-footer">';
     if (f.Outcome) h += '<span>Résultat: <b>' + esc(f.Outcome) + '</b></span>';
     if (f.Status) h += '<span>Statut: <b>' + esc(f.Status) + '</b></span>';
     if (Number(f.Cost) > 0) h += '<span class="fu-cost">Coût: ' + fmt(f.Cost) + ' FCFA</span>';
-    if (f.NextAction) h += '<span>Prochaine: <b>' + esc(f.NextAction) + '</b></span>';
+    if (f.NextAction) h += '<span>Suite: <b>' + esc(f.NextAction) + '</b></span>';
     h += '</div></div>';
   });
   h += '</div></div></div>';
@@ -6444,6 +6825,22 @@ function showInviteForm() {
   if (p) p.classList.add('act');
 }
 
+async function deleteFollowupEntry(id) {
+  if (!canDeleteFollowups(currentUser)) { showToast('Seul Noah peut supprimer une entrée', true); return; }
+  if (!id) { showToast('Entrée introuvable', true); return; }
+  var res = await apiDeleteFollowup(id);
+  if (res && res.success) {
+    showToast(res.message || 'Entrée supprimée');
+    if (isBackendConfigured() && nateivaApiToken) {
+      await refreshSyncedState();
+    }
+    setEntryImpactForUser(currentUser && currentUser.username, null);
+    rSuivi();
+  } else {
+    showToast((res && res.error) || 'Suppression impossible', true);
+  }
+}
+
 async function submitFollowup() {
   if (!currentUser) { showToast('Veuillez vous connecter', true); return; }
   var schoolSel = document.getElementById('fuSchool').value;
@@ -6454,8 +6851,11 @@ async function submitFollowup() {
     showToast(schoolValidation.message, true);
     return;
   }
+  var beforeSnapshot = buildVisibleFunnelSnapshot();
+  var entryTimestamp = new Date().toISOString();
   var data = {
     action: 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
+    timestamp: entryTimestamp,
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
@@ -6475,10 +6875,21 @@ async function submitFollowup() {
   };
   var res = await apiPost(data);
   if (res.success) {
-    showToast(res.message || 'Suivi enregistré!');
     if (isBackendConfigured() && nateivaApiToken) {
       await refreshSyncedState();
     }
+    var afterSnapshot = buildVisibleFunnelSnapshot();
+    setEntryImpactForUser(currentUser.username, buildEntryImpactPayload(res.followup || {
+      ID: res.id || '',
+      Timestamp: entryTimestamp,
+      SchoolName: schoolName,
+      FollowupType: data.followupType,
+      Outcome: data.outcome,
+      Notes: data.notes,
+      NextAction: data.nextAction,
+      NextDate: data.nextDate
+    }, beforeSnapshot, afterSnapshot));
+    showToast(res.message || 'Suivi enregistré!');
     document.getElementById('fuSchool').selectedIndex = 0;
     if (document.getElementById('fuSchoolCustom')) document.getElementById('fuSchoolCustom').value = '';
     if (document.getElementById('fuSchoolCustomWrap')) document.getElementById('fuSchoolCustomWrap').style.display = 'none';
@@ -6531,9 +6942,12 @@ async function submitNewSchoolDirect() {
     showToast(validation.message, true);
     return;
   }
+  var beforeSnapshot = buildVisibleFunnelSnapshot();
+  var entryTimestamp = new Date().toISOString();
   
   var data = {
     action: 'addFollowup',
+    timestamp: entryTimestamp,
     expert: currentUser.fullName,
     schoolName: schoolName,
     contactName: document.getElementById('nsContactName').value.trim(),
@@ -6556,10 +6970,21 @@ async function submitNewSchoolDirect() {
   
   var res = await apiPost(data);
   if (res.success) {
-    showToast('Nouvelle école enregistrée!');
     if (isBackendConfigured() && nateivaApiToken) {
       await refreshSyncedState();
     }
+    var afterSnapshot = buildVisibleFunnelSnapshot();
+    setEntryImpactForUser(currentUser.username, buildEntryImpactPayload(res.followup || {
+      ID: res.id || '',
+      Timestamp: entryTimestamp,
+      SchoolName: schoolName,
+      FollowupType: 'CREATION',
+      Outcome: data.outcome,
+      Notes: data.notes,
+      NextAction: data.nextAction,
+      NextDate: data.nextDate
+    }, beforeSnapshot, afterSnapshot));
+    showToast('Nouvelle école enregistrée!');
     document.getElementById('nsSchoolName').value = '';
     document.getElementById('nsSchoolType').selectedIndex = 0;
     document.getElementById('nsCategory').selectedIndex = 2; // Standing Moyen
