@@ -1329,11 +1329,11 @@ body{
   margin:0;font-size:14px;line-height:1.7;color:var(--g600)
 }
 .workspace-primary-actions{
-  display:flex;justify-content:center;gap:16px;flex-wrap:wrap
+  display:flex;justify-content:center;gap:14px;flex-wrap:wrap;align-items:stretch
 }
 .workspace-cta{
-  min-width:280px;max-width:360px;flex:1 1 280px;border:none;border-radius:22px;
-  padding:22px 20px;background:linear-gradient(135deg, var(--red), var(--red-deep));
+  min-width:220px;max-width:300px;flex:0 1 260px;border:none;border-radius:20px;
+  padding:18px 18px;background:linear-gradient(135deg, var(--red), var(--red-deep));
   color:var(--paper);box-shadow:0 16px 36px rgba(220,38,38,.26);cursor:pointer;
   transition:transform .2s ease, box-shadow .2s ease;text-align:center
 }
@@ -1343,10 +1343,10 @@ body{
   letter-spacing:.12em;text-transform:uppercase;opacity:.82;margin-bottom:10px
 }
 .workspace-cta strong{
-  display:block;font-size:24px;line-height:1.1;margin-bottom:8px;color:var(--paper)
+  display:block;font-size:20px;line-height:1.15;margin-bottom:7px;color:var(--paper)
 }
 .workspace-cta small{
-  display:block;font-size:13px;line-height:1.55;color:rgba(255,255,255,.9)
+  display:block;font-size:12px;line-height:1.5;color:rgba(255,255,255,.9)
 }
 .workspace-cta.alt{
   background:linear-gradient(135deg, #ef4444, #991b1b);
@@ -1560,7 +1560,7 @@ body{
   .planner-shell{grid-template-columns:1fr}
   .workspace-action-center{padding:20px 16px}
   .workspace-primary-actions{flex-direction:column}
-  .workspace-cta{max-width:none;width:100%}
+  .workspace-cta{width:min(100%,420px);max-width:420px;flex:none;margin:0 auto}
 }
 
 .suivi-tabs{
@@ -2106,7 +2106,7 @@ const PROSPECTION_THEME_RULES=[
 const PROSPECTION_THEME_ORDER=PROSPECTION_THEME_RULES.map(function(rule){ return rule.key; });
 
 function extractCallIntent(item){
-  const text=normalizeText(item && item.Notes);
+  const text=normalizeText(getFollowupPlainNotes(item));
   const signals={
     rejection:hasAnyPattern(text,CALL_INTENT_RULES[0].patterns),
     visit:hasAnyPattern(text,CALL_INTENT_RULES[1].patterns),
@@ -2244,6 +2244,19 @@ function buildSchoolRecords(rawRows, followups){
         standing:'',
         type:'',
         expert:'',
+        quartier:'',
+        productType:'',
+        appMode:'',
+        currentSystem:'',
+        decisionReach:'',
+        decisionMaker:'',
+        internetQuality:'',
+        powerQuality:'',
+        supportRequest:'',
+        requestedModules:'',
+        budgetTiming:'',
+        preferredChannel:'',
+        campusCount:'',
         contactName:'',
         phone:'',
         rate:null,
@@ -2304,28 +2317,60 @@ function buildSchoolRecords(rawRows, followups){
     if(item.Source==='calls-sheet' && itemKey && !map.has(itemKey))return;
     const rec=ensure(item.SchoolName,itemKey);
     if(!rec)return;
+    const meta=readFollowupMeta(item);
+    const cleanNotes=getFollowupPlainNotes(item);
     rec.followupCount++;
     rec.schoolName=item.SchoolName||rec.schoolName;
     rec.city=item.City||rec.city;
     rec.zone=item.Sector||rec.zone;
+    if(meta.institutionLevel)rec.type=meta.institutionLevel||rec.type;
+    if(meta.quartier)rec.quartier=rec.quartier||meta.quartier;
+    if(meta.productType)rec.productType=rec.productType||meta.productType;
+    if(meta.appMode)rec.appMode=rec.appMode||meta.appMode;
+    if(meta.currentSystem)rec.currentSystem=rec.currentSystem||meta.currentSystem;
+    if(meta.decisionReach)rec.decisionReach=rec.decisionReach||meta.decisionReach;
+    if(meta.decisionMaker)rec.decisionMaker=rec.decisionMaker||meta.decisionMaker;
+    if(meta.internetQuality)rec.internetQuality=rec.internetQuality||meta.internetQuality;
+    if(meta.powerQuality)rec.powerQuality=rec.powerQuality||meta.powerQuality;
+    if(meta.supportRequest)rec.supportRequest=rec.supportRequest||meta.supportRequest;
+    if(meta.requestedModules)rec.requestedModules=rec.requestedModules||meta.requestedModules;
+    if(meta.budgetTiming)rec.budgetTiming=rec.budgetTiming||meta.budgetTiming;
+    if(meta.preferredChannel)rec.preferredChannel=rec.preferredChannel||meta.preferredChannel;
+    if(meta.campusCount)rec.campusCount=rec.campusCount||meta.campusCount;
     if(item.Expert){rec.expert=rec.expert||item.Expert;rec._experts.add(item.Expert);}
     if(item.ContactName){rec.contactName=rec.contactName||item.ContactName;rec._contacts.add(item.ContactName);}
     const cleanPhone=digitsOnly(item.ContactPhone);
     if(cleanPhone){rec.phone=rec.phone||cleanPhone;rec._phones.add(cleanPhone);}
     if(item.FollowupType==='CALL')rec.callCount++;
     if(item.FollowupType==='VISIT')rec.visitCount++;
+    if(meta.rate && !Number.isNaN(Number(meta.rate)))rec.rate=Number(meta.rate);
     const dt=parseEntryDate(item.Timestamp);
     if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
       rec.lastTouch=dt;
-      rec.notes=[item.Outcome||'',item.Status||'',item.Notes||'',item.NextAction||''].filter(Boolean).join(' · ');
+      rec.notes=[item.Outcome||'',item.Status||'',cleanNotes||'',item.NextAction||''].filter(Boolean).join(' · ');
+      if(meta.rate && !Number.isNaN(Number(meta.rate)))rec.rate=Number(meta.rate);
+      if(meta.institutionLevel)rec.type=meta.institutionLevel;
+      if(meta.quartier)rec.quartier=meta.quartier;
+      if(meta.productType)rec.productType=meta.productType;
+      if(meta.appMode)rec.appMode=meta.appMode;
+      if(meta.currentSystem)rec.currentSystem=meta.currentSystem;
+      if(meta.decisionReach)rec.decisionReach=meta.decisionReach;
+      if(meta.decisionMaker)rec.decisionMaker=meta.decisionMaker;
+      if(meta.internetQuality)rec.internetQuality=meta.internetQuality;
+      if(meta.powerQuality)rec.powerQuality=meta.powerQuality;
+      if(meta.supportRequest)rec.supportRequest=meta.supportRequest;
+      if(meta.requestedModules)rec.requestedModules=meta.requestedModules;
+      if(meta.budgetTiming)rec.budgetTiming=meta.budgetTiming;
+      if(meta.preferredChannel)rec.preferredChannel=meta.preferredChannel;
+      if(meta.campusCount)rec.campusCount=meta.campusCount;
     }
-    const note=normalizeText([item.Outcome,item.Status,item.Notes,item.NextAction].join(' '));
+    const note=normalizeText([item.Outcome,item.Status,cleanNotes,item.NextAction].join(' '));
     if(/clos|closed|converti|gagn|signe|sign|paid|paye/.test(note)){
       rec.won=true;
       if(dt && (!rec.closedAt || dt>rec.closedAt))rec.closedAt=dt;
       rec.closedBy=item.Expert || rec.closedBy || rec.expert;
       rec.closeContact=item.ContactName || rec.closeContact || rec.contactName;
-      rec.closeStatus=[item.Status||item.Outcome||'Deal clos', item.Notes||item.NextAction||''].filter(Boolean).join(' · ');
+      rec.closeStatus=[item.Status||item.Outcome||'Deal clos', cleanNotes||item.NextAction||''].filter(Boolean).join(' · ');
     }
     if(/pas interesse|pas interresse|refus|abandon|perdu/.test(note))rec.lost=true;
   });
@@ -2612,7 +2657,7 @@ function buildCallAnalytics(followups, experts){
     if(isYesFlag(item.CallToSuperior)){ sourceFlags.toSuperior++; row.toSuperior++; }
     if(isYesFlag(item.CallVisit)){ sourceFlags.visit++; row.visit++; }
     if(parseCount(item.CallRating)>0){ sourceFlags.ratingFilled++; row.ratingFilled++; }
-    if(normalizeText(item.Notes)){
+    if(normalizeText(getFollowupPlainNotes(item))){
       sourceFlags.summaryFilled++;
       row.summaryFilled++;
     }else{
@@ -5387,6 +5432,7 @@ var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
 var VERIFIED_CALL_SOURCE_COUNT = 130;
 var VERIFIED_CALL_SOURCE_ROWS = 131;
 var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
+var FOLLOWUP_META_MARKER = '[NATEIVA_META]';
 var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
 var suiviPreferredTab = 'planner';
 var PANE_ACCESS_CONFIG = [
@@ -5439,7 +5485,7 @@ function setServerUsers(users) {
 }
 
 function setSyncedFollowups(followups) {
-  suiviFollowups = Array.isArray(followups) ? followups : [];
+  suiviFollowups = Array.isArray(followups) ? followups.map(hydrateFollowupRecord) : [];
   localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
 }
 
@@ -5622,6 +5668,8 @@ function buildNewSchoolsFromFollowups() {
   for (var j = 0; j < allFollowups.length; j++) {
     var f = allFollowups[j];
     if (!shouldCreateSchoolFromFollowup(f)) continue;
+    var fMeta = readFollowupMeta(f);
+    var cleanNotes = getFollowupPlainNotes(f);
     var sName = f.SchoolName || '';
     var sKey = schoolKey(sName);
     if (!sKey || seen[sKey]) continue;
@@ -5631,29 +5679,29 @@ function buildNewSchoolsFromFollowups() {
         t: f.Timestamp || new Date().toISOString(),
         e: f.Expert || '',
         n: sName,
-        ty: f.SchoolType || 'Primaire',
+        ty: f.SchoolType || fMeta.institutionLevel || 'Primaire',
         rn: f.ContactName || '',
         rp: f.ContactRole || 'DIRECTEUR (TRICE)',
         pw: f.ContactPhone || '',
         pn: '',
-        co: f.Notes || '',
-        tx: f.Status === 'Converti' ? '1.0' : '0.1',
-        r: f.Status === 'Converti' ? 100 : 10,
+        co: cleanNotes || '',
+        tx: fMeta.rate ? String((Number(fMeta.rate) || 0) / 100) : (f.Status === 'Converti' ? '1.0' : '0.1'),
+        r: fMeta.rate ? Number(fMeta.rate) : (f.Status === 'Converti' ? 100 : 10),
         ef: f.Effectif || '',
         ca: f.Category || 'STANDIG MOYEN',
         v: f.City || '',
         sy: (f.City === 'YAOUNDE') ? (f.Sector || '') : '',
         sd: (f.City === 'DOUALA') ? (f.Sector || '') : '',
-        lo: f.Location || '',
+        lo: [fMeta.quartier, f.Location || ''].filter(Boolean).join(' · '),
         re: '',
         isNewSchool: true
       };
     } else {
       var entry = newSchoolsMap[sKey];
-      if (f.SchoolType) entry.ty = f.SchoolType;
+      if (f.SchoolType || fMeta.institutionLevel) entry.ty = f.SchoolType || fMeta.institutionLevel;
       if (f.Category) entry.ca = f.Category;
       if (f.Effectif) entry.ef = f.Effectif;
-      if (f.Location) entry.lo = f.Location;
+      if (f.Location || fMeta.quartier) entry.lo = [fMeta.quartier, f.Location || ''].filter(Boolean).join(' · ');
       if (f.ContactRole) entry.rp = f.ContactRole;
       if (f.ContactName && !entry.rn) entry.rn = f.ContactName;
       if (f.ContactPhone && !entry.pw) entry.pw = f.ContactPhone;
@@ -5662,7 +5710,10 @@ function buildNewSchoolsFromFollowups() {
         if (f.City === 'YAOUNDE') entry.sy = f.Sector || '';
         if (f.City === 'DOUALA') entry.sd = f.Sector || '';
       }
-      if (f.Status === 'Converti') {
+      if (fMeta.rate) {
+        entry.tx = String((Number(fMeta.rate) || 0) / 100);
+        entry.r = Number(fMeta.rate);
+      } else if (f.Status === 'Converti') {
         entry.tx = '1.0';
         entry.r = 100;
       }
@@ -5680,6 +5731,11 @@ function buildNewSchoolsFromFollowups() {
 
 function getAllRawRows() {
   return getBaseRawRows().concat(buildNewSchoolsFromFollowups());
+}
+
+function getWorkspaceRawForUser(expertName) {
+  if (!expertName) return [];
+  return getAllRawRows().filter(function(r) { return samePerson(r.e, expertName); });
 }
 
 function getVisibleRaw() {
@@ -5767,6 +5823,11 @@ function buildImportedSheetFollowups() {
 
 function getAllFollowups() {
   return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
+}
+
+function getWorkspaceFollowupsForUser(expertName) {
+  if (!expertName) return [];
+  return getAllFollowups().filter(function(f) { return samePerson(f.Expert, expertName); });
 }
 
 function getVisibleFollowups() {
@@ -5924,7 +5985,7 @@ function localFallback(action, params) {
     case 'addFollowup': {
       var schoolValidation = validateSchoolSelectionForUser(params.schoolName);
       if (!schoolValidation.ok) return { success: false, error: schoolValidation.message };
-      var fu = {
+      var fu = hydrateFollowupRecord({
         ID: 'FU-' + Date.now(),
         Timestamp: params.timestamp || params.Timestamp || new Date().toISOString(),
         Expert: params.expert,
@@ -5944,8 +6005,31 @@ function localFallback(action, params) {
         Category: params.category || '',
         Effectif: params.effectif || '',
         Location: params.location || '',
-        ContactRole: params.contactRole || ''
-      };
+        ContactRole: params.contactRole || '',
+        Rate: params.rate || params.Rate || '',
+        Quartier: params.quartier || params.Quartier || '',
+        ProductType: params.productType || params.ProductType || '',
+        AppMode: params.appMode || params.AppMode || '',
+        CurrentSystem: params.currentSystem || params.CurrentSystem || '',
+        DecisionReach: params.decisionReach || params.DecisionReach || '',
+        DecisionMaker: params.decisionMaker || params.DecisionMaker || '',
+        InternetQuality: params.internetQuality || params.InternetQuality || '',
+        PowerQuality: params.powerQuality || params.PowerQuality || '',
+        SupportRequest: params.supportRequest || params.SupportRequest || '',
+        RequestedModules: params.requestedModules || params.RequestedModules || '',
+        BudgetTiming: params.budgetTiming || params.BudgetTiming || '',
+        PreferredChannel: params.preferredChannel || params.PreferredChannel || '',
+        CampusCount: params.campusCount || params.CampusCount || '',
+        CallStart: params.callStart || params.CallStart || '',
+        CallDuration: params.callDuration || params.CallDuration || '',
+        CallRating: params.callRating || params.CallRating || '',
+        CallTimesCalled: params.timesCalled || params.CallTimesCalled || '',
+        CallSecondCall: params.secondCall || params.CallSecondCall || '',
+        CallWhatsappDocs: params.whatsappDocs || params.CallWhatsappDocs || '',
+        CallToSuperior: params.toSuperior || params.CallToSuperior || '',
+        CallVisit: params.visit || params.CallVisit || '',
+        ProspectionYear: params.prospectionYear || params.ProspectionYear || ''
+      });
       suiviFollowups.push(fu);
       localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
       return { success: true, id: fu.ID, followup: fu, message: 'Suivi ajouté avec succès' };
@@ -6159,6 +6243,209 @@ function canDeleteFollowups(user) {
   return String(username || '').trim().toLowerCase() === 'noah';
 }
 
+function cleanMetaValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(function(item) { return cleanMetaValue(item); }).filter(Boolean);
+  }
+  if (value == null) return '';
+  return String(value).trim();
+}
+
+function splitFollowupNotes(noteText) {
+  var fullText = String(noteText || '');
+  var markerIndex = fullText.lastIndexOf(FOLLOWUP_META_MARKER);
+  if (markerIndex < 0) return { text: fullText.trim(), meta: {} };
+  var plainText = fullText.slice(0, markerIndex).trim();
+  var rawMeta = fullText.slice(markerIndex + FOLLOWUP_META_MARKER.length).trim();
+  try {
+    var parsed = JSON.parse(rawMeta);
+    return { text: plainText, meta: parsed && typeof parsed === 'object' ? parsed : {} };
+  } catch (e) {
+    return { text: fullText.trim(), meta: {} };
+  }
+}
+
+function buildFollowupNotes(noteText, meta) {
+  var plain = cleanMetaValue(noteText);
+  var payload = {};
+  Object.keys(meta || {}).forEach(function(key) {
+    var value = cleanMetaValue(meta[key]);
+    if (Array.isArray(value) ? value.length : value) payload[key] = value;
+  });
+  if (!Object.keys(payload).length) return plain;
+  return (plain ? plain + '\n' : '') + FOLLOWUP_META_MARKER + JSON.stringify(payload);
+}
+
+function getFollowupPlainNotes(itemOrText) {
+  var rawNotes = typeof itemOrText === 'string' ? itemOrText : (itemOrText && itemOrText.Notes);
+  return splitFollowupNotes(rawNotes).text;
+}
+
+function readFollowupMeta(item) {
+  var stored = splitFollowupNotes(item && item.Notes).meta;
+  return {
+    rate: cleanMetaValue((item && item.Rate) || stored.rate),
+    institutionLevel: cleanMetaValue((item && (item.InstitutionLevel || item.SchoolType)) || stored.institutionLevel),
+    quartier: cleanMetaValue((item && item.Quartier) || stored.quartier),
+    productType: cleanMetaValue((item && item.ProductType) || stored.productType),
+    appMode: cleanMetaValue((item && item.AppMode) || stored.appMode),
+    currentSystem: cleanMetaValue((item && item.CurrentSystem) || stored.currentSystem),
+    decisionReach: cleanMetaValue((item && item.DecisionReach) || stored.decisionReach),
+    decisionMaker: cleanMetaValue((item && item.DecisionMaker) || stored.decisionMaker),
+    internetQuality: cleanMetaValue((item && item.InternetQuality) || stored.internetQuality),
+    powerQuality: cleanMetaValue((item && item.PowerQuality) || stored.powerQuality),
+    supportRequest: cleanMetaValue((item && item.SupportRequest) || stored.supportRequest),
+    requestedModules: cleanMetaValue((item && item.RequestedModules) || stored.requestedModules),
+    budgetTiming: cleanMetaValue((item && item.BudgetTiming) || stored.budgetTiming),
+    preferredChannel: cleanMetaValue((item && item.PreferredChannel) || stored.preferredChannel),
+    campusCount: cleanMetaValue((item && item.CampusCount) || stored.campusCount),
+    callStart: cleanMetaValue((item && item.CallStart) || stored.callStart),
+    callDuration: cleanMetaValue((item && item.CallDuration) || stored.callDuration),
+    callRating: cleanMetaValue((item && item.CallRating) || stored.callRating),
+    callTimesCalled: cleanMetaValue((item && item.CallTimesCalled) || stored.callTimesCalled),
+    callSecondCall: cleanMetaValue((item && item.CallSecondCall) || stored.callSecondCall),
+    callWhatsappDocs: cleanMetaValue((item && item.CallWhatsappDocs) || stored.callWhatsappDocs),
+    callToSuperior: cleanMetaValue((item && item.CallToSuperior) || stored.callToSuperior),
+    callVisit: cleanMetaValue((item && item.CallVisit) || stored.callVisit),
+    prospectionYear: cleanMetaValue((item && item.ProspectionYear) || stored.prospectionYear)
+  };
+}
+
+function hydrateFollowupRecord(record) {
+  if (!record || typeof record !== 'object') return record;
+  var hydrated = Object.assign({}, record);
+  var meta = readFollowupMeta(hydrated);
+  if (meta.rate && !hydrated.Rate) hydrated.Rate = meta.rate;
+  if (meta.institutionLevel && !hydrated.InstitutionLevel) hydrated.InstitutionLevel = meta.institutionLevel;
+  if (meta.quartier && !hydrated.Quartier) hydrated.Quartier = meta.quartier;
+  if (meta.productType && !hydrated.ProductType) hydrated.ProductType = meta.productType;
+  if (meta.appMode && !hydrated.AppMode) hydrated.AppMode = meta.appMode;
+  if (meta.currentSystem && !hydrated.CurrentSystem) hydrated.CurrentSystem = meta.currentSystem;
+  if (meta.decisionReach && !hydrated.DecisionReach) hydrated.DecisionReach = meta.decisionReach;
+  if (meta.decisionMaker && !hydrated.DecisionMaker) hydrated.DecisionMaker = meta.decisionMaker;
+  if (meta.internetQuality && !hydrated.InternetQuality) hydrated.InternetQuality = meta.internetQuality;
+  if (meta.powerQuality && !hydrated.PowerQuality) hydrated.PowerQuality = meta.powerQuality;
+  if (meta.supportRequest && !hydrated.SupportRequest) hydrated.SupportRequest = meta.supportRequest;
+  if (meta.requestedModules && !hydrated.RequestedModules) hydrated.RequestedModules = meta.requestedModules;
+  if (meta.budgetTiming && !hydrated.BudgetTiming) hydrated.BudgetTiming = meta.budgetTiming;
+  if (meta.preferredChannel && !hydrated.PreferredChannel) hydrated.PreferredChannel = meta.preferredChannel;
+  if (meta.campusCount && !hydrated.CampusCount) hydrated.CampusCount = meta.campusCount;
+  if (meta.callStart && !hydrated.CallStart) hydrated.CallStart = meta.callStart;
+  if (meta.callDuration && !hydrated.CallDuration) hydrated.CallDuration = meta.callDuration;
+  if (meta.callRating && !hydrated.CallRating) hydrated.CallRating = meta.callRating;
+  if (meta.callTimesCalled && !hydrated.CallTimesCalled) hydrated.CallTimesCalled = meta.callTimesCalled;
+  if (meta.callSecondCall && !hydrated.CallSecondCall) hydrated.CallSecondCall = meta.callSecondCall;
+  if (meta.callWhatsappDocs && !hydrated.CallWhatsappDocs) hydrated.CallWhatsappDocs = meta.callWhatsappDocs;
+  if (meta.callToSuperior && !hydrated.CallToSuperior) hydrated.CallToSuperior = meta.callToSuperior;
+  if (meta.callVisit && !hydrated.CallVisit) hydrated.CallVisit = meta.callVisit;
+  if (meta.prospectionYear && !hydrated.ProspectionYear) hydrated.ProspectionYear = meta.prospectionYear;
+  return hydrated;
+}
+
+function incrementBucket(map, label) {
+  var key = cleanMetaValue(label);
+  if (!key) return;
+  map[key] = (map[key] || 0) + 1;
+}
+
+function topBuckets(map, limit) {
+  return Object.keys(map || {}).sort(function(a, b) {
+    return (map[b] || 0) - (map[a] || 0);
+  }).slice(0, limit || 5).map(function(label) {
+    return { label: label, value: map[label] || 0 };
+  });
+}
+
+function buildQualificationSummary(rawRows, followups) {
+  var records = buildSchoolRecords(rawRows || [], followups || []);
+  var byLevel = {};
+  var byProductType = {};
+  var byAppMode = {};
+  var byQuartier = {};
+  var bySystem = {};
+  var byInternet = {};
+  var byPower = {};
+  var qualified = 0;
+  var effectifKnown = 0;
+  var totalStudents = 0;
+
+  records.forEach(function(record) {
+    var level = cleanMetaValue(record.type);
+    var productType = cleanMetaValue(record.productType);
+    var appMode = cleanMetaValue(record.appMode);
+    var quartier = cleanMetaValue(record.quartier || record.zone);
+    var currentSystem = cleanMetaValue(record.currentSystem);
+    var internet = cleanMetaValue(record.internetQuality);
+    var power = cleanMetaValue(record.powerQuality);
+    if (level) incrementBucket(byLevel, level);
+    if (productType) incrementBucket(byProductType, productType);
+    incrementBucket(byAppMode, appMode || 'À clarifier');
+    if (quartier) incrementBucket(byQuartier, quartier);
+    if (currentSystem) incrementBucket(bySystem, currentSystem);
+    if (internet) incrementBucket(byInternet, internet);
+    if (power) incrementBucket(byPower, power);
+    if (level || appMode || quartier || currentSystem || internet || power || Number(record.effectif) > 0) qualified++;
+    if (Number(record.effectif) > 0) {
+      effectifKnown++;
+      totalStudents += Number(record.effectif);
+    }
+  });
+
+  return {
+    total: records.length,
+    qualified: qualified,
+    effectifKnown: effectifKnown,
+    totalStudents: totalStudents,
+    averageStudents: effectifKnown ? Math.round(totalStudents / effectifKnown) : 0,
+    levels: topBuckets(byLevel, 6),
+    productTypes: topBuckets(byProductType, 6),
+    appModes: topBuckets(byAppMode, 5),
+    quartiers: topBuckets(byQuartier, 5),
+    systems: topBuckets(bySystem, 5),
+    internet: topBuckets(byInternet, 4),
+    power: topBuckets(byPower, 4)
+  };
+}
+
+var entryAutoClockTimer = null;
+
+function formatAutoEntryStamp(dateValue) {
+  var date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  return date.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+function formatAutoEntryTime(dateValue) {
+  var date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  return [date.getHours(), date.getMinutes(), date.getSeconds()].map(function(part) {
+    return String(part).padStart(2, '0');
+  }).join(':');
+}
+
+function updateEntryAutoFields() {
+  var now = new Date();
+  ['fuRecordedAt', 'nsRecordedAt'].forEach(function(id) {
+    var input = document.getElementById(id);
+    if (input) input.value = formatAutoEntryStamp(now);
+  });
+  ['fuCallStart', 'nsCallStart'].forEach(function(id) {
+    var input = document.getElementById(id);
+    if (input) input.value = formatAutoEntryTime(now);
+  });
+}
+
+function startEntryAutoClock() {
+  if (entryAutoClockTimer) clearInterval(entryAutoClockTimer);
+  updateEntryAutoFields();
+  entryAutoClockTimer = setInterval(updateEntryAutoFields, 1000);
+}
+
 function getStageMeta(stageKey) {
   var found = DASHBOARD_STAGES.find(function(stage) { return stage.key === stageKey; });
   return found || { key: 'nouveau', label: '🆕 Nouveau', desc: 'À qualifier', range: 'pas encore noté', color: 'dark' };
@@ -6207,6 +6494,7 @@ function buildEntryImpactPayload(entry, before, after) {
   var schoolRecord = after && Array.isArray(after.records)
     ? after.records.find(function(record) { return record.key === entryKey; })
     : null;
+  var entryMeta = readFollowupMeta(entry);
   var stageMeta = getStageMeta(schoolRecord ? schoolRecord.stage : 'nouveau');
   return {
     entryId: (entry && (entry.ID || entry.LegacyID)) || '',
@@ -6214,7 +6502,12 @@ function buildEntryImpactPayload(entry, before, after) {
     schoolName: (entry && entry.SchoolName) || '',
     followupType: (entry && entry.FollowupType) || '',
     outcome: (entry && entry.Outcome) || '',
-    notes: (entry && entry.Notes) || '',
+    notes: getFollowupPlainNotes(entry),
+    productType: cleanMetaValue(entryMeta.productType || (schoolRecord && schoolRecord.productType) || ''),
+    appMode: cleanMetaValue(entryMeta.appMode || (schoolRecord && schoolRecord.appMode) || ''),
+    quartier: cleanMetaValue(entryMeta.quartier || (schoolRecord && schoolRecord.quartier) || ''),
+    currentSystem: cleanMetaValue(entryMeta.currentSystem || (schoolRecord && schoolRecord.currentSystem) || ''),
+    callTimesCalled: cleanMetaValue(entryMeta.callTimesCalled || (entry && entry.CallTimesCalled) || ''),
     nextAction: (entry && entry.NextAction) || '',
     nextDate: (entry && entry.NextDate) || '',
     stageKey: schoolRecord ? schoolRecord.stage : 'nouveau',
@@ -6313,9 +6606,9 @@ function buildPlannerModel(followups) {
   };
 }
 
-function getHistorySchoolRecordMap() {
+function getHistorySchoolRecordMap(rawRows, followups) {
   var map = {};
-  buildSchoolRecords(getVisibleRaw(), getVisibleFollowups()).forEach(function(record) {
+  buildSchoolRecords(rawRows || getVisibleRaw(), followups || getVisibleFollowups()).forEach(function(record) {
     map[record.key] = record;
   });
   return map;
@@ -6474,6 +6767,24 @@ function updateSchoolOwnershipNotice() {
   return result;
 }
 
+function updateNewSchoolOwnershipNotice() {
+  var notice = document.getElementById('nsSchoolNotice');
+  if (!notice) return { ok: true, level: 'ok', message: '' };
+  var input = document.getElementById('nsSchoolName');
+  var schoolName = input ? input.value.trim() : '';
+  if (!schoolName) {
+    notice.style.display = 'none';
+    notice.className = 'note';
+    notice.textContent = '';
+    return { ok: true, level: 'ok', message: '' };
+  }
+  var result = validateSchoolSelectionForUser(schoolName);
+  notice.style.display = '';
+  notice.className = 'note ' + (result.level === 'error' ? 'red' : (result.level === 'warn' ? 'saffron' : 'teal'));
+  notice.textContent = result.message;
+  return result;
+}
+
 // --- Render Suivi ---
 function rSuivi() {
   buildRankings();
@@ -6489,30 +6800,39 @@ function rSuivi() {
   var isSuper = canSeeAllData(currentUser);
   var canAdminUsers = canManageUsers(currentUser);
   var roleLabel = roleBadgeLabel(currentUser);
-  var stats = isSuper ? computeVisibleWorkspaceStats() : computeExpertStats(me);
+  var workspaceRaw = getWorkspaceRawForUser(me);
+  var workspaceFollowups = getWorkspaceFollowupsForUser(me);
+  var stats = computeExpertStats(me);
   var myRank = suiviRankings.find(function(r) { return samePerson(r.expert, me); });
-  var myFollowups = getVisibleFollowups().sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
+  var myFollowups = workspaceFollowups.sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
   var rankingRows = isSuper ? suiviRankings : suiviRankings.filter(function(r) { return samePerson(r.expert, me); });
-  var schools = getSchoolSuggestions(isSuper ? null : me);
+  var schools = getSchoolSuggestions(me);
   var schoolOpts = schools.map(function(s) { return '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>'; }).join('');
   var lastImpact = currentUser ? getEntryImpactForUser(currentUser.username) : null;
   var impactReminder = lastImpact ? getReminderMeta(lastImpact.nextDate) : null;
   var planner = buildPlannerModel(myFollowups);
-  var schoolRecordMap = getHistorySchoolRecordMap();
+  var schoolRecordMap = getHistorySchoolRecordMap(workspaceRaw, workspaceFollowups);
+  var qualification = buildQualificationSummary(workspaceRaw, workspaceFollowups);
 
   var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : t === 'VISIT' ? '🚶 VISITE' : '📝 CRÉATION'; };
   var fuDate = function(ts) { return formatFollowupDateTime(ts); };
+  var tagCloud = function(items, emptyLabel) {
+    if (!items || !items.length) return '<span>Aucune donnée qualifiée pour le moment</span>';
+    return items.map(function(item) {
+      return '<span>' + esc(item.label) + ' · <b>' + item.value + '</b></span>';
+    }).join('');
+  };
 
   var h = '';
   h += '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2>';
-  h += '<p>Tableau de bord ' + (roleLabel === 'SUPER ADMIN' ? '<b>Super Admin</b>' : (roleLabel === 'SUB ADMIN' ? '<b>Sous-admin</b>' : 'personnel')) + ' de <b>' + esc(me) + '</b>. ' + (isSuper ? 'Vous voyez la donnée autorisée de toute l\'équipe.' : 'Vous voyez uniquement vos écoles, vos suivis, vos chiffres et votre rang dans l\'équipe.') + '</p></div>';
+  h += '<p>Tableau de bord ' + (roleLabel === 'SUPER ADMIN' ? '<b>Super Admin</b>' : (roleLabel === 'SUB ADMIN' ? '<b>Sous-admin</b>' : 'personnel')) + ' de <b>' + esc(me) + '</b>. Le <b>Workspace</b> reste votre portefeuille personnel pour saisir, relancer et clôturer vos propres écoles. Les analyses équipe restent dans le Dashboard et BI.</p></div>';
 
   // Header
   h += '<div class="suivi-header"><div class="suivi-user">';
   h += '<div class="suivi-avatar">' + me.charAt(0).toUpperCase() + '</div>';
   h += '<div><div class="suivi-name">' + esc(me) + '</div>';
   h += '<div class="suivi-role">' + roleLabel + ' · ' + esc(currentUser.city) + '</div></div>';
-  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> ' + (isSuper ? 'jours actifs scope' : 'jours sur le terrain') + '</div>';
+  h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
   h += '</div><div class="suivi-actions">';
   if (canAdminUsers) h += '<button onclick="showInviteForm()">+ Inviter</button>';
   h += '<button onclick="doLogout()">Déconnexion</button>';
@@ -6548,6 +6868,7 @@ function rSuivi() {
     h += '<div class="process-box"><small>École</small><strong>' + esc(lastImpact.schoolName || '—') + '</strong><span>' + esc(lastImpact.stageLabel || '🆕 Nouveau') + '</span></div>';
     h += '<div class="process-box"><small>Entrée</small><strong>' + esc(fuTypeIcon(lastImpact.followupType || 'VISIT')) + '</strong><span>' + esc(fuDate(lastImpact.recordedAt)) + '</span></div>';
     h += '<div class="process-box"><small>Rappel</small><strong>' + esc(lastImpact.nextAction || 'À préciser') + '</strong><span>' + (impactReminder ? esc(impactReminder.label + ' · ' + impactReminder.displayDate) : 'Pas de date fixée') + '</span></div>';
+    h += '<div class="process-box"><small>Produit discuté</small><strong>' + esc(lastImpact.productType || 'À préciser') + '</strong><span>' + esc([lastImpact.appMode, lastImpact.quartier, lastImpact.currentSystem].filter(Boolean).join(' · ') || 'Produit, version ou concurrent non précisés') + '</span></div>';
     h += '</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">';
     if (Array.isArray(lastImpact.movement) && lastImpact.movement.length) {
       lastImpact.movement.forEach(function(item) {
@@ -6558,6 +6879,20 @@ function rSuivi() {
     }
     h += '</div></div>';
   }
+
+  h += '<div class="form-card"><h3>Qualification & <span class="it">segmentation</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Le questionnaire reprend la logique terrain + appels de vos feuilles source, puis transforme cela en vue exploitable: type d\'école, quartier, effectif, mode online/offline, système actuel et signaux d\'urgence.</p>';
+  h += '<div class="agent-grid">';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + '</span></div>';
+  h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif renseigné</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés connus</span></div><div><b>' + qualification.averageStudents + '</b><span>moyenne d\'élèves</span></div><div><b>' + myFollowups.length + '</b><span>suivis personnels</span></div></div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">source terrain + suivi</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline · hybride</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top portefeuille</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
+  h += '</div></div>';
 
   // Sub-tabs
   h += '<div class="suivi-tabs">';
@@ -6571,32 +6906,56 @@ function rSuivi() {
 
   // Panel: Add followup
   h += '<div class="suivi-panel" id="stab-add"><div class="form-card" id="followupForm"><h3>Nouveau <span class="it">suivi</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">' + (isSuper ? 'Vous pouvez traiter tous les portefeuilles autorisés et débloquer les écoles déjà prises.' : 'Vous voyez seulement vos écoles. Si une école existe déjà chez un autre expert, le système vous bloquera et vous guidera vers un sous-admin ou le super admin.') + '</p>';
+  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Le formulaire suit maintenant la logique de vos deux questionnaires d\'origine. Pour un <b>appel</b>, on reprend le statut, l\'heure, la durée, le rating, les docs WhatsApp et la prochaine relance. Pour une <b>descente terrain</b>, on garde le type d\'établissement, le taux, l\'effectif, le standing, la zone et les remarques. ' + (isSuper ? 'Les admins peuvent débloquer une école déjà prise si besoin.' : 'Vous restez limité à votre propre portefeuille.') + '</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
   h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école"></div>';
-  h += '<div class="form-field full" id="newSchoolInfoWrap" style="display:none;background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
-  h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Détails de la nouvelle école</h4>';
+  h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
+  h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
   h += '<div class="form-grid" style="grid-gap:14px;display:grid;grid-template-columns:1fr 1fr;margin:0">';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option></select></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="fuRate" placeholder="Ex: 60" min="0" max="100"></div>';
+  h += '<div class="form-field"><label>Ville</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field"><label>Quartier</label><input type="text" id="fuQuartier" placeholder="Ex: Bojongo, Bastos, Biyem-Assi"></div>';
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="fuContactRole" placeholder="Ex: Principal, Directeur"></div>';
+  h += '<div class="form-field"><label>Système actuel / concurrent</label><input type="text" id="fuCurrentSystem" placeholder="Ex: Excel, papier, LOGESCO..."></div>';
+  h += '<div class="form-field"><label>Type de produit discuté</label><select id="fuProductType"><option value="">-- À préciser --</option><option value="Nateiva School">Nateiva School</option><option value="Nateiva Learn">Nateiva Learn</option><option value="Marketplace">Marketplace</option><option value="Conference">Conference</option><option value="Build">Build</option><option value="Ambassadeur">Ambassadeur</option><option value="Pack complet">Pack complet</option></select></div>';
+  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="fuAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option><option value="Hybride">Hybride</option><option value="Mobile only">Mobile only</option></select></div>';
+  h += '<div class="form-field"><label>Qualité internet</label><select id="fuInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
+  h += '<div class="form-field"><label>Qualité électricité</label><select id="fuPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
+  h += '<div class="form-field"><label>Nombre de campus</label><input type="number" id="fuCampusCount" placeholder="Ex: 1" min="1"></div>';
   h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="fuLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
+  h += '<div class="form-field"><label>Modules demandés</label><input type="text" id="fuRequestedModules" placeholder="Ex: bulletins, Mobile Money, communication parents"></div>';
+  h += '<div class="form-field"><label>Support demandé</label><input type="text" id="fuSupportRequest" placeholder="Ex: dossier physique, démo, docs WhatsApp"></div>';
   h += '</div>';
   h += '</div>';
   h += '<div class="form-field full"><div id="fuSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
+  h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="fuRecordedAt" readonly></div>';
   h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option></select></div>';
+  h += '<div class="form-field"><label>Heure auto du contact</label><input type="text" id="fuCallStart" readonly></div>';
+  h += '<div class="form-field"><label>Durée observée</label><input type="time" id="fuCallDuration" step="1"></div>';
   h += '<div class="form-field"><label>Nom du contact</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor"></div>';
   h += '<div class="form-field"><label>Téléphone</label><input type="text" id="fuPhone" placeholder="Ex: 675 876 770"></div>';
-  h += '<div class="form-field"><label>Résultat</label><select id="fuOutcome"><option value="">-- Résultat --</option><option value="Intéressé">Intéressé</option><option value="Pas intéressé">Pas intéressé</option><option value="Rappeler plus tard">Rappeler plus tard</option><option value="Dossier transmis">Dossier transmis</option><option value="RDV fixé">RDV fixé</option><option value="Démo faite">Démo faite</option><option value="Converti">Converti / Signé</option><option value="Pas joignable">Pas joignable</option></select></div>';
+  h += '<div class="form-field"><label>Résultat / statut de l\'échange</label><select id="fuOutcome"><option value="">-- Résultat --</option><option value="Contact établi (personne concernée jointe)">Contact établi (personne concernée jointe)</option><option value="Contact établi (autre personne / message laissé)">Contact établi (autre personne / message laissé)</option><option value="Aucune réponse/Ligne occupée">Aucune réponse / Ligne occupée</option><option value="Numéro injoignable / erreur">Numéro injoignable / erreur</option><option value="Intéressé">Intéressé</option><option value="Pas intéressé">Pas intéressé</option><option value="Rappeler plus tard">Rappeler plus tard</option><option value="Dossier transmis">Dossier transmis</option><option value="RDV fixé">RDV fixé</option><option value="Démo faite">Démo faite</option><option value="Converti">Converti / Signé</option><option value="Pas joignable">Pas joignable</option></select></div>';
   h += '<div class="form-field"><label>Statut</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé</option></select></div>';
+  h += '<div class="form-field"><label>Qualité / rating appel</label><input type="number" id="fuCallRating" placeholder="Ex: 3" min="0" max="5"></div>';
+  h += '<div class="form-field"><label>Nombre total d\'appels déjà tentés</label><input type="number" id="fuTimesCalled" placeholder="Ex: 1, 5, 9..." min="0"></div>';
+  h += '<div class="form-field"><label>Décideur atteint ?</label><select id="fuDecisionReach"><option value="">-- À préciser --</option><option value="Décideur joint">Décideur joint</option><option value="Relais joint">Relais joint</option><option value="Aucun contact">Aucun contact</option></select></div>';
+  h += '<div class="form-field"><label>Décideur final / hiérarchie</label><input type="text" id="fuDecisionMaker" placeholder="Ex: Fondateur, Rectorat, Principal"></div>';
+  h += '<div class="form-field"><label>2e appel / rappel prévu</label><select id="fuSecondCall"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Docs WhatsApp demandés</label><select id="fuWhatsappDocs"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Transmission au supérieur</label><select id="fuToSuperior"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Visite / descente prévue</label><select id="fuVisitFlag"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
   h += '<div class="form-field" id="fuCostWrap"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
   h += '<div class="form-field"><label>Prochaine action</label><input type="text" id="fuNextAction" placeholder="Rappeler lundi..."></div>';
   h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="fuNextDate"></div>';
+  h += '<div class="form-field"><label>Canal de suivi préféré</label><select id="fuPreferredChannel"><option value="">-- À préciser --</option><option value="Appel">Appel</option><option value="WhatsApp">WhatsApp</option><option value="Visite">Visite</option><option value="Email">Email</option></select></div>';
+  h += '<div class="form-field"><label>Timing budget / décision</label><select id="fuBudgetTiming"><option value="">-- À préciser --</option><option value="Immédiat">Immédiat</option><option value="Cette semaine">Cette semaine</option><option value="Ce mois">Ce mois</option><option value="Rentrée">Rentrée</option><option value="Trimestre prochain">Trimestre prochain</option></select></div>';
+  h += '<div class="form-field"><label>Année / historique de prospection</label><input type="text" id="fuProspectionYear" placeholder="Ex: prospecté les années antérieures"></div>';
   h += '<div class="form-field full"><label>Notes / Détails</label><textarea id="fuNotes" placeholder="Décrivez ce qui s\'est passé..."></textarea></div>';
-  h += '<div class="form-field"><label>Ville</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-  h += '<div class="form-field"><label>Secteur</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '</div><div class="form-submit"><button class="btn-save" onclick="submitFollowup()">Enregistrer le suivi</button></div></div>';
 
   // Quick school list
@@ -6617,18 +6976,48 @@ function rSuivi() {
   // Panel: Add school directly
   h += '<div class="suivi-panel" id="stab-addschool">';
   h += '<div class="form-card" id="newSchoolForm"><h3>Nouvelle <span class="it">école</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Enregistrez directement une nouvelle école dans le portefeuille. Elle apparaîtra ensuite dans la liste des écoles et pourra faire l\'objet de suivis.</p>';
+  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, que ce soit <b>par téléphone</b> ou <b>sur le terrain</b>. On reprend ici les questions clés du questionnaire original pour bien classer l\'école dès le premier contact.</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem"></div>';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option></select></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="nsRate" placeholder="Ex: 60" min="0" max="100"></div>';
   h += '<div class="form-field"><label>Ville</label><select id="nsCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-  h += '<div class="form-field"><label>Secteur</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
+  h += '<div class="form-field"><label>Quartier</label><input type="text" id="nsQuartier" placeholder="Ex: Bojongo, Bastos"></div>';
+  h += '<div class="form-field"><label>Canal du 1er contact</label><select id="nsEntryType"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option></select></div>';
+  h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="nsRecordedAt" readonly></div>';
   h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="nsLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
   h += '<div class="form-field"><label>Nom du contact principal</label><input type="text" id="nsContactName" placeholder="Ex: M. Nkoum"></div>';
   h += '<div class="form-field"><label>Téléphone du contact</label><input type="text" id="nsContactPhone" placeholder="Ex: 677 889 900"></div>';
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="nsContactRole" placeholder="Ex: Proviseur, Censeur"></div>';
+  h += '<div class="form-field"><label>Système actuel / concurrent</label><input type="text" id="nsCurrentSystem" placeholder="Ex: papier, Excel, LOGESCO"></div>';
+  h += '<div class="form-field"><label>Type de produit discuté</label><select id="nsProductType"><option value="">-- À préciser --</option><option value="Nateiva School">Nateiva School</option><option value="Nateiva Learn">Nateiva Learn</option><option value="Marketplace">Marketplace</option><option value="Conference">Conference</option><option value="Build">Build</option><option value="Ambassadeur">Ambassadeur</option><option value="Pack complet">Pack complet</option></select></div>';
+  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="nsAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option><option value="Hybride">Hybride</option><option value="Mobile only">Mobile only</option></select></div>';
+  h += '<div class="form-field"><label>Qualité internet</label><select id="nsInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
+  h += '<div class="form-field"><label>Qualité électricité</label><select id="nsPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
+  h += '<div class="form-field"><label>Décideur atteint ?</label><select id="nsDecisionReach"><option value="">-- À préciser --</option><option value="Décideur joint">Décideur joint</option><option value="Relais joint">Relais joint</option><option value="Aucun contact">Aucun contact</option></select></div>';
+  h += '<div class="form-field"><label>Décideur final / hiérarchie</label><input type="text" id="nsDecisionMaker" placeholder="Ex: Fondateur, Rectorat, Principal"></div>';
+  h += '<div class="form-field"><label>Modules demandés</label><input type="text" id="nsRequestedModules" placeholder="Ex: bulletins, Mobile Money, communication parents"></div>';
+  h += '<div class="form-field"><label>Support demandé</label><input type="text" id="nsSupportRequest" placeholder="Ex: dossier physique, démo, docs WhatsApp"></div>';
+  h += '<div class="form-field"><label>Heure auto du contact</label><input type="text" id="nsCallStart" readonly></div>';
+  h += '<div class="form-field"><label>Durée observée</label><input type="time" id="nsCallDuration" step="1"></div>';
+  h += '<div class="form-field"><label>Qualité / rating appel</label><input type="number" id="nsCallRating" placeholder="Ex: 3" min="0" max="5"></div>';
+  h += '<div class="form-field"><label>Nombre total d\'appels déjà tentés</label><input type="number" id="nsTimesCalled" placeholder="Ex: 1, 5, 9..." min="0"></div>';
+  h += '<div class="form-field"><label>2e appel / rappel prévu</label><select id="nsSecondCall"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Docs WhatsApp demandés</label><select id="nsWhatsappDocs"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Transmission au supérieur</label><select id="nsToSuperior"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Visite / descente prévue</label><select id="nsVisitFlag"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
+  h += '<div class="form-field"><label>Résultat initial</label><select id="nsOutcome"><option value="">-- Résultat --</option><option value="Contact établi (personne concernée jointe)">Contact établi (personne concernée jointe)</option><option value="Contact établi (autre personne / message laissé)">Contact établi (autre personne / message laissé)</option><option value="Aucune réponse/Ligne occupée">Aucune réponse / Ligne occupée</option><option value="Numéro injoignable / erreur">Numéro injoignable / erreur</option><option value="Intéressé">Intéressé</option><option value="Pas intéressé">Pas intéressé</option><option value="Rappeler plus tard">Rappeler plus tard</option><option value="Dossier transmis">Dossier transmis</option><option value="RDV fixé">RDV fixé</option><option value="Démo faite">Démo faite</option><option value="Converti">Converti / Signé</option></select></div>';
+  h += '<div class="form-field"><label>Statut</label><select id="nsStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé</option></select></div>';
+  h += '<div class="form-field"><label>Canal de suivi préféré</label><select id="nsPreferredChannel"><option value="">-- À préciser --</option><option value="Appel">Appel</option><option value="WhatsApp">WhatsApp</option><option value="Visite">Visite</option><option value="Email">Email</option></select></div>';
+  h += '<div class="form-field"><label>Timing budget / décision</label><select id="nsBudgetTiming"><option value="">-- À préciser --</option><option value="Immédiat">Immédiat</option><option value="Cette semaine">Cette semaine</option><option value="Ce mois">Ce mois</option><option value="Rentrée">Rentrée</option><option value="Trimestre prochain">Trimestre prochain</option></select></div>';
+  h += '<div class="form-field"><label>Année / historique de prospection</label><input type="text" id="nsProspectionYear" placeholder="Ex: déjà prospectée auparavant"></div>';
+  h += '<div class="form-field"><label>Prochaine action</label><input type="text" id="nsNextAction" placeholder="Ex: envoyer dossier, rappeler jeudi"></div>';
+  h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="nsNextDate"></div>';
+  h += '<div class="form-field full"><div id="nsSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
+  h += '<div class="form-field full"><label>Notes / remarques initiales</label><textarea id="nsNotes" placeholder="Décrivez le premier échange, l\'objection ou le besoin principal..."></textarea></div>';
   h += '</div><div class="form-submit"><button class="btn-save" onclick="submitNewSchoolDirect()">Enregistrer l\'école</button></div></div></div>';
 
   // Panel: Planner
@@ -6674,7 +7063,7 @@ function rSuivi() {
   h += '</div></div></div></div></div>';
 
   // Panel: History
-  h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique des <span class="it">follow-ups</span>' + (isSuper ? ' (toute l\'équipe)' : '') + '</h3>';
+  h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique de votre <span class="it">portefeuille</span></h3>';
   h += '<div class="history-tools">';
   h += '<span class="timeline-pill">🗂️ ' + myFollowups.length + ' entrées visibles</span>';
   h += '<span class="timeline-pill' + (planner.overdue.length ? ' overdue reminder-blink' : '') + '">⏳ ' + planner.overdue.length + ' en retard</span>';
@@ -6687,6 +7076,14 @@ function rSuivi() {
     var record = schoolRecordMap[schoolKey(f.SchoolName)] || null;
     var stageMeta = getStageMeta(record ? record.stage : 'nouveau');
     var reminder = getReminderMeta(f.NextDate);
+    var meta = readFollowupMeta(f);
+    var cleanNotes = getFollowupPlainNotes(f);
+    var productLabel = cleanMetaValue(meta.productType || f.ProductType || (record && record.productType) || '');
+    var appModeLabel = cleanMetaValue(meta.appMode || f.AppMode || (record && record.appMode) || '');
+    var quartierLabel = cleanMetaValue(meta.quartier || f.Quartier || (record && record.quartier) || '');
+    var currentSystemLabel = cleanMetaValue(meta.currentSystem || f.CurrentSystem || (record && record.currentSystem) || '');
+    var timesCalledLabel = cleanMetaValue(meta.callTimesCalled || f.CallTimesCalled || '');
+    var levelLabel = cleanMetaValue(meta.institutionLevel || (record && record.type) || '');
     var canDelete = canDeleteFollowups(currentUser) && !f.Imported && f.Source !== 'calls-sheet' && f.ID;
     h += '<div class="fu-item type-' + esc(f.FollowupType || 'CALL') + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
@@ -6700,12 +7097,23 @@ function rSuivi() {
     if (reminder) h += '<span class="timeline-pill ' + reminder.tone + (reminder.blink ? ' reminder-blink' : '') + '">⏰ ' + esc(reminder.label + ' · ' + reminder.displayDate) + '</span>';
     if (f.ContactName) h += '<span class="timeline-pill">👤 ' + esc(f.ContactName) + '</span>';
     if (f.City || f.Sector) h += '<span class="timeline-pill">🗺️ ' + esc([f.City, f.Sector].filter(Boolean).join(' · ')) + '</span>';
+    if (productLabel) h += '<span class="timeline-pill">🧰 ' + esc(productLabel) + '</span>';
     if (f.Source === 'calls-sheet' || f.Imported) h += '<span class="timeline-pill">📥 Source appels</span>';
     h += '</div>';
-    h += '<div class="fu-body">' + (esc(f.Notes) || '<i style="color:var(--g400)">Pas de notes</i>') + '</div>';
+    h += '<div class="fu-body">' + (esc(cleanNotes) || '<i style="color:var(--g400)">Pas de notes</i>') + '</div>';
+    if (productLabel || appModeLabel || quartierLabel || currentSystemLabel || timesCalledLabel || levelLabel) {
+      h += '<div class="history-tools" style="margin:0 0 12px">';
+      if (levelLabel) h += '<span class="timeline-pill">🏫 ' + esc(levelLabel) + '</span>';
+      if (appModeLabel) h += '<span class="timeline-pill">🌐 ' + esc(appModeLabel) + '</span>';
+      if (quartierLabel) h += '<span class="timeline-pill">📍 ' + esc(quartierLabel) + '</span>';
+      if (currentSystemLabel) h += '<span class="timeline-pill">🧩 ' + esc(currentSystemLabel) + '</span>';
+      if (timesCalledLabel) h += '<span class="timeline-pill">🔁 ' + esc(timesCalledLabel + ' appels') + '</span>';
+      h += '</div>';
+    }
     h += '<div class="followup-process">';
     h += '<div class="process-box"><small>Résultat</small><strong>' + esc(f.Outcome || 'À qualifier') + '</strong><span>' + (f.ContactPhone ? '<a href="' + attrEsc(phoneHref(f.ContactPhone)) + '">📞 ' + esc(f.ContactPhone) + '</a>' : 'Pas de numéro') + '</span></div>';
     h += '<div class="process-box"><small>Statut</small><strong>' + esc(f.Status || 'En cours') + '</strong><span>' + (record ? esc((record.followupCount || 0) + ' suivis · ' + (record.callCount || 0) + ' appels') : '1ère trace visible') + '</span></div>';
+    h += '<div class="process-box"><small>Produit / version</small><strong>' + esc(productLabel || 'À préciser') + '</strong><span>' + esc([appModeLabel, currentSystemLabel, quartierLabel].filter(Boolean).join(' · ') || 'Produit, version ou concurrent non précisés') + '</span></div>';
     h += '<div class="process-box"><small>Action suivante</small><strong>' + esc(f.NextAction || 'À définir') + '</strong><span>' + (reminder ? esc(reminder.label + ' · ' + reminder.displayDate) : 'Pas de date fixée') + '</span></div>';
     h += '<div class="process-box"><small>Impact funnel</small><strong>' + esc(stageMeta.label) + '</strong><span>' + esc(stageMeta.desc + ' · ' + stageMeta.range) + '</span></div>';
     h += '</div>';
@@ -6739,8 +7147,8 @@ function rSuivi() {
   h += '<div class="cost-item"><div class="ci-val">' + (stats.daysOnField > 0 ? fmt(Math.round(stats.totalCost / stats.daysOnField)) : '0') + '</div><div class="ci-lbl">Coût moyen / jour</div></div>';
   h += '</div>';
 
-  // Visit detail list (own visits for regular, all for super admin)
-  var costFollowups = getAllFollowups().filter(function(f) { return f.FollowupType === 'VISIT' && (isSuper || samePerson(f.Expert, me)); });
+  // Visit detail list stays personal inside Workspace, even for admins
+  var costFollowups = workspaceFollowups.filter(function(f) { return f.FollowupType === 'VISIT'; });
   if (costFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:30px">Aucune visite terrain enregistrée.</p>';
   costFollowups.forEach(function(f) {
     h += '<div class="fu-item type-VISIT"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
@@ -6773,7 +7181,7 @@ function rSuivi() {
       h += '<div class="fu-item type-' + f.FollowupType + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
       h += '<div style="display:flex;gap:8px;align-items:center"><span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
       h += '<span class="fu-type ' + f.FollowupType + '">' + f.FollowupType + '</span></div></div>';
-      h += '<div class="fu-body">' + (esc(f.Notes) || '') + '</div>';
+      h += '<div class="fu-body">' + (esc(getFollowupPlainNotes(f)) || '') + '</div>';
       h += '<div class="fu-footer"><span>' + new Date(f.Timestamp).toLocaleDateString('fr-FR') + '</span>';
       if (f.Status) h += '<span>' + esc(f.Status) + '</span>';
       if (Number(f.Cost) > 0) h += '<span class="fu-cost">' + fmt(f.Cost) + ' FCFA</span>';
@@ -6859,7 +7267,14 @@ function rSuivi() {
     customSchoolInput.oninput = updateSchoolOwnershipNotice;
     customSchoolInput.onblur = updateSchoolOwnershipNotice;
   }
+  var newSchoolNameInput = document.getElementById('nsSchoolName');
+  if (newSchoolNameInput) {
+    newSchoolNameInput.oninput = updateNewSchoolOwnershipNotice;
+    newSchoolNameInput.onblur = updateNewSchoolOwnershipNotice;
+  }
   updateSchoolOwnershipNotice();
+  updateNewSchoolOwnershipNotice();
+  startEntryAutoClock();
   activateSuiviPanel(suiviPreferredTab || 'planner');
 }
 
@@ -6867,19 +7282,47 @@ function prefillSchool() {
   var sel = document.getElementById('fuSchool');
   var cw = document.getElementById('fuSchoolCustomWrap');
   var nw = document.getElementById('newSchoolInfoWrap');
+  var expertName = currentUser ? currentUser.fullName : '';
+  var workspaceRaw = expertName ? getWorkspaceRawForUser(expertName) : getVisibleRaw();
+  var workspaceFollowups = expertName ? getWorkspaceFollowupsForUser(expertName) : getVisibleFollowups();
   if (sel.value === '__other__') {
     cw.style.display = '';
     if (nw) nw.style.display = '';
     document.getElementById('fuSchoolCustom').focus();
   } else {
     cw.style.display = 'none';
-    if (nw) nw.style.display = 'none';
-    var school = getVisibleRaw().find(function(r) { return r.n === sel.value; }) || getAllRawRows().find(function(r) { return r.n === sel.value; });
+    if (nw) nw.style.display = '';
+    var school = workspaceRaw.find(function(r) { return r.n === sel.value; });
+    var record = getHistorySchoolRecordMap(workspaceRaw, workspaceFollowups)[schoolKey(sel.value)] || null;
     if (school) {
       document.getElementById('fuContact').value = school.rn || '';
       document.getElementById('fuPhone').value = school.pw || school.pn || '';
       document.getElementById('fuCity').value = school.v || 'DOUALA';
       document.getElementById('fuSector').value = (school.v === 'YAOUNDE' ? school.sy : school.sd) || '';
+      if (document.getElementById('fuSchoolType')) document.getElementById('fuSchoolType').value = school.ty || 'Primaire';
+      if (document.getElementById('fuCategory')) document.getElementById('fuCategory').value = school.ca || 'STANDIG MOYEN';
+      if (document.getElementById('fuEffectif')) document.getElementById('fuEffectif').value = school.ef || '';
+      if (document.getElementById('fuRate')) document.getElementById('fuRate').value = typeof school.r === 'number' ? Math.round(school.r) : '';
+      if (document.getElementById('fuLocation')) document.getElementById('fuLocation').value = school.lo || '';
+      if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = school.rp || '';
+    }
+    if (record) {
+      if (document.getElementById('fuRate') && !document.getElementById('fuRate').value && record.rate != null) document.getElementById('fuRate').value = Math.round(record.rate);
+      if (document.getElementById('fuQuartier') && !document.getElementById('fuQuartier').value) document.getElementById('fuQuartier').value = record.quartier || (school ? school.lo || '' : '');
+      if (document.getElementById('fuCurrentSystem') && !document.getElementById('fuCurrentSystem').value) document.getElementById('fuCurrentSystem').value = record.currentSystem || '';
+      if (document.getElementById('fuProductType') && !document.getElementById('fuProductType').value) document.getElementById('fuProductType').value = record.productType || '';
+      if (document.getElementById('fuAppMode') && !document.getElementById('fuAppMode').value) document.getElementById('fuAppMode').value = record.appMode || '';
+      if (document.getElementById('fuDecisionReach') && !document.getElementById('fuDecisionReach').value) document.getElementById('fuDecisionReach').value = record.decisionReach || '';
+      if (document.getElementById('fuDecisionMaker') && !document.getElementById('fuDecisionMaker').value) document.getElementById('fuDecisionMaker').value = record.decisionMaker || '';
+      if (document.getElementById('fuInternetQuality') && !document.getElementById('fuInternetQuality').value) document.getElementById('fuInternetQuality').value = record.internetQuality || '';
+      if (document.getElementById('fuPowerQuality') && !document.getElementById('fuPowerQuality').value) document.getElementById('fuPowerQuality').value = record.powerQuality || '';
+      if (document.getElementById('fuRequestedModules') && !document.getElementById('fuRequestedModules').value) document.getElementById('fuRequestedModules').value = record.requestedModules || '';
+      if (document.getElementById('fuSupportRequest') && !document.getElementById('fuSupportRequest').value) document.getElementById('fuSupportRequest').value = record.supportRequest || '';
+      if (document.getElementById('fuPreferredChannel') && !document.getElementById('fuPreferredChannel').value) document.getElementById('fuPreferredChannel').value = record.preferredChannel || '';
+      if (document.getElementById('fuBudgetTiming') && !document.getElementById('fuBudgetTiming').value) document.getElementById('fuBudgetTiming').value = record.budgetTiming || '';
+      if (document.getElementById('fuCampusCount') && !document.getElementById('fuCampusCount').value) document.getElementById('fuCampusCount').value = record.campusCount || '';
+    } else if (document.getElementById('fuQuartier') && !document.getElementById('fuQuartier').value && school) {
+      document.getElementById('fuQuartier').value = school.lo || '';
     }
   }
   updateSchoolOwnershipNotice();
@@ -6909,24 +7352,25 @@ function activateSuiviPanel(panelKey, options) {
 
 function prefillFromSchool(name, contact, phone, city, sector) {
   var sel = document.getElementById('fuSchool');
-  var nw = document.getElementById('newSchoolInfoWrap');
-  if (nw) nw.style.display = 'none';
   if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === name) { sel.selectedIndex = i; break; } } }
   if (document.getElementById('fuContact')) document.getElementById('fuContact').value = contact || '';
   if (document.getElementById('fuPhone')) document.getElementById('fuPhone').value = phone || '';
   if (document.getElementById('fuCity')) document.getElementById('fuCity').value = city || 'DOUALA';
   if (document.getElementById('fuSector')) document.getElementById('fuSector').value = sector || '';
+  prefillSchool();
   updateSchoolOwnershipNotice();
   activateSuiviPanel('add', { scroll: true });
 }
 
 function showFollowupForm() {
   activateSuiviPanel('add', { scroll: true });
+  updateEntryAutoFields();
   if (document.getElementById('fuSchool')) document.getElementById('fuSchool').focus();
 }
 
 function showNewSchoolForm() {
   activateSuiviPanel('addschool', { scroll: true });
+  updateEntryAutoFields();
   if (document.getElementById('nsSchoolName')) document.getElementById('nsSchoolName').focus();
 }
 
@@ -6963,14 +7407,41 @@ async function submitFollowup() {
     return;
   }
   var beforeSnapshot = buildVisibleFunnelSnapshot();
-  var entryTimestamp = new Date().toISOString();
+  var capturedAt = new Date();
+  var entryTimestamp = capturedAt.toISOString();
+  var questionnaireMeta = {
+    rate: document.getElementById('fuRate').value.trim(),
+    institutionLevel: document.getElementById('fuSchoolType').value,
+    quartier: document.getElementById('fuQuartier').value.trim(),
+    productType: document.getElementById('fuProductType').value,
+    appMode: document.getElementById('fuAppMode').value,
+    currentSystem: document.getElementById('fuCurrentSystem').value.trim(),
+    decisionReach: document.getElementById('fuDecisionReach').value,
+    decisionMaker: document.getElementById('fuDecisionMaker').value.trim(),
+    internetQuality: document.getElementById('fuInternetQuality').value,
+    powerQuality: document.getElementById('fuPowerQuality').value,
+    supportRequest: document.getElementById('fuSupportRequest').value.trim(),
+    requestedModules: document.getElementById('fuRequestedModules').value.trim(),
+    budgetTiming: document.getElementById('fuBudgetTiming').value,
+    preferredChannel: document.getElementById('fuPreferredChannel').value,
+    campusCount: document.getElementById('fuCampusCount').value.trim(),
+    callStart: formatAutoEntryTime(capturedAt),
+    callDuration: document.getElementById('fuCallDuration').value,
+    callRating: document.getElementById('fuCallRating').value.trim(),
+    callTimesCalled: document.getElementById('fuTimesCalled').value.trim(),
+    callSecondCall: document.getElementById('fuSecondCall').value,
+    callWhatsappDocs: document.getElementById('fuWhatsappDocs').value,
+    callToSuperior: document.getElementById('fuToSuperior').value,
+    callVisit: document.getElementById('fuVisitFlag').value,
+    prospectionYear: document.getElementById('fuProspectionYear').value.trim()
+  };
   var data = {
     action: 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
     timestamp: entryTimestamp,
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
-    notes: document.getElementById('fuNotes').value.trim(),
+    notes: buildFollowupNotes(document.getElementById('fuNotes').value.trim(), questionnaireMeta),
     outcome: document.getElementById('fuOutcome').value,
     nextAction: document.getElementById('fuNextAction').value.trim(),
     nextDate: document.getElementById('fuNextDate').value,
@@ -6978,11 +7449,57 @@ async function submitFollowup() {
     status: document.getElementById('fuStatus').value,
     city: document.getElementById('fuCity').value,
     sector: document.getElementById('fuSector').value.trim(),
-    schoolType: schoolSel === '__other__' ? document.getElementById('fuSchoolType').value : '',
-    category: schoolSel === '__other__' ? document.getElementById('fuCategory').value : '',
-    effectif: schoolSel === '__other__' ? document.getElementById('fuEffectif').value.trim() : '',
-    location: schoolSel === '__other__' ? document.getElementById('fuLocation').value.trim() : '',
-    contactRole: schoolSel === '__other__' ? document.getElementById('fuContactRole').value.trim() : ''
+    schoolType: document.getElementById('fuSchoolType').value,
+    category: document.getElementById('fuCategory').value,
+    effectif: document.getElementById('fuEffectif').value.trim(),
+    location: document.getElementById('fuLocation').value.trim(),
+    contactRole: document.getElementById('fuContactRole').value.trim(),
+    Rate: questionnaireMeta.rate,
+    rate: questionnaireMeta.rate,
+    Quartier: questionnaireMeta.quartier,
+    quartier: questionnaireMeta.quartier,
+    ProductType: questionnaireMeta.productType,
+    productType: questionnaireMeta.productType,
+    AppMode: questionnaireMeta.appMode,
+    appMode: questionnaireMeta.appMode,
+    CurrentSystem: questionnaireMeta.currentSystem,
+    currentSystem: questionnaireMeta.currentSystem,
+    DecisionReach: questionnaireMeta.decisionReach,
+    decisionReach: questionnaireMeta.decisionReach,
+    DecisionMaker: questionnaireMeta.decisionMaker,
+    decisionMaker: questionnaireMeta.decisionMaker,
+    InternetQuality: questionnaireMeta.internetQuality,
+    internetQuality: questionnaireMeta.internetQuality,
+    PowerQuality: questionnaireMeta.powerQuality,
+    powerQuality: questionnaireMeta.powerQuality,
+    SupportRequest: questionnaireMeta.supportRequest,
+    supportRequest: questionnaireMeta.supportRequest,
+    RequestedModules: questionnaireMeta.requestedModules,
+    requestedModules: questionnaireMeta.requestedModules,
+    BudgetTiming: questionnaireMeta.budgetTiming,
+    budgetTiming: questionnaireMeta.budgetTiming,
+    PreferredChannel: questionnaireMeta.preferredChannel,
+    preferredChannel: questionnaireMeta.preferredChannel,
+    CampusCount: questionnaireMeta.campusCount,
+    campusCount: questionnaireMeta.campusCount,
+    CallStart: questionnaireMeta.callStart,
+    callStart: questionnaireMeta.callStart,
+    CallDuration: questionnaireMeta.callDuration,
+    callDuration: questionnaireMeta.callDuration,
+    CallRating: questionnaireMeta.callRating,
+    callRating: questionnaireMeta.callRating,
+    CallTimesCalled: questionnaireMeta.callTimesCalled,
+    timesCalled: questionnaireMeta.callTimesCalled,
+    CallSecondCall: questionnaireMeta.callSecondCall,
+    secondCall: questionnaireMeta.callSecondCall,
+    CallWhatsappDocs: questionnaireMeta.callWhatsappDocs,
+    whatsappDocs: questionnaireMeta.callWhatsappDocs,
+    CallToSuperior: questionnaireMeta.callToSuperior,
+    toSuperior: questionnaireMeta.callToSuperior,
+    CallVisit: questionnaireMeta.callVisit,
+    visit: questionnaireMeta.callVisit,
+    ProspectionYear: questionnaireMeta.prospectionYear,
+    prospectionYear: questionnaireMeta.prospectionYear
   };
   var res = await apiPost(data);
   if (res.success) {
@@ -7007,9 +7524,9 @@ async function submitFollowup() {
     if (document.getElementById('fuSchoolType')) document.getElementById('fuSchoolType').selectedIndex = 0;
     if (document.getElementById('fuCategory')) document.getElementById('fuCategory').selectedIndex = 2; // STANDIG MOYEN
     if (document.getElementById('fuEffectif')) document.getElementById('fuEffectif').value = '';
+    if (document.getElementById('fuRate')) document.getElementById('fuRate').value = '';
     if (document.getElementById('fuLocation')) document.getElementById('fuLocation').value = '';
     if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = '';
-    if (document.getElementById('newSchoolInfoWrap')) document.getElementById('newSchoolInfoWrap').style.display = 'none';
     document.getElementById('fuContact').value = '';
     document.getElementById('fuPhone').value = '';
     document.getElementById('fuNotes').value = '';
@@ -7018,6 +7535,27 @@ async function submitFollowup() {
     document.getElementById('fuNextDate').value = '';
     document.getElementById('fuCost').value = '0';
     document.getElementById('fuStatus').selectedIndex = 0;
+    document.getElementById('fuCallDuration').value = '';
+    document.getElementById('fuCallRating').value = '';
+    document.getElementById('fuTimesCalled').value = '';
+    document.getElementById('fuSecondCall').selectedIndex = 0;
+    document.getElementById('fuWhatsappDocs').selectedIndex = 0;
+    document.getElementById('fuToSuperior').selectedIndex = 0;
+    document.getElementById('fuVisitFlag').selectedIndex = 0;
+    document.getElementById('fuDecisionReach').selectedIndex = 0;
+    document.getElementById('fuDecisionMaker').value = '';
+    document.getElementById('fuCurrentSystem').value = '';
+    document.getElementById('fuProductType').selectedIndex = 0;
+    document.getElementById('fuAppMode').selectedIndex = 0;
+    document.getElementById('fuInternetQuality').selectedIndex = 0;
+    document.getElementById('fuPowerQuality').selectedIndex = 0;
+    document.getElementById('fuSupportRequest').value = '';
+    document.getElementById('fuRequestedModules').value = '';
+    document.getElementById('fuBudgetTiming').selectedIndex = 0;
+    document.getElementById('fuPreferredChannel').selectedIndex = 0;
+    document.getElementById('fuCampusCount').value = '';
+    document.getElementById('fuProspectionYear').value = '';
+    document.getElementById('fuQuartier').value = '';
     document.getElementById('fuSector').value = '';
     updateSchoolOwnershipNotice();
     suiviPreferredTab = 'history';
@@ -7050,13 +7588,39 @@ async function submitNewSchoolDirect() {
   var schoolName = document.getElementById('nsSchoolName').value.trim();
   if (!schoolName) { showToast('Veuillez entrer le nom de l\'école', true); return; }
   
-  var validation = validateSchoolSelectionForUser(schoolName);
+  var validation = updateNewSchoolOwnershipNotice();
   if (validation && !validation.ok) {
     showToast(validation.message, true);
     return;
   }
   var beforeSnapshot = buildVisibleFunnelSnapshot();
-  var entryTimestamp = new Date().toISOString();
+  var capturedAt = new Date();
+  var entryTimestamp = capturedAt.toISOString();
+  var questionnaireMeta = {
+    rate: document.getElementById('nsRate').value.trim(),
+    institutionLevel: document.getElementById('nsSchoolType').value,
+    quartier: document.getElementById('nsQuartier').value.trim(),
+    productType: document.getElementById('nsProductType').value,
+    appMode: document.getElementById('nsAppMode').value,
+    currentSystem: document.getElementById('nsCurrentSystem').value.trim(),
+    decisionReach: document.getElementById('nsDecisionReach').value,
+    decisionMaker: document.getElementById('nsDecisionMaker').value.trim(),
+    internetQuality: document.getElementById('nsInternetQuality').value,
+    powerQuality: document.getElementById('nsPowerQuality').value,
+    supportRequest: document.getElementById('nsSupportRequest').value.trim(),
+    requestedModules: document.getElementById('nsRequestedModules').value.trim(),
+    budgetTiming: document.getElementById('nsBudgetTiming').value,
+    preferredChannel: document.getElementById('nsPreferredChannel').value,
+    callStart: formatAutoEntryTime(capturedAt),
+    callDuration: document.getElementById('nsCallDuration').value,
+    callRating: document.getElementById('nsCallRating').value.trim(),
+    callTimesCalled: document.getElementById('nsTimesCalled').value.trim(),
+    callSecondCall: document.getElementById('nsSecondCall').value,
+    callWhatsappDocs: document.getElementById('nsWhatsappDocs').value,
+    callToSuperior: document.getElementById('nsToSuperior').value,
+    callVisit: document.getElementById('nsVisitFlag').value,
+    prospectionYear: document.getElementById('nsProspectionYear').value.trim()
+  };
   
   var data = {
     action: 'addFollowup',
@@ -7065,20 +7629,64 @@ async function submitNewSchoolDirect() {
     schoolName: schoolName,
     contactName: document.getElementById('nsContactName').value.trim(),
     contactPhone: document.getElementById('nsContactPhone').value.trim(),
-    followupType: 'CREATION',
-    notes: 'Création de la fiche école',
-    outcome: 'Intéressé',
-    nextAction: '',
-    nextDate: '',
+    followupType: document.getElementById('nsEntryType').value,
+    notes: buildFollowupNotes(document.getElementById('nsNotes').value.trim() || 'Création de la fiche école', questionnaireMeta),
+    outcome: document.getElementById('nsOutcome').value || 'Intéressé',
+    nextAction: document.getElementById('nsNextAction').value.trim(),
+    nextDate: document.getElementById('nsNextDate').value,
     cost: 0,
-    status: 'En cours',
+    status: document.getElementById('nsStatus').value,
     city: document.getElementById('nsCity').value,
     sector: document.getElementById('nsSector').value.trim(),
     schoolType: document.getElementById('nsSchoolType').value,
     category: document.getElementById('nsCategory').value,
     effectif: document.getElementById('nsEffectif').value.trim(),
     location: document.getElementById('nsLocation').value.trim(),
-    contactRole: document.getElementById('nsContactRole').value.trim()
+    contactRole: document.getElementById('nsContactRole').value.trim(),
+    Rate: questionnaireMeta.rate,
+    rate: questionnaireMeta.rate,
+    Quartier: questionnaireMeta.quartier,
+    quartier: questionnaireMeta.quartier,
+    ProductType: questionnaireMeta.productType,
+    productType: questionnaireMeta.productType,
+    AppMode: questionnaireMeta.appMode,
+    appMode: questionnaireMeta.appMode,
+    CurrentSystem: questionnaireMeta.currentSystem,
+    currentSystem: questionnaireMeta.currentSystem,
+    DecisionReach: questionnaireMeta.decisionReach,
+    decisionReach: questionnaireMeta.decisionReach,
+    DecisionMaker: questionnaireMeta.decisionMaker,
+    decisionMaker: questionnaireMeta.decisionMaker,
+    InternetQuality: questionnaireMeta.internetQuality,
+    internetQuality: questionnaireMeta.internetQuality,
+    PowerQuality: questionnaireMeta.powerQuality,
+    powerQuality: questionnaireMeta.powerQuality,
+    SupportRequest: questionnaireMeta.supportRequest,
+    supportRequest: questionnaireMeta.supportRequest,
+    RequestedModules: questionnaireMeta.requestedModules,
+    requestedModules: questionnaireMeta.requestedModules,
+    BudgetTiming: questionnaireMeta.budgetTiming,
+    budgetTiming: questionnaireMeta.budgetTiming,
+    PreferredChannel: questionnaireMeta.preferredChannel,
+    preferredChannel: questionnaireMeta.preferredChannel,
+    CallStart: questionnaireMeta.callStart,
+    callStart: questionnaireMeta.callStart,
+    CallDuration: questionnaireMeta.callDuration,
+    callDuration: questionnaireMeta.callDuration,
+    CallRating: questionnaireMeta.callRating,
+    callRating: questionnaireMeta.callRating,
+    CallTimesCalled: questionnaireMeta.callTimesCalled,
+    timesCalled: questionnaireMeta.callTimesCalled,
+    CallSecondCall: questionnaireMeta.callSecondCall,
+    secondCall: questionnaireMeta.callSecondCall,
+    CallWhatsappDocs: questionnaireMeta.callWhatsappDocs,
+    whatsappDocs: questionnaireMeta.callWhatsappDocs,
+    CallToSuperior: questionnaireMeta.callToSuperior,
+    toSuperior: questionnaireMeta.callToSuperior,
+    CallVisit: questionnaireMeta.callVisit,
+    visit: questionnaireMeta.callVisit,
+    ProspectionYear: questionnaireMeta.prospectionYear,
+    prospectionYear: questionnaireMeta.prospectionYear
   };
   
   var res = await apiPost(data);
@@ -7102,11 +7710,38 @@ async function submitNewSchoolDirect() {
     document.getElementById('nsSchoolType').selectedIndex = 0;
     document.getElementById('nsCategory').selectedIndex = 2; // Standing Moyen
     document.getElementById('nsEffectif').value = '';
+    document.getElementById('nsRate').value = '';
     document.getElementById('nsSector').value = '';
+    document.getElementById('nsQuartier').value = '';
     document.getElementById('nsLocation').value = '';
     document.getElementById('nsContactName').value = '';
     document.getElementById('nsContactPhone').value = '';
     document.getElementById('nsContactRole').value = '';
+    document.getElementById('nsCurrentSystem').value = '';
+    document.getElementById('nsProductType').selectedIndex = 0;
+    document.getElementById('nsAppMode').selectedIndex = 0;
+    document.getElementById('nsInternetQuality').selectedIndex = 0;
+    document.getElementById('nsPowerQuality').selectedIndex = 0;
+    document.getElementById('nsDecisionReach').selectedIndex = 0;
+    document.getElementById('nsDecisionMaker').value = '';
+    document.getElementById('nsRequestedModules').value = '';
+    document.getElementById('nsSupportRequest').value = '';
+    document.getElementById('nsCallDuration').value = '';
+    document.getElementById('nsCallRating').value = '';
+    document.getElementById('nsTimesCalled').value = '';
+    document.getElementById('nsSecondCall').selectedIndex = 0;
+    document.getElementById('nsWhatsappDocs').selectedIndex = 0;
+    document.getElementById('nsToSuperior').selectedIndex = 0;
+    document.getElementById('nsVisitFlag').selectedIndex = 0;
+    document.getElementById('nsOutcome').selectedIndex = 0;
+    document.getElementById('nsStatus').selectedIndex = 0;
+    document.getElementById('nsPreferredChannel').selectedIndex = 0;
+    document.getElementById('nsBudgetTiming').selectedIndex = 0;
+    document.getElementById('nsProspectionYear').value = '';
+    document.getElementById('nsNextAction').value = '';
+    document.getElementById('nsNextDate').value = '';
+    document.getElementById('nsNotes').value = '';
+    updateNewSchoolOwnershipNotice();
     
     suiviPreferredTab = 'history';
     rSuivi();
