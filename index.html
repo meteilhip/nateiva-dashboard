@@ -1390,6 +1390,7 @@ body{
 }
 .form-card h3 .it{font-style:italic;color:var(--red)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-grid > *{min-width:0}
 @media(max-width:768px){.form-grid{grid-template-columns:1fr}}
 @media(max-width:900px){
   .pie-layout{grid-template-columns:1fr}
@@ -1409,7 +1410,8 @@ body{
 .form-field input,.form-field select,.form-field textarea{
   padding:12px 14px;border:1.5px solid var(--g200);border-radius:10px;
   font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);
-  background:var(--bg);transition:all .2s;
+  background:var(--bg);transition:all .2s;width:100%;max-width:100%;min-width:0;
+  appearance:none;-webkit-appearance:none;
 }
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{
   outline:none;border-color:var(--red);box-shadow:0 0 0 4px var(--red-soft);
@@ -1590,6 +1592,53 @@ body{
   .workspace-cta{width:min(100%,420px);max-width:420px;flex:none;margin:0 auto}
   .planner-entry{flex-direction:column}
   .planner-entry-side{align-items:flex-start}
+}
+@media (max-width: 768px){
+  .form-card{padding:18px 16px;border-radius:16px}
+  .form-card h3{font-size:20px;margin-bottom:14px}
+  .form-grid,
+  .form-card .form-grid,
+  .form-card .form-grid[style]{
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+  .form-submit{
+    flex-direction:column;
+    justify-content:stretch;
+  }
+  .form-submit button{
+    width:100%;
+  }
+  .fu-item,
+  .planner-summary,
+  .planner-board,
+  .page-intro,
+  .workspace-action-center{
+    overflow:hidden;
+  }
+  .fu-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .history-tools{
+    gap:8px;
+  }
+  .suivi-tabs{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .suivi-tabs::-webkit-scrollbar{display:none}
+  .suivi-tab{
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .table-scroll{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
 }
 
 .suivi-tabs{
@@ -7249,7 +7298,7 @@ function rSuivi() {
   h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école" oninput="updateSchoolOwnershipNotice()"></div>';
   h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
   h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
-  h += '<div class="form-grid" style="grid-gap:14px;display:grid;grid-template-columns:1fr 1fr;margin:0">';
+  h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0">';
   h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
@@ -7515,14 +7564,14 @@ function rSuivi() {
 
   if (isSuper) {
     h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:24px 0 14px">Coûts par expert</h4>';
-    h += '<table class="tbl"><thead><tr><th>Expert</th><th>Visites</th><th>Total FCFA</th><th>Moy/visite</th><th>Jours terrain</th><th>Moy/jour</th></tr></thead><tbody>';
+    h += '<div class="table-scroll"><table class="tbl"><thead><tr><th>Expert</th><th>Visites</th><th>Total FCFA</th><th>Moy/visite</th><th>Jours terrain</th><th>Moy/jour</th></tr></thead><tbody>';
     suiviRankings.forEach(function(r) {
       h += '<tr><td><b>' + esc(r.expert) + '</b></td><td class="num">' + r.visits + '</td><td class="num" style="color:var(--red)">' + fmt(r.totalCost) + '</td>';
       h += '<td class="num">' + (r.visits > 0 ? fmt(Math.round(r.totalCost / r.visits)) : '—') + '</td>';
       h += '<td class="num">' + r.daysOnField + '</td>';
       h += '<td class="num">' + (r.daysOnField > 0 ? fmt(Math.round(r.totalCost / r.daysOnField)) : '—') + '</td></tr>';
     });
-    h += '</tbody></table>';
+    h += '</tbody></table></div>';
   }
   h += '</div></div>';
 
@@ -7581,7 +7630,7 @@ function rSuivi() {
 
     // Existing users list
     h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Utilisateurs actuels</h4>';
-    h += '<table class="tbl"><thead><tr><th>Utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Ville</th><th>Portée</th><th>Gestion</th><th>Onglets</th><th>Source</th></tr></thead><tbody>';
+    h += '<div class="table-scroll"><table class="tbl"><thead><tr><th>Utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Ville</th><th>Portée</th><th>Gestion</th><th>Onglets</th><th>Source</th></tr></thead><tbody>';
     getAllUsers().forEach(function(u) {
       var role = roleBadgeLabel(u);
       var permissions = normalizePermissions(u);
@@ -7593,7 +7642,7 @@ function rSuivi() {
       h += '<td style="font-size:12px;color:var(--g600)">' + permissions.panes.map(function(paneKey) { var cfg = PANE_ACCESS_CONFIG.find(function(item) { return item.key === paneKey; }); return cfg ? cfg.label : paneKey; }).join(', ') + '</td>';
       h += '<td><span class="src ' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'src-fondateur' : 'src-terrain') + '">' + (DEFAULT_USERS.some(function(d) { return d.username === u.username; }) ? 'INITIAL' : 'INVITÉ') + '</span></td></tr>';
     });
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table></div></div></div>';
   }
 
   el.innerHTML = h;
