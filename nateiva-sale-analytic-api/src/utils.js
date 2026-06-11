@@ -33,9 +33,50 @@ function samePerson(a, b) {
   return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 }
 
+function digitsOnly(value) {
+  return String(value || "").replace(/\D+/g, "");
+}
+
+function normalizeFollowupValue(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function splitFollowupNotes(noteText) {
+  const marker = "[NATEIVA_META]";
+  const fullText = String(noteText || "");
+  const markerIndex = fullText.lastIndexOf(marker);
+  if (markerIndex < 0) return { text: fullText.trim(), meta: {} };
+  const plainText = fullText.slice(0, markerIndex).trim();
+  const rawMeta = fullText.slice(markerIndex + marker.length).trim();
+  try {
+    const parsed = JSON.parse(rawMeta);
+    return { text: plainText, meta: parsed && typeof parsed === "object" ? parsed : {} };
+  } catch (error) {
+    return { text: fullText.trim(), meta: {} };
+  }
+}
+
+function buildFollowupNearDuplicateSignature(item) {
+  const split = splitFollowupNotes(item.Notes || "");
+  const base = [
+    item.Expert || "",
+    item.SchoolName || "",
+    item.ContactName || "",
+    digitsOnly(item.ContactPhone || ""),
+    item.FollowupType || "",
+    split.text || "",
+    item.Outcome || "",
+    item.NextAction || "",
+    item.NextDate || "",
+    item.Status || "",
+    item.City || "",
+    item.ContactRole || ""
+  ].map(normalizeFollowupValue).join("|");
+  return crypto.createHash("sha1").update(base).digest("hex");
+}
+
 function buildFollowupFingerprint(item) {
   const base = [
-    item.legacyId || item.ID || "",
     item.Timestamp || "",
     item.Expert || "",
     item.SchoolName || "",
@@ -65,6 +106,9 @@ module.exports = {
   defaultPermissionsForRole,
   normalizePermissions,
   samePerson,
+  digitsOnly,
+  splitFollowupNotes,
+  buildFollowupNearDuplicateSignature,
   buildFollowupFingerprint,
   generateServerId,
   boolToTiny

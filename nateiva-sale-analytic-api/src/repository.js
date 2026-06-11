@@ -1,5 +1,5 @@
 const { query } = require("./db");
-const { defaultPermissionsForRole, normalizePermissions, buildFollowupFingerprint, generateServerId, boolToTiny, normalizeRole } = require("./utils");
+const { defaultPermissionsForRole, normalizePermissions, buildFollowupFingerprint, buildFollowupNearDuplicateSignature, generateServerId, boolToTiny, normalizeRole } = require("./utils");
 
 function mapUser(row) {
   if (!row) return null;
@@ -131,11 +131,49 @@ async function findFollowupByLegacyOrFingerprint(legacyId, fingerprint) {
   return rows[0] || null;
 }
 
+function parseTimestampMs(value) {
+  const ms = Date.parse(String(value || ""));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+async function findRecentNearDuplicate(input, windowSeconds) {
+  const candidateRows = await query(
+    `SELECT *
+     FROM followups
+     WHERE deleted_at IS NULL
+       AND LOWER(expert) = LOWER(?)
+       AND followup_type = ?
+       AND LOWER(school_name) = LOWER(?)
+     ORDER BY id DESC
+     LIMIT 50`,
+    [input.Expert || "", input.FollowupType || "", input.SchoolName || ""]
+  );
+  if (!candidateRows.length) return null;
+
+  const targetSignature = buildFollowupNearDuplicateSignature(input);
+  const targetTimestampMs = parseTimestampMs(input.Timestamp);
+  const windowMs = Math.max(0, Number(windowSeconds) || 0) * 1000;
+
+  for (const row of candidateRows) {
+    const mapped = mapFollowup(row);
+    if (buildFollowupNearDuplicateSignature(mapped) !== targetSignature) continue;
+    if (!windowMs) return row;
+    const candidateTimestampMs = parseTimestampMs(mapped.Timestamp);
+    if (targetTimestampMs != null && candidateTimestampMs != null && Math.abs(targetTimestampMs - candidateTimestampMs) <= windowMs) {
+      return row;
+    }
+  }
+  return null;
+}
+
 async function upsertFollowup(input) {
   const legacyId = input.legacyId || input.ID || "";
   const fingerprint = buildFollowupFingerprint(input);
   const existing = await findFollowupByLegacyOrFingerprint(legacyId, fingerprint);
   if (existing) return mapFollowup(existing);
+
+  const nearDuplicate = await findRecentNearDuplicate(input, 90);
+  if (nearDuplicate) return mapFollowup(nearDuplicate);
 
   const serverUid = generateServerId("NSA-FU");
   await query(
