@@ -114,7 +114,14 @@
   }
 
   function getFollowups() {
-    return IMPORTED_FOLLOWUPS.concat(getStoredFollowups());
+    var combined = IMPORTED_FOLLOWUPS.concat(getStoredFollowups());
+    var seen = {};
+    return combined.filter(function(f) {
+      var key = normalize(f.Expert) + '|' + normalize(f.SchoolName) + '|' + (f.Timestamp || '').slice(0, 16);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
   }
 
   function setCurrentUser(user) {

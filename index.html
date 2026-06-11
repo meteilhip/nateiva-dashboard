@@ -5958,11 +5958,16 @@ function buildImportedSheetFollowups() {
 }
 
 function getAllFollowups() {
+  var imported = Array.isArray(importedSheetFollowups) ? importedSheetFollowups : [];
   var synced = Array.isArray(suiviFollowups) ? suiviFollowups : [];
-  if (synced.some(function(f){ return f.Source === 'browser-local-sync' || (f.ID && String(f.ID).startsWith('NSA-')); })) {
-    return synced;
-  }
-  return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(synced);
+  var combined = imported.concat(synced);
+  var seen = {};
+  return combined.filter(function(f) {
+    var key = (f.Expert || '').toLowerCase().trim() + '|' + (f.SchoolName || '').toLowerCase().trim() + '|' + (f.Timestamp || '').slice(0, 16);
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
 }
 
 function getWorkspaceFollowupsForUser(expertName) {
