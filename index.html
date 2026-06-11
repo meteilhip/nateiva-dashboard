@@ -5958,7 +5958,11 @@ function buildImportedSheetFollowups() {
 }
 
 function getAllFollowups() {
-  return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
+  var synced = Array.isArray(suiviFollowups) ? suiviFollowups : [];
+  if (synced.some(function(f){ return f.Source === 'browser-local-sync' || (f.ID && String(f.ID).startsWith('NSA-')); })) {
+    return synced;
+  }
+  return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(synced);
 }
 
 function getWorkspaceFollowupsForUser(expertName) {
