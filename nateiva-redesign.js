@@ -800,8 +800,8 @@
       uniqueSchools: new Set(rawRows.map((row) => schoolKey(row.n)).filter(Boolean)).size,
       importedCalls: followups.filter((item) => item.Imported && item.FollowupType === "CALL").length,
       sourceStats: {
-        terrainInputs: SOURCE_COUNTS.prospection || rawRows.length,
-        callInputs: SOURCE_COUNTS.calls || followups.filter((item) => item.FollowupType === "CALL").length,
+        terrainInputs: rawRows.length,
+        callInputs: followups.filter((item) => item.FollowupType === "CALL").length,
         sourceLinks: SOURCE_LINKS
       },
       backendShared: hasSharedBackend(),
@@ -1198,7 +1198,7 @@
   }
 
   function renderLogin() {
-    const totalSchools = SOURCE_COUNTS.prospection || RAW_DATA.length;
+    const totalSchools = RAW_DATA.length;
     const experts = new Set(RAW_DATA.map((row) => normalize(row.e)).filter(Boolean)).size;
     const zones = new Set(RAW_DATA.map((row) => `${row.v || ""}-${zoneOf(row) || ""}`).filter((value) => value !== "-")).size;
     return `
@@ -1209,7 +1209,7 @@
           <p>Une seule entree pour le terrain, les appels, le suivi et le dashboard analytique par zone, pipeline, BI, playbook, NLP et concurrence.</p>
           <div class="ntv-stat-grid">
             <article class="ntv-stat-card"><strong>${num(totalSchools)}</strong><span>Prospections terrain</span></article>
-            <article class="ntv-stat-card"><strong>${num(SOURCE_COUNTS.calls || 0)}</strong><span>Appels importes</span></article>
+            <article class="ntv-stat-card"><strong>${num(IMPORTED_FOLLOWUPS.filter(f => f.FollowupType === "CALL").length || 0)}</strong><span>Appels</span></article>
             <article class="ntv-stat-card"><strong>${num(experts)}</strong><span>Experts actifs</span></article>
             <article class="ntv-stat-card"><strong>${num(zones)}</strong><span>Couches zone/secteur</span></article>
             <article class="ntv-stat-card"><strong>${num(COMPETITOR_DATA.length)}</strong><span>Competiteurs traces</span></article>
@@ -1360,7 +1360,7 @@
             <article class="ntv-metric-card">
               <span class="ntv-kicker">Appels</span>
               <strong>${num(dashboard.sourceStats.callInputs)}</strong>
-              <p>Appels importes et relies au pipeline.</p>
+              <p>Appels relies au pipeline.</p>
             </article>
             <article class="ntv-metric-card">
               <span class="ntv-kicker">Hot Rate</span>
@@ -1743,7 +1743,7 @@
           <article class="ntv-user-card">
             <span class="ntv-kicker">Source appels</span>
             <strong>${num(dashboard.sourceStats.callInputs)} appels</strong>
-            <p>${num(dashboard.sourceStats.callInputs)} appels reliés au pipeline, aux experts et aux semaines.</p>
+            <p>Appels reliés au pipeline, aux experts et aux semaines.</p>
             <a class="ntv-link-pill" href="${attr(dashboard.sourceStats.sourceLinks.callsSheet)}" target="_blank" rel="noreferrer">Ouvrir la feuille appels ↗</a>
           </article>
           <article class="ntv-user-card">

@@ -2928,10 +2928,10 @@ function buildDashboardModel(){
   const terrainInputs=scope.rawRows.length+scope.followups.filter(function(item){ return item.FollowupType==='VISIT'; }).length;
   const activeDays=new Set(scope.rawRows.map(function(row){ return activeDayKey(row.t); }).concat(scope.followups.map(function(item){ return activeDayKey(item.Timestamp); })).filter(Boolean)).size;
   const hotRate=records.length ? Math.round((((hotStage.count||0)+(wonStage.count||0))/records.length)*100) : 0;
-  const importedSourceCallRows=(LIVE_DATA && LIVE_DATA.callSheetRows) || (((LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length) + 1);
   const importedSourceCallCount=(LIVE_DATA && LIVE_DATA.callCount) || getAllFollowups().filter(function(item){ return item.FollowupType==='CALL'; }).length;
-  const sourceCallCount=Math.max(importedSourceCallCount, VERIFIED_CALL_SOURCE_COUNT);
-  const sourceCallRows=Math.max(importedSourceCallRows, VERIFIED_CALL_SOURCE_ROWS, sourceCallCount ? sourceCallCount + 1 : 0);
+  const importedSourceCallRows=(LIVE_DATA && LIVE_DATA.callSheetRows) || (importedSourceCallCount + 1);
+  const sourceCallCount=importedSourceCallCount;
+  const sourceCallRows=importedSourceCallRows;
   return {
     rawRows:scope.rawRows,
     followups:scope.followups,
@@ -3666,20 +3666,18 @@ function rHome(){
   const introCopy = '';
   const summaryTags = showAll
     ? [
-        '🏫 ' + dashboard.sourceProspectionRows + ' lignes source',
-        '📌 ' + dashboard.sourceProspectionCount + ' prospections utiles',
-        '📞 ' + dashboard.sourceCallCount + ' appels source',
+        '🏫 ' + totalProspections + ' prospections',
+        '📞 ' + dashboard.detailedCallCount + ' appels',
         '📍 Zones & couches terrain',
         '👥 Scope expert / admin',
         '📅 Semaine vs semaine'
       ]
     : [
-        '🏫 ' + totalProspections + ' prospections visibles',
-        '📞 ' + dashboard.callInputs + ' appels visibles',
+        '🏫 ' + totalProspections + ' prospections',
+        '📞 ' + dashboard.callInputs + ' appels',
         '👤 Portefeuille personnel',
         '📍 Vos zones et secteurs',
-        '📅 Votre progression',
-        '🏁 Votre pipeline'
+        '📅 Votre progression'
       ];
 
   let h=`
@@ -3698,14 +3696,14 @@ function rHome(){
     </div>
     <div class="kpis">
       <div class="kpi red">
-        <div class="lbl">Prospections visibles</div>
+        <div class="lbl">Prospections</div>
         <div class="val">${totalProspections}</div>
-        <div class="delta">${uniqueSchools} écoles uniques · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} DLA · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} YDE</div>
+        <div class="delta">${uniqueSchools} écoles uniques · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} Douala · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} Yaoundé</div>
       </div>
       <div class="kpi teal">
-        <div class="lbl">Appels source</div>
-        <div class="val">${dashboard.sourceCallCount}</div>
-        <div class="delta">${dashboard.detailedCallCount} analysés en détail${dashboard.sourceCallGap ? ' · ' + dashboard.sourceCallGap + ' nouveaux à relire' : ''}</div>
+        <div class="lbl">Appels</div>
+        <div class="val">${dashboard.detailedCallCount}</div>
+        <div class="delta">${callSummary.connected} joints · ${callSummary.noAnswer + callSummary.unreachable} sans réponse</div>
       </div>
       <div class="kpi dark">
         <div class="lbl">Vélocité</div>
@@ -3754,7 +3752,7 @@ function rHome(){
   <div class="section">
     <div class="sec-head">
       <h2>🥧 Prospection <span class="it">Pie Charts + NLP</span></h2>
-      <span class="anno">${totalProspections} prospections visibles · lecture exclusive + signaux terrain</span>
+      <span class="anno">${totalProspections} prospections · lecture exclusive + signaux terrain</span>
     </div>
     <div class="pie-grid">
       ${renderPieCard(
@@ -3783,14 +3781,13 @@ function rHome(){
   <div class="section">
     <div class="sec-head">
       <h2>📞 Appels <span class="it">& Résultats</span></h2>
-      <span class="anno">${dashboard.sourceCallCount} appels source · ${dashboard.detailedCallCount} appels détaillés importés · suivi par issue et par expert</span>
+      <span class="anno">${dashboard.detailedCallCount} appels · suivi par issue et par expert</span>
     </div>
-    ${dashboard.sourceCallGap ? `<div class="note teal"><b>Volume source confirmé:</b> la feuille appels montre <b>${dashboard.sourceCallCount}</b> réponses (ligne ${dashboard.sourceCallRows} avec entête). L’analyse fine visible ici repose encore sur <b>${dashboard.detailedCallCount}</b> appels importés en détail, donc <b>${dashboard.sourceCallGap}</b> appels doivent encore être relus ligne par ligne pour mettre à jour toutes les issues, experts et signaux NLP.</div>` : ''}
     <div class="kpis">
       <div class="kpi teal">
-        <div class="lbl">Appels source</div>
-        <div class="val">${dashboard.sourceCallCount}</div>
-        <div class="delta">${dashboard.detailedCallCount} analysés · ${callSummary.connected} joints visibles</div>
+        <div class="lbl">Total appels</div>
+        <div class="val">${dashboard.detailedCallCount}</div>
+        <div class="delta">${callSummary.connected} joints · ${callSummary.noAnswer} sans réponse · ${callSummary.unreachable} injoignables</div>
       </div>
       <div class="kpi green">
         <div class="lbl">Contacts Établis</div>
@@ -3823,7 +3820,7 @@ function rHome(){
       )}
       ${renderPieCard(
         'Résumés d’appels interprétés',
-        'Camembert NLP calculé uniquement sur les résumés réellement saisis, pas sur les 105 appels entiers.',
+        'Camembert NLP calculé uniquement sur les résumés réellement saisis, pas sur tous les appels.',
         dashboard.callAnalytics.primaryIntentSegments,
         String(callQuality.summaryFilled),
         'résumés remplis',
@@ -4091,7 +4088,7 @@ function rMetrics(){
       </div>
       <div class="mb b3">
         <h4><span class="icon">⭐</span>Pourquoi C'EST IMPORTANT</h4>
-        <p><b>Le taux permet le tri.</b> Avec 340 prospections, on doit savoir QUI rappeler en premier:</p>
+        <p><b>Le taux permet le tri.</b> Avec des centaines de prospections, on doit savoir QUI rappeler en premier:</p>
         <ul>
           <li><b>≥80%</b> = signature imminente, action <b>cette semaine</b></li>
           <li><b>60-79%</b> = négociation, action <b>ce mois</b></li>
@@ -4475,7 +4472,7 @@ function rMetrics(){
       <div class="mb b2">
         <h4><span class="icon">2️⃣</span>% Distribution</h4>
         <p>Indique <b>quelle proportion d'un total</b>.</p>
-        <p>Ex: "Hot deals = 15.6% du portefeuille" = 53/340.</p>
+        <p>Ex: "Hot deals = 15% du portefeuille" = chauds ÷ total écoles.</p>
         <span class="m-formula">% = (Sous-groupe ÷ Total) × 100</span>
       </div>
       <div class="mb b3">
@@ -4795,7 +4792,7 @@ function rMarket(){
             <div class="kpi green"><div class="lbl">Hot</div><div class="val">${sd.hot}</div></div>
             <div class="kpi saffron"><div class="lbl">Closeable</div><div class="val">${sd.closeable}</div></div>
           </div>
-          <div class="note teal" style="margin-top:14px"><b>Insight Bonabéri:</b> 155 sur 244 prospections Douala sont à BONABÉRI — où est notre bureau. Concurrent #1: <b>LOGESCO</b> (HQ Douala, Facebook 1280 likes). #2 local: LA GESTION SCOLAIRE.</div>
+          <div class="note teal" style="margin-top:14px"><b>Insight Bonabéri:</b> ${dla.filter(r=>(r.sd||'').toUpperCase().includes('BONAB')).length} sur ${sd.n} prospections Douala sont à BONABÉRI — où est notre bureau. Concurrent #1: <b>LOGESCO</b> (HQ Douala). #2 local: LA GESTION SCOLAIRE.</div>
         </div>
         <div class="chart" style="border-left:5px solid var(--saffron)">
           <h3>📍 YAOUNDÉ</h3>
@@ -4846,7 +4843,7 @@ function rMarket(){
       <!-- DOUALA -->
       <div class="metric" style="margin-bottom:18px">
         <div class="metric-header" data-num="DLA">
-          <span class="m-tag">Région #1 · 244 prospections</span>
+          <span class="m-tag">Région #1 · ${sd.n} prospections</span>
           <h3>📍 <span class="it">DOUALA</span> — Notre Forteresse</h3>
           <p class="m-summary">Concurrent dominant: <b>LOGESCO</b> (HQ Douala). Concurrents secondaires: <b>LA GESTION SCOLAIRE</b>, <b>SIMPALA</b> (présence émergente). Notre avantage: bureau physique Bonabéri, présence terrain massive.</p>
         </div>
@@ -4879,7 +4876,7 @@ function rMarket(){
             <h4><span class="icon">🎯</span>Stratégie Douala</h4>
             <p><b>Quartiers prioritaires:</b></p>
             <ul>
-              <li><b>BONABERI</b> (155/244 prospections, où est notre bureau)</li>
+              <li><b>BONABERI</b> (${dla.filter(r=>(r.sd||'').toUpperCase().includes('BONAB')).length}/${sd.n} prospections, où est notre bureau)</li>
               <li>DEIDO (Kendo Fabiola fort)</li>
               <li>BEPANDA, BALI</li>
             </ul>
@@ -4904,7 +4901,7 @@ function rMarket(){
       <!-- YAOUNDÉ -->
       <div class="metric" style="margin-bottom:18px">
         <div class="metric-header" data-num="YDE">
-          <span class="m-tag">Région #2 · 96 prospections</span>
+          <span class="m-tag">Région #2 · ${sy.n} prospections</span>
           <h3>📍 <span class="it">YAOUNDÉ</span> — Capitale Stratégique</h3>
           <p class="m-summary">Concurrent dominant: <b>SIMPALA</b> (Cyrille Feugang, 2012, 100% cloud). Secondaires: <b>TURBOSCHOOL</b>, <b>GALACTIS</b>. Notre angle: mobile + Ambassadeur 40% + souveraineté des données.</p>
         </div>
@@ -5539,8 +5536,8 @@ var SUPER_ADMINS = ['Noah'];
 var SUB_ADMINS = ['Mbeuka brice', 'Ntsa Guy'];
 var REVENUE_VIEWERS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
 var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
-var VERIFIED_CALL_SOURCE_COUNT = 130;
-var VERIFIED_CALL_SOURCE_ROWS = 131;
+var VERIFIED_CALL_SOURCE_COUNT = 0;
+var VERIFIED_CALL_SOURCE_ROWS = 0;
 var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
 var FOLLOWUP_META_MARKER = '[NATEIVA_META]';
 var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
