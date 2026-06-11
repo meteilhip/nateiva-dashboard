@@ -1919,7 +1919,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
     </div>
     <div class="meta-block">
       <span class="meta-pill red">v9.1 · KPI + BI</span>
-      <span class="meta-pill saffron">05 JUIN 2026</span>
+      <span class="meta-pill saffron" id="headerDate">05 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
     <div id="headerAuth" class="header-auth"></div>
@@ -3655,6 +3655,11 @@ function rHome(){
   const callExperts=dashboard.callAnalytics.experts;
   const callQuality=dashboard.callAnalytics.quality;
   const prospectionAnalytics=dashboard.prospectionAnalytics;
+  const importedCalls=dashboard.followups.filter(function(f){return f.ID && String(f.ID).startsWith('IMP-');}).length;
+  const platformCalls=dashboard.followups.filter(function(f){return f.ID && String(f.ID).startsWith('NSA-');}).length;
+  const calledSchools=new Set(dashboard.followups.map(function(f){return schoolKey(f.SchoolName);}).filter(Boolean));
+  const schoolsCalled=calledSchools.size;
+  const schoolCoverage=uniqueSchools>0?Math.round((schoolsCalled/uniqueSchools)*100):0;
   const quickLinks=[
     userCanAccessPane(currentUser,'suivi') ? '<a href="#" data-jump="suivi">🗂️ Workspace</a>' : '',
     userCanAccessPane(currentUser,'metrics') ? '<a href="#" data-jump="metrics">📊 BI & KPI</a>' : '',
@@ -3668,7 +3673,7 @@ function rHome(){
     ? [
         '🏫 ' + totalProspections + ' prospections',
         '📞 ' + dashboard.detailedCallCount + ' appels',
-        '📍 Zones & couches terrain',
+        '🎯 ' + schoolCoverage + '% couverture appels',
         '👥 Scope expert / admin',
         '📅 Semaine vs semaine'
       ]
@@ -3714,6 +3719,11 @@ function rHome(){
         <div class="lbl">Hot Rate</div>
         <div class="val">${dashboard.hotRate}<small>%</small></div>
         <div class="delta">${hotStage.count + wonStage.count} chauds/gagnés sur ${uniqueSchools}</div>
+      </div>
+      <div class="kpi ${schoolCoverage>=50?'teal':'saffron'}">
+        <div class="lbl">Couverture Appels</div>
+        <div class="val">${schoolCoverage}<small>%</small></div>
+        <div class="delta">${schoolsCalled} écoles appelées sur ${uniqueSchools}</div>
       </div>
     </div>
   </div>
@@ -3804,6 +3814,12 @@ function rHome(){
         <div class="val">${callQuality.summaryFilled}</div>
         <div class="delta">${callQuality.summaryBlank} appels sans note · ${callQuality.ratedCount} avec rating</div>
       </div>
+    </div>
+    <div class="note teal" style="margin-top:12px;margin-bottom:16px">
+      <b>📊 Sources & Couverture:</b>
+      ${importedCalls>0||platformCalls>0 ? '<b>'+importedCalls+'</b> appels importés (Google Sheets) + <b>'+platformCalls+'</b> appels plateforme.' : ''}
+      <b>${schoolsCalled}</b> écoles appelées sur <b>${uniqueSchools}</b> prospectées = <b>${schoolCoverage}%</b> de couverture téléphonique.
+      ${schoolCoverage<50 ? ' <span style="color:var(--red);font-weight:700">⚠️ Plus de la moitié du portefeuille n\'a pas encore été contactée par téléphone.</span>' : schoolCoverage<80 ? ' Bonne progression, continuez les relances.' : ' Excellente couverture !'}
     </div>
     <div class="pie-grid">
       ${renderPieCard(
@@ -5515,6 +5531,8 @@ function renderAll(){
   rSuivi();
   applyNavigationAccess();
   updateHeaderAuth();
+  var _hd=document.getElementById('headerDate');
+  if(_hd){var _now=new Date();var _m=['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];_hd.textContent=String(_now.getDate()).padStart(2,'0')+' '+_m[_now.getMonth()]+' '+_now.getFullYear();}
   setTimeout(()=>{
     document.querySelectorAll('.pane.act .bar-row').forEach(b=>b.classList.add('animate'));
   },100);
