@@ -5963,7 +5963,7 @@ function getAllFollowups() {
   var combined = imported.concat(synced);
   var seen = {};
   return combined.filter(function(f) {
-    var key = (f.Expert || '').toLowerCase().trim() + '|' + (f.SchoolName || '').toLowerCase().trim() + '|' + (f.Timestamp || '').slice(0, 16);
+    var key = f.ID || ((f.Expert || '').toLowerCase().trim() + '|' + (f.SchoolName || '').toLowerCase().trim() + '|' + (f.Timestamp || ''));
     if (seen[key]) return false;
     seen[key] = true;
     return true;

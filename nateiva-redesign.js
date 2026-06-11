@@ -117,7 +117,7 @@
     var combined = IMPORTED_FOLLOWUPS.concat(getStoredFollowups());
     var seen = {};
     return combined.filter(function(f) {
-      var key = normalize(f.Expert) + '|' + normalize(f.SchoolName) + '|' + (f.Timestamp || '').slice(0, 16);
+      var key = f.ID || (normalize(f.Expert) + '|' + normalize(f.SchoolName) + '|' + (f.Timestamp || ''));
       if (seen[key]) return false;
       seen[key] = true;
       return true;
