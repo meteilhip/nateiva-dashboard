@@ -3310,6 +3310,152 @@ function drillDownCategory(standingKey,stageKey){
   var title=(standingKey||'Toutes catégories')+(stageKey?' · '+stageKey:'');
   showDrillDown('📋 '+esc(title)+' · '+filtered.length+' écoles',html);
 }
+function ddCallItem(item){
+  var school=esc(item.SchoolName||'École inconnue');
+  var expert=esc(canonicalPersonName(item.Expert)||'?');
+  var dt=item.Timestamp?String(item.Timestamp).slice(0,10):'';
+  var outcome=item.Outcome?'<span style="color:var(--green);font-weight:600">'+esc(item.Outcome)+'</span>':'';
+  var contact=item.ContactName?esc(item.ContactName):'';
+  var phone=item.ContactPhone?esc(item.ContactPhone):'';
+  var notes=getFollowupPlainNotes(item);
+  var noteSnippet=notes?esc(notes.length>80?notes.slice(0,80)+'...':notes):'';
+  return '<div class="dd-school-item" style="padding:10px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="dd-school-name">'+school+'</span>'+outcome+'</div><div class="dd-school-meta" style="margin-top:4px"><span>👤 '+expert+'</span>'+(dt?'<span>📅 '+dt+'</span>':'')+(contact?'<span>📇 '+contact+'</span>':'')+(phone?'<span>📞 '+phone+'</span>':'')+'</div>'+(noteSnippet?'<div style="margin-top:6px;font-size:12px;color:var(--g500);font-style:italic">'+noteSnippet+'</div>':'')+'</div>';
+}
+function drillDownCallKPI(kpiKey){
+  if(!_ddDashboard)return;
+  var d=_ddDashboard;
+  var calls=d.followups.filter(function(f){return f.FollowupType==='CALL';});
+  var html='';
+  if(kpiKey==='appels_suivis'){
+    var byExpert={};var bySchool={};
+    calls.forEach(function(f){
+      var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;
+      var s=f.SchoolName||'?';bySchool[s]=(bySchool[s]||0)+1;
+    });
+    var topSchools=Object.keys(bySchool).map(function(k){return{label:k,value:bySchool[k]};}).sort(function(a,b){return b.value-a.value;});
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Total appels</span><span class="dd-stat-value">'+calls.length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Écoles distinctes</span><span class="dd-stat-value">'+Object.keys(bySchool).length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Experts actifs</span><span class="dd-stat-value">'+Object.keys(byExpert).length+'</span></div>';
+    html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddCallExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCallSchool\')">Écoles les + appelées</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCallList\')">Derniers appels</button></div>';
+    html+='<div id="ddCallExp">'+ddStatList(byExpert)+'</div>';
+    html+='<div id="ddCallSchool" style="display:none">'+topSchools.slice(0,30).map(function(e){return '<div class="dd-stat-row"><span class="dd-stat-label">'+esc(e.label)+'</span><span class="dd-stat-value">'+e.value+' appels</span></div>';}).join('')+'</div>';
+    html+='<div id="ddCallList" style="display:none"><div class="dd-school-list">'+calls.slice(0,40).map(ddCallItem).join('')+'</div></div>';
+    showDrillDown('📞 Appels suivis · '+calls.length,html);
+  }else if(kpiKey==='contacts'){
+    var connected=calls.filter(function(f){return categorizeCallStatus(f)==='connected';});
+    var byExpert={};
+    connected.forEach(function(f){var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;});
+    var rate=calls.length?Math.round((connected.length/calls.length)*100):0;
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Contacts établis</span><span class="dd-stat-value" style="color:var(--green)">'+connected.length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Total appels</span><span class="dd-stat-value">'+calls.length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Taux de contact</span><span class="dd-stat-value">'+rate+'%</span></div>';
+    html+='<h4 style="margin:16px 0 8px;font-size:14px">Par expert</h4>'+ddStatList(byExpert);
+    html+='<h4 style="margin:16px 0 8px;font-size:14px">Détail des contacts joints</h4><div class="dd-school-list">'+connected.slice(0,40).map(ddCallItem).join('')+'</div>';
+    showDrillDown('✅ Contacts établis · '+connected.length,html);
+  }else if(kpiKey==='sans_reponse'){
+    var noAnswer=calls.filter(function(f){var s=categorizeCallStatus(f);return s==='no_answer'||s==='unreachable';});
+    var byExpert={};var bySchool={};
+    noAnswer.forEach(function(f){
+      var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;
+      var s=f.SchoolName||'?';bySchool[s]=(bySchool[s]||0)+1;
+    });
+    var topUnreachable=Object.keys(bySchool).map(function(k){return{label:k,value:bySchool[k]};}).sort(function(a,b){return b.value-a.value;});
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Sans réponse</span><span class="dd-stat-value" style="color:var(--saffron)">'+calls.filter(function(f){return categorizeCallStatus(f)==='no_answer';}).length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Injoignables</span><span class="dd-stat-value" style="color:var(--red)">'+calls.filter(function(f){return categorizeCallStatus(f)==='unreachable';}).length+'</span></div>';
+    html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddNoExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddNoSchool\')">Écoles à problème</button></div>';
+    html+='<div id="ddNoExp">'+ddStatList(byExpert)+'</div>';
+    html+='<div id="ddNoSchool" style="display:none">'+topUnreachable.slice(0,30).map(function(e){return '<div class="dd-stat-row"><span class="dd-stat-label">'+esc(e.label)+'</span><span class="dd-stat-value" style="color:var(--red)">'+e.value+'x</span></div>';}).join('')+'</div>';
+    showDrillDown('📵 Sans réponse / Injoignables · '+noAnswer.length,html);
+  }else if(kpiKey==='resumes'){
+    var withNotes=calls.filter(function(f){return normalizeText(getFollowupPlainNotes(f));});
+    var withoutNotes=calls.filter(function(f){return!normalizeText(getFollowupPlainNotes(f));});
+    var byExpertFilled={};var byExpertBlank={};
+    withNotes.forEach(function(f){var e=canonicalPersonName(f.Expert)||'?';byExpertFilled[e]=(byExpertFilled[e]||0)+1;});
+    withoutNotes.forEach(function(f){var e=canonicalPersonName(f.Expert)||'?';byExpertBlank[e]=(byExpertBlank[e]||0)+1;});
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Résumés remplis</span><span class="dd-stat-value" style="color:var(--green)">'+withNotes.length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Sans note</span><span class="dd-stat-value" style="color:var(--red)">'+withoutNotes.length+'</span></div>';
+    html+='<div class="dd-stat-row"><span class="dd-stat-label">Taux de remplissage</span><span class="dd-stat-value">'+(calls.length?Math.round((withNotes.length/calls.length)*100):0)+'%</span></div>';
+    html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddResFilled\')">Notes remplies par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddResBlank\')">Notes manquantes par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddResDetail\')">Appels sans note</button></div>';
+    html+='<div id="ddResFilled">'+ddStatList(byExpertFilled)+'</div>';
+    html+='<div id="ddResBlank" style="display:none">'+ddStatList(byExpertBlank)+'</div>';
+    html+='<div id="ddResDetail" style="display:none"><div class="dd-school-list">'+withoutNotes.slice(0,40).map(ddCallItem).join('')+'</div></div>';
+    showDrillDown('📝 Résumés appels · '+withNotes.length+'/'+calls.length+' remplis',html);
+  }
+}
+function drillDownCallSignal(signalKey){
+  if(!_ddDashboard)return;
+  var calls=_ddDashboard.followups.filter(function(f){return f.FollowupType==='CALL';});
+  var filtered,title,icon;
+  if(signalKey==='whatsapp'){
+    filtered=calls.filter(function(f){return isYesFlag(f.CallWhatsappDocs);});
+    title='WhatsApp Docs';icon='📄';
+  }else if(signalKey==='secondcall'){
+    filtered=calls.filter(function(f){return isYesFlag(f.CallSecondCall);});
+    title='Second Call';icon='🔁';
+  }else if(signalKey==='visit'){
+    filtered=calls.filter(function(f){return isYesFlag(f.CallVisit);});
+    title='Visite terrain';icon='📍';
+  }else if(signalKey==='superior'){
+    filtered=calls.filter(function(f){return isYesFlag(f.CallToSuperior);});
+    title='Transmission supérieur';icon='🏛️';
+  }else{return;}
+  var byExpert={};var bySchool={};
+  filtered.forEach(function(f){
+    var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;
+    var s=f.SchoolName||'?';bySchool[s]=(bySchool[s]||0)+1;
+  });
+  var html='<div class="dd-stat-row"><span class="dd-stat-label">Total signaux</span><span class="dd-stat-value">'+filtered.length+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Sur total appels</span><span class="dd-stat-value">'+(calls.length?Math.round((filtered.length/calls.length)*100):0)+'%</span></div>';
+  html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddSigExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddSigSchool\')">Par école</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddSigDetail\')">Détail</button></div>';
+  html+='<div id="ddSigExp">'+ddStatList(byExpert)+'</div>';
+  html+='<div id="ddSigSchool" style="display:none">'+ddStatList(bySchool)+'</div>';
+  html+='<div id="ddSigDetail" style="display:none"><div class="dd-school-list">'+filtered.slice(0,40).map(ddCallItem).join('')+'</div></div>';
+  showDrillDown(icon+' '+title+' · '+filtered.length+' appels',html);
+}
+function drillDownCallStatus(segmentLabel){
+  if(!_ddDashboard)return;
+  var calls=_ddDashboard.followups.filter(function(f){return f.FollowupType==='CALL';});
+  var statusMap={'✅ Contact établi':'connected','📝 Message laissé':'message','📵 Sans réponse':'no_answer','⛔ Injoignable':'unreachable','❔ Statut vide / autre':'other'};
+  var targetStatus=statusMap[segmentLabel];
+  if(!targetStatus)return;
+  var filtered=calls.filter(function(f){return categorizeCallStatus(f)===targetStatus;});
+  var byExpert={};var bySchool={};
+  filtered.forEach(function(f){
+    var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;
+    var s=f.SchoolName||'?';bySchool[s]=(bySchool[s]||0)+1;
+  });
+  var html='<div class="dd-stat-row"><span class="dd-stat-label">Appels</span><span class="dd-stat-value">'+filtered.length+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Écoles distinctes</span><span class="dd-stat-value">'+Object.keys(bySchool).length+'</span></div>';
+  html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddCSExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCSSchool\')">Par école</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCSList\')">Détail appels</button></div>';
+  html+='<div id="ddCSExp">'+ddStatList(byExpert)+'</div>';
+  html+='<div id="ddCSSchool" style="display:none">'+ddStatList(bySchool)+'</div>';
+  html+='<div id="ddCSList" style="display:none"><div class="dd-school-list">'+filtered.slice(0,40).map(ddCallItem).join('')+'</div></div>';
+  showDrillDown(segmentLabel+' · '+filtered.length+' appels',html);
+}
+function drillDownCallIntent(segmentLabel){
+  if(!_ddDashboard)return;
+  var calls=_ddDashboard.followups.filter(function(f){return f.FollowupType==='CALL';});
+  var intentMap={'📄 Docs / WhatsApp':'docs','📍 RDV / visite':'visit','🔁 Relance / rappel':'callback','🏛️ Hiérarchie / fondateur':'escalation','✨ Intérêt explicite':'interest','⛔ Rejet / concurrent':'rejection','📝 Note à clarifier':'qualify'};
+  var targetIntent=intentMap[segmentLabel];
+  if(!targetIntent)return;
+  var filtered=calls.filter(function(f){
+    var note=normalizeText(getFollowupPlainNotes(f));
+    if(!note)return false;
+    var intent=extractCallIntent(f);
+    return intent.primary===targetIntent;
+  });
+  var byExpert={};var bySchool={};
+  filtered.forEach(function(f){
+    var e=canonicalPersonName(f.Expert)||'?';byExpert[e]=(byExpert[e]||0)+1;
+    var s=f.SchoolName||'?';bySchool[s]=(bySchool[s]||0)+1;
+  });
+  var html='<div class="dd-stat-row"><span class="dd-stat-label">Résumés dans cette catégorie</span><span class="dd-stat-value">'+filtered.length+'</span></div>';
+  html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddCIExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCISchool\')">Par école</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddCIList\')">Détail</button></div>';
+  html+='<div id="ddCIExp">'+ddStatList(byExpert)+'</div>';
+  html+='<div id="ddCISchool" style="display:none">'+ddStatList(bySchool)+'</div>';
+  html+='<div id="ddCIList" style="display:none"><div class="dd-school-list">'+filtered.slice(0,40).map(ddCallItem).join('')+'</div></div>';
+  showDrillDown(segmentLabel+' · '+filtered.length+' résumés',html);
+}
 function updateStandingTip(prefix){
   var catEl=document.getElementById(prefix+'Category');
   var tipEl=document.getElementById(prefix+'StandingTip');
@@ -4144,23 +4290,23 @@ function rHome(){
     </div>
     ${dashboard.sourceCallGap ? `<div class="note teal"><b>Volume import confirmé:</b> la feuille appels montre <b>${dashboard.importedCallSourceCount}</b> réponses (ligne ${dashboard.sourceCallRows} avec entête). L'analyse détaillée importée visible ici en couvre déjà <b>${dashboard.importedDetailedCallCount}</b>, donc <b>${dashboard.sourceCallGap}</b> imports restent à relire ligne par ligne.</div>` : ''}
     <div class="kpis">
-      <div class="kpi teal">
-        <div class="lbl">Appels suivis</div>
+      <div class="kpi teal clickable" onclick="drillDownCallKPI('appels_suivis')">
+        <div class="lbl">Appels suivis ›</div>
         <div class="val">${dashboard.sourceCallCount}</div>
         <div class="delta">${dashboard.importedCallSourceCount} importés · ${dashboard.systemCallCount} saisis ici</div>
       </div>
-      <div class="kpi green">
-        <div class="lbl">Contacts Établis</div>
+      <div class="kpi green clickable" onclick="drillDownCallKPI('contacts')">
+        <div class="lbl">Contacts Établis ›</div>
         <div class="val">${callSummary.connected}</div>
         <div class="delta">${callSummary.total ? Math.round((callSummary.connected/callSummary.total)*100) : 0}% du volume appels</div>
       </div>
-      <div class="kpi saffron">
-        <div class="lbl">Sans Réponse / Erreur</div>
+      <div class="kpi saffron clickable" onclick="drillDownCallKPI('sans_reponse')">
+        <div class="lbl">Sans Réponse / Erreur ›</div>
         <div class="val">${callSummary.noAnswer + callSummary.unreachable}</div>
         <div class="delta">${callSummary.noAnswer} sans réponse · ${callSummary.unreachable} injoignables</div>
       </div>
-      <div class="kpi red">
-        <div class="lbl">Résumés Remplis</div>
+      <div class="kpi red clickable" onclick="drillDownCallKPI('resumes')">
+        <div class="lbl">Résumés Remplis ›</div>
         <div class="val">${callQuality.summaryFilled}</div>
         <div class="delta">${callQuality.summaryBlank} appels sans note · ${callQuality.ratedCount} avec rating</div>
       </div>
@@ -4176,7 +4322,8 @@ function rHome(){
           `<b>${callSummary.connected}</b> appels ont joint directement la bonne personne.`,
           `<b>${callSummary.noAnswer + callSummary.unreachable}</b> appels sont bloqués par la joignabilité avant même la vente.`,
           `<b>${callSummary.message}</b> appels ont seulement laissé un message ou parlé à une autre personne, et <b>${callSummary.other}</b> ont un statut vide / autre.`
-        ]
+        ],
+        'drillDownCallStatus'
       )}
       ${renderPieCard(
         'Résumés d\'appels interprétés',
@@ -4184,27 +4331,28 @@ function rHome(){
         dashboard.callAnalytics.primaryIntentSegments,
         String(callQuality.summaryFilled),
         'résumés remplis',
-        dashboard.callAnalytics.insights
+        dashboard.callAnalytics.insights,
+        'drillDownCallIntent'
       )}
     </div>
     <div class="call-insight-grid">
-      <div class="call-signal-card">
-        <div class="eyebrow">📄 WhatsApp Docs</div>
+      <div class="call-signal-card clickable" onclick="drillDownCallSignal('whatsapp')" style="cursor:pointer">
+        <div class="eyebrow">📄 WhatsApp Docs ›</div>
         <div class="value">${dashboard.callAnalytics.sourceFlags.whatsappDocs}</div>
         <div class="body">Champ source marqué <b>Oui</b> pour l'envoi de documents ou supports sur WhatsApp.</div>
       </div>
-      <div class="call-signal-card">
-        <div class="eyebrow">🔁 Second Call</div>
+      <div class="call-signal-card clickable" onclick="drillDownCallSignal('secondcall')" style="cursor:pointer">
+        <div class="eyebrow">🔁 Second Call ›</div>
         <div class="value">${dashboard.callAnalytics.sourceFlags.secondCall}</div>
         <div class="body">Champ source marqué <b>Oui</b> pour un deuxième appel / relance prévue.</div>
       </div>
-      <div class="call-signal-card">
-        <div class="eyebrow">📍 Visit</div>
+      <div class="call-signal-card clickable" onclick="drillDownCallSignal('visit')" style="cursor:pointer">
+        <div class="eyebrow">📍 Visit ›</div>
         <div class="value">${dashboard.callAnalytics.sourceFlags.visit}</div>
         <div class="body">Champ source marqué <b>Oui</b> ou <b>En cours</b> pour une visite / action terrain liée à l'appel.</div>
       </div>
-      <div class="call-signal-card">
-        <div class="eyebrow">🏛️ To Superior</div>
+      <div class="call-signal-card clickable" onclick="drillDownCallSignal('superior')" style="cursor:pointer">
+        <div class="eyebrow">🏛️ To Superior ›</div>
         <div class="value">${dashboard.callAnalytics.sourceFlags.toSuperior}</div>
         <div class="body">Champ source marqué <b>Oui</b> pour une transmission explicite au supérieur / décideur.</div>
       </div>
