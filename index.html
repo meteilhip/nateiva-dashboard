@@ -6134,8 +6134,21 @@ function rGlossary(){
         <div class="gloss-use"><strong>Stratégie</strong>Battlecard adaptée par tier.</div>
       </div>
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="emoji">💡</span> Guide de lecture de la Heatmap</div>
+    <div class="card" style="padding:1.2rem 1.5rem;line-height:1.7">
+      <p style="margin:0 0 .8rem">Cette heatmap croise le <b>standing</b> (potentiel financier) avec l\\'<b>état d\\'avancement</b> (funnel) et la <b>localisation</b> (ville/quartier) de nos écoles&nbsp;:</p>
+      <ul style="margin:0;padding-left:1.4rem">
+        <li><b>Couleur de ligne = Catégorie de standing</b>&nbsp;: Chaque ligne est associée à un code couleur spécifique (Violet pour Très Haute Standing, Bleu pour Haute, Vert pour Moyen, etc.).</li>
+        <li><b>Opacité = Densité d\\'écoles</b>&nbsp;: Plus la cellule est foncée, plus elle contient d\\'écoles actives dans ce croisement.</li>
+        <li><b>Zéros masqués (·)</b>&nbsp;: Les cellules vides avec un simple point gris (·) indiquent qu\\'il n\\'y a aucun prospect dans ce croisement, ce qui permet aux zones chaudes de sauter instantanément aux yeux.</li>
+        <li><b>Focus Closing</b>&nbsp;: Pour optimiser l\\'effort terrain et télé, ciblez les cellules foncées situées dans les colonnes 🏆&nbsp;Gagné, 🔥&nbsp;Chaud et ⚡&nbsp;Tiède.</li>
+      </ul>
+    </div>
   </div>`;
-  
+
   document.getElementById('p-glossary').innerHTML=h;
 }
 
