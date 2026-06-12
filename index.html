@@ -3140,11 +3140,13 @@ function renderStageMetric(stage, showRevenue){
   </article>`;
 }
 
-function renderRevenueCard(title,value,copy,colorClass,ambTotal,netTotal){
+function renderRevenueCard(title,value,copy,colorClass,ambTotal,netTotal,onClickAttr){
   var amb=typeof ambTotal==='number'?ambTotal:Math.round(value*0.40);
   var net=typeof netTotal==='number'?netTotal:Math.round(value*0.60);
-  return `<div class="chart revenue-card ${colorClass||''}">
-    <h3>${title}</h3>
+  var clickCss=onClickAttr?'cursor:pointer;transition:transform .12s,box-shadow .12s':'';
+  var clickHover=onClickAttr?'onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 20px rgba(0,0,0,.08)\'" onmouseout="this.style.transform=\'none\';this.style.boxShadow=\'none\'"':'';
+  return `<div class="chart revenue-card ${colorClass||''}" ${onClickAttr||''} style="${clickCss}" ${clickHover}>
+    <h3>${title}${onClickAttr?' ›':''}</h3>
     <div class="desc">Total brut cumulé</div>
     <div style="font-family:'Fraunces',serif;font-size:48px;font-weight:600;color:var(--red);line-height:1;letter-spacing:-.04em;margin:6px 0 12px">${moneyCompact(value)}</div>
     <div style="margin: 12px 0 16px; background: rgba(0,0,0,0.02); padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--g200);">
@@ -3396,6 +3398,47 @@ function ddCallItem(item){
   var notes=getFollowupPlainNotes(item);
   var noteSnippet=notes?esc(notes.length>80?notes.slice(0,80)+'...':notes):'';
   return '<div class="dd-school-item" style="padding:10px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="dd-school-name">'+school+'</span>'+outcome+'</div><div class="dd-school-meta" style="margin-top:4px"><span>👤 '+expert+'</span>'+(dt?'<span>📅 '+dt+'</span>':'')+(contact?'<span>📇 '+contact+'</span>':'')+(phone?'<span>📞 '+phone+'</span>':'')+'</div>'+(noteSnippet?'<div style="margin-top:6px;font-size:12px;color:var(--g500);font-style:italic">'+noteSnippet+'</div>':'')+'</div>';
+}
+function drillDownRevenue(segmentKey){
+  if(!_ddDashboard)return;
+  var d=_ddDashboard;
+  var records=d.records||[];
+  var filtered,title,icon;
+  if(segmentKey==='won'){
+    filtered=records.filter(function(r){return r.stage==='gagne';});
+    title='Revenu gagné';icon='🏆';
+  }else if(segmentKey==='hot'){
+    filtered=records.filter(function(r){return r.stage==='chaud';});
+    title='Pipeline chaud';icon='🔥';
+  }else if(segmentKey==='warm'){
+    filtered=records.filter(function(r){return r.stage==='tiede';});
+    title='Pipeline tiède';icon='🟠';
+  }else{return;}
+  var totalVal=filtered.reduce(function(s,r){return s+(r.amount||0);},0);
+  var totalAmb=filtered.reduce(function(s,r){return s+(r.ambassadorAmount||0);},0);
+  var totalNet=filtered.reduce(function(s,r){return s+(r.netAmount||0);},0);
+  var byCategory={};var byMode={};var byExpert={};
+  filtered.forEach(function(r){
+    var cat=(r.revenueCategory||'?')+' · '+(r.revenueMode||'?');
+    byCategory[cat]={count:(byCategory[cat]?byCategory[cat].count:0)+1,amount:(byCategory[cat]?byCategory[cat].amount:0)+(r.amount||0)};
+    var m=r.revenueMode||'?';byMode[m]={count:(byMode[m]?byMode[m].count:0)+1,amount:(byMode[m]?byMode[m].amount:0)+(r.amount||0)};
+    var e=canonicalPersonName(r.expert)||'?';byExpert[e]={count:(byExpert[e]?byExpert[e].count:0)+1,amount:(byExpert[e]?byExpert[e].amount:0)+(r.amount||0)};
+  });
+  var html='<div class="dd-stat-row"><span class="dd-stat-label">Écoles</span><span class="dd-stat-value">'+filtered.length+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Valeur brute</span><span class="dd-stat-value" style="color:var(--red)">'+moneyFCFA(totalVal)+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Part ambassadeurs</span><span class="dd-stat-value" style="color:var(--saffron)">'+moneyFCFA(totalAmb)+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Net entreprise</span><span class="dd-stat-value" style="color:var(--green)">'+moneyFCFA(totalNet)+'</span></div>';
+  html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddRevCat\')">Par catégorie</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddRevExp\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddRevList\')">Détail écoles</button></div>';
+  var catEntries=Object.keys(byCategory).map(function(k){return{label:k,count:byCategory[k].count,amount:byCategory[k].amount};}).sort(function(a,b){return b.amount-a.amount;});
+  var expEntries=Object.keys(byExpert).map(function(k){return{label:k,count:byExpert[k].count,amount:byExpert[k].amount};}).sort(function(a,b){return b.amount-a.amount;});
+  html+='<div id="ddRevCat">'+catEntries.map(function(e){return '<div class="dd-stat-row"><span class="dd-stat-label">'+esc(e.label)+' <small>('+e.count+')</small></span><span class="dd-stat-value">'+moneyFCFA(e.amount)+'</span></div>';}).join('')+'</div>';
+  html+='<div id="ddRevExp" style="display:none">'+expEntries.map(function(e){return '<div class="dd-stat-row"><span class="dd-stat-label">'+esc(e.label)+' <small>('+e.count+' écoles)</small></span><span class="dd-stat-value">'+moneyFCFA(e.amount)+'</span></div>';}).join('')+'</div>';
+  html+='<div id="ddRevList" style="display:none"><div class="dd-school-list">'+filtered.sort(function(a,b){return(b.amount||0)-(a.amount||0);}).slice(0,50).map(function(r){
+    var catTag=r.revenueCategory?'<span class="dd-revenue-tag '+(r.revenueCategory==='Université'?'university':'')+'">'+esc(r.revenueCategory)+'</span>':'';
+    var modeTag=r.revenueMode?'<span class="dd-revenue-tag '+(r.revenueMode==='Online'?'online':'offline')+'">'+esc(r.revenueMode)+'</span>':'';
+    return '<div class="dd-school-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="dd-school-name">'+esc(r.schoolName)+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;color:var(--red)">'+moneyFCFA(r.amount||0)+'</span></div><div class="dd-school-meta" style="margin-top:4px">'+catTag+modeTag+(r.expert?'<span>👤 '+esc(r.expert)+'</span>':'')+(r.city?'<span>📍 '+esc(r.city)+'</span>':'')+(r.standing?'<span>'+esc(r.standing)+'</span>':'')+'</div></div>';
+  }).join('')+'</div>';
+  showDrillDown(icon+' '+title+' · '+moneyFCFA(totalVal),html);
 }
 function drillDownCallKPI(kpiKey){
   if(!_ddDashboard)return;
@@ -4276,9 +4319,9 @@ function rHome(){
     </div>
     <div class="kpis">
       <div class="kpi red clickable" onclick="drillDownKPI('prospections')">
-        <div class="lbl">Prospections</div>
-        <div class="val">${totalProspections}</div>
-        <div class="delta">${uniqueSchools} écoles uniques · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} DLA · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} YDE</div>
+        <div class="lbl">Écoles prospectées</div>
+        <div class="val">${uniqueSchools}</div>
+        <div class="delta">${totalProspections} entrées · ${dashboard.rawRows.filter(r=>r.v==='DOUALA').length} DLA · ${dashboard.rawRows.filter(r=>r.v==='YAOUNDE').length} YDE</div>
       </div>
       <div class="kpi teal clickable" onclick="drillDownKPI('appels')">
         <div class="lbl">Appels</div>
@@ -4328,9 +4371,10 @@ function rHome(){
       <span class="anno">Forecast basé sur catégorie × mode (Primaire/Secondaire/Université × Online/Offline)</span>
     </div>
     <div class="three">
-      ${renderRevenueCard('🏆 Revenu gagné',dashboard.wonRevenue,'Montant selon catégorie: Primaire/Sec. Offline=60k, Online=250k · Université Offline=550k, Online=2500/élève.','',wonAmb,wonNet)}
-      ${renderRevenueCard('🔥 Pipeline chaud',dashboard.hotRevenue,'Valeur pondérée des écoles chaudes (≥60%) prêtes à closer.','',hotAmb,hotNet)}
-      ${renderRevenueCard('🟠 Pipeline tiède',dashboard.warmRevenue,'Valeur pondérée des écoles tièdes (40-59%) à travailler.','',warmAmb,warmNet)}
+      ${renderRevenueCard('🏆 Revenu gagné',dashboard.wonRevenue,'Montant selon catégorie: Primaire/Sec. Offline=60k, Online=250k · Université Offline=550k, Online=2500/élève.','',wonAmb,wonNet,'onclick="drillDownRevenue(\'won\')"')}
+      ${renderRevenueCard('🔥 Pipeline chaud',dashboard.hotRevenue,'Valeur pondérée des écoles chaudes (≥60%) prêtes à closer.','',hotAmb,hotNet,'onclick="drillDownRevenue(\'hot\')"')}
+      ${renderRevenueCard('🟠 Pipeline tiède',dashboard.warmRevenue,'Valeur pondérée des écoles tièdes (40-59%) à travailler.','',warmAmb,warmNet,'onclick="drillDownRevenue(\'warm\')"')}
+
     </div>
   </div>`;
   })() : ''}
