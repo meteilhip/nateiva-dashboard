@@ -82,6 +82,74 @@ body{
   35%{opacity:.5}
   to{transform:translateX(160%) skewX(-18deg);opacity:0}
 }
+@keyframes cardPop{
+  from{opacity:0;transform:translateY(24px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes slideInLeft{
+  from{opacity:0;transform:translateX(-30px)}
+  to{opacity:1;transform:translateX(0)}
+}
+@keyframes slideInRight{
+  from{opacity:0;transform:translateX(30px)}
+  to{opacity:1;transform:translateX(0)}
+}
+@keyframes scaleIn{
+  from{opacity:0;transform:scale(.85)}
+  to{opacity:1;transform:scale(1)}
+}
+@keyframes shimmer{
+  0%{background-position:-200% 0}
+  100%{background-position:200% 0}
+}
+@keyframes countUp{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.15)}
+  50%{box-shadow:0 0 0 8px rgba(220,38,38,0)}
+}
+.section{animation:cardPop .5s cubic-bezier(.16,1,.3,1) both}
+.section:nth-child(2){animation-delay:.08s}
+.section:nth-child(3){animation-delay:.16s}
+.section:nth-child(4){animation-delay:.24s}
+.section:nth-child(5){animation-delay:.32s}
+.kpi{animation:cardPop .48s cubic-bezier(.16,1,.3,1) both}
+.kpi:nth-child(1){animation-delay:.05s}
+.kpi:nth-child(2){animation-delay:.1s}
+.kpi:nth-child(3){animation-delay:.15s}
+.kpi:nth-child(4){animation-delay:.2s}
+.kpi:nth-child(5){animation-delay:.25s}
+.kpi:nth-child(6){animation-delay:.3s}
+.kpi.clickable{animation-name:cardPop;cursor:pointer}
+.kpi.clickable:hover{transform:translateY(-4px) scale(1.02);box-shadow:var(--shadow-lg)}
+.kpi.clickable:active{transform:translateY(-1px) scale(.99);transition-duration:.1s}
+.card{transition:all .3s cubic-bezier(.16,1,.3,1)}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.rev-card{transition:all .3s cubic-bezier(.16,1,.3,1)}
+.rev-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.rev-card:active{transform:translateY(-1px) scale(.98);transition-duration:.1s}
+.section-title{animation:slideInLeft .5s cubic-bezier(.16,1,.3,1) both}
+.chart-wrap,.donut-wrap{animation:scaleIn .5s cubic-bezier(.16,1,.3,1) both;animation-delay:.15s}
+.nav-btn{transition:all .25s cubic-bezier(.16,1,.3,1)}
+.nav-btn:hover{transform:translateY(-2px)}
+.nav-btn:active{transform:translateY(0) scale(.96)}
+.nav-btn.active{animation:breathe 2s ease-in-out infinite}
+.gloss-card{animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
+.gloss-card:nth-child(1){animation-delay:.03s}
+.gloss-card:nth-child(2){animation-delay:.06s}
+.gloss-card:nth-child(3){animation-delay:.09s}
+.gloss-card:nth-child(4){animation-delay:.12s}
+.gloss-card:nth-child(5){animation-delay:.15s}
+.gloss-card:nth-child(6){animation-delay:.18s}
+.gloss-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:var(--shadow-lg)}
+.suivi-kpi{animation:cardPop .4s cubic-bezier(.16,1,.3,1) both;transition:all .25s ease}
+.suivi-kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.ranking-card{animation:slideInRight .45s cubic-bezier(.16,1,.3,1) both;transition:all .25s ease}
+.ranking-card:hover{transform:translateY(-2px) scale(1.01);box-shadow:var(--shadow-lg)}
+table tr{transition:background .2s ease}
+table tbody tr:hover{background:rgba(220,38,38,.04)}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,
@@ -1938,21 +2006,25 @@ body{
   font-weight: 500;
 }
 .btn-logout-header, .btn-login-header {
-  background: transparent;
-  border: 1.5px solid var(--g300);
-  color: var(--g700);
-  padding: 6px 14px;
-  font-size: 12px;
+  background: var(--red);
+  border: 2px solid var(--red);
+  color: white;
+  padding: 10px 24px;
+  font-size: 15px;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   font-family: 'Outfit', sans-serif;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: .02em;
+  box-shadow: 0 2px 8px rgba(220,38,38,.25);
 }
 .btn-logout-header:hover {
-  background: var(--red-glow);
-  color: var(--red);
-  border-color: var(--red);
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: white;
+  box-shadow: 0 4px 16px rgba(220,38,38,.4);
+  transform: translateY(-1px);
 }
 .btn-login-header {
   background: linear-gradient(135deg, var(--red), var(--saffron));
@@ -2034,7 +2106,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v9.6 · Count Fix + Motion UX</span>
+      <span class="meta-pill red">v9.7 · Roles + Animations</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -4141,7 +4213,7 @@ function refreshFilters(){
   sx.value=exp.includes(ST.expert)?ST.expert:'';
   ss.value=secs.includes(ST.sec)?ST.sec:'';
   sc.value=cats.includes(ST.cat)?ST.cat:'';
-  const locked=currentUser && !canSeeAllData(currentUser);
+  const locked=currentUser && !canSeeAllData(currentUser) && !canSeeTeamData(currentUser);
   cityEl.disabled=locked && cities.length <= 1;
   if(locked && cities.length === 1){
     ST.city=cities[0];
@@ -6174,6 +6246,34 @@ function renderAll(){
   setTimeout(()=>{
     document.querySelectorAll('.pane.act .bar-row').forEach(b=>b.classList.add('animate'));
   },100);
+  setTimeout(animateCounters,200);
+}
+
+function animateCounters(){
+  document.querySelectorAll('.pane.act .kpi .val, .pane.act .suivi-kpi .sk-val').forEach(function(el){
+    var text=el.textContent.trim();
+    var match=text.match(/^([\d\s,.]+)/);
+    if(!match) return;
+    var raw=match[1].replace(/\s/g,'');
+    var target=parseFloat(raw.replace(',','.'));
+    if(isNaN(target)||target===0) return;
+    var suffix=text.slice(match[1].length);
+    var isFloat=raw.indexOf('.')>-1||raw.indexOf(',')>-1;
+    var sep=raw.indexOf(',')>-1;
+    var duration=600;
+    var start=performance.now();
+    var small=el.querySelector('small');
+    var smallHtml=small?small.outerHTML:'';
+    function step(now){
+      var t=Math.min((now-start)/duration,1);
+      var ease=1-Math.pow(1-t,3);
+      var val=target*ease;
+      var display=isFloat?val.toFixed(1):(sep?Math.round(val).toLocaleString('fr-FR'):fmt(Math.round(val)));
+      el.innerHTML=display+suffix+(smallHtml?' '+smallHtml:'');
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 // =============================================================
@@ -6243,10 +6343,10 @@ var PANE_ACCESS_CONFIG = [
 var DEFAULT_USERS = [
   { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'YAOUNDE' },
   { username: 'fabiola', password: 'fabiola123', fullName: 'Kendo Fabiola', role: 'Expert', city: 'DOUALA' },
-  { username: 'ida', password: 'ida123', fullName: 'Emambo Ida', role: 'Expert', city: 'DOUALA' },
+  { username: 'ida', password: 'ida123', fullName: 'Emambo Ida', role: 'Ambassador', city: 'DOUALA' },
   { username: 'guy', password: 'guy123', fullName: 'Ntsa Guy', role: 'SubAdmin', city: 'YAOUNDE' },
   { username: 'brice', password: 'brice123', fullName: 'Mbeuka brice', role: 'SubAdmin', city: 'DOUALA' },
-  { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Expert', city: 'YAOUNDE' },
+  { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Ambassador', city: 'YAOUNDE' },
   { username: 'noah', password: 'noah2026', fullName: 'Noah', role: 'SuperAdmin', city: 'ALL' }
 ];
 
@@ -6329,6 +6429,18 @@ function isSubAdmin(userOrName) {
   return role === 'SubAdmin' || isListedPerson(SUB_ADMINS, userOrName);
 }
 
+function isExpert(userOrName) {
+  if (!userOrName) return false;
+  var role = typeof userOrName === 'string' ? '' : (userOrName.role || '');
+  return role === 'Expert';
+}
+
+function isAmbassador(userOrName) {
+  if (!userOrName) return false;
+  var role = typeof userOrName === 'string' ? '' : (userOrName.role || '');
+  return role === 'Ambassador';
+}
+
 function hasAdminRole(userOrName) {
   return isSuperAdmin(userOrName) || isSubAdmin(userOrName);
 }
@@ -6336,6 +6448,8 @@ function hasAdminRole(userOrName) {
 function roleBadgeLabel(userOrName) {
   if (isSuperAdmin(userOrName)) return 'SUPER ADMIN';
   if (isSubAdmin(userOrName)) return 'SUB ADMIN';
+  if (isExpert(userOrName)) return 'EXPERT';
+  if (isAmbassador(userOrName)) return 'AMBASSADEUR';
   return 'EXPERT';
 }
 
@@ -6348,19 +6462,19 @@ function canBypassSchoolOwnership(user) {
 }
 
 function getDefaultPermissions(user) {
-  var elevatedPanes = hasAdminRole(user);
-  var globalData = isNoahSuperAdmin(user);
+  var elevated = hasAdminRole(user);
+  var expert = isExpert(user);
+  var globalData = isSuperAdmin(user) || isSubAdmin(user);
   return {
-    panes: elevatedPanes ? allPaneKeys() : ['home', 'suivi', 'glossary'],
-    dataScope: globalData ? 'all' : 'own',
-    manageUsers: globalData
+    panes: (elevated || expert) ? allPaneKeys() : ['home', 'suivi', 'glossary'],
+    dataScope: globalData ? 'all' : (expert ? 'team' : 'own'),
+    manageUsers: isSuperAdmin(user)
   };
 }
 
 function normalizePermissions(user) {
   var defaults = getDefaultPermissions(user || {});
   var permissions = user && user.permissions ? user.permissions : {};
-  var canKeepGlobalData = isNoahSuperAdmin(user || {});
   var panes = Array.isArray(permissions.panes) && permissions.panes.length
     ? permissions.panes.filter(function(pane) { return allPaneKeys().indexOf(pane) > -1; })
     : defaults.panes.slice();
@@ -6368,7 +6482,7 @@ function normalizePermissions(user) {
   if (panes.indexOf('home') === -1) panes.unshift('home');
   return {
     panes: Array.from(new Set(panes)),
-    dataScope: canKeepGlobalData && permissions.dataScope === 'all' ? 'all' : defaults.dataScope,
+    dataScope: defaults.dataScope,
     manageUsers: defaults.manageUsers
   };
 }
@@ -6405,16 +6519,23 @@ function userCanAccessPane(user, pane) {
 
 function canSeeAllData(user) {
   if (!user) return false;
-  return isNoahSuperAdmin(user) && normalizePermissions(user).dataScope === 'all';
+  var scope = normalizePermissions(user).dataScope;
+  return scope === 'all';
+}
+
+function canSeeTeamData(user) {
+  if (!user) return false;
+  var scope = normalizePermissions(user).dataScope;
+  return scope === 'all' || scope === 'team';
 }
 
 function canManageUsers(user) {
   if (!user) return false;
-  return isNoahSuperAdmin(user);
+  return isSuperAdmin(user);
 }
 
 function canManageUserAccess(user) {
-  return !!(user && isNoahSuperAdmin(user));
+  return !!(user && isSuperAdmin(user));
 }
 
 function applyNavigationAccess() {
@@ -6591,10 +6712,20 @@ function schoolBelongsToUserPortfolio(expertName, schoolName) {
   return !getKnownSchoolKeySet().has(key);
 }
 
+function getAmbassadorNames() {
+  return getAllUsers().filter(function(u) { return isAmbassador(u); }).map(function(u) { return u.fullName; });
+}
+
 function getVisibleRaw() {
   var allRows = getAllRawRows();
   if (!currentUser) return [];
   if (canSeeAllData(currentUser)) return allRows;
+  if (canSeeTeamData(currentUser)) {
+    var ambNames = getAmbassadorNames();
+    return allRows.filter(function(r) {
+      return samePerson(r.e, currentUser.fullName) || ambNames.some(function(n) { return samePerson(r.e, n); });
+    });
+  }
   return getWorkspaceRawForUser(currentUser.fullName);
 }
 
@@ -6662,6 +6793,7 @@ function buildImportedSheetFollowups() {
     if (!inferredExpert && schoolInfo && schoolInfo.experts.length === 1) inferredExpert = schoolInfo.experts[0];
     if (!inferredExpert && phoneInfo && phoneInfo.experts.length === 1) inferredExpert = phoneInfo.experts[0];
     inferredExpert = canonicalPersonName(inferredExpert);
+    if (normalizeAssignedCity(inferredCity) === 'YAOUNDE') inferredExpert = canonicalPersonName('Kessi Taylor');
     var nextActions = [];
     if (call.secondCall) nextActions.push('Second appel');
     if (call.whatsappDocs) nextActions.push('Docs WhatsApp');
@@ -6718,6 +6850,12 @@ function getVisibleFollowups() {
   var allFollowups = getAllFollowups();
   if (!currentUser) return [];
   if (canSeeAllData(currentUser)) return allFollowups;
+  if (canSeeTeamData(currentUser)) {
+    var ambNames = getAmbassadorNames();
+    return allFollowups.filter(function(f) {
+      return samePerson(f.Expert, currentUser.fullName) || ambNames.some(function(n) { return samePerson(f.Expert, n); });
+    });
+  }
   return getWorkspaceFollowupsForUser(currentUser.fullName);
 }
 
@@ -8092,8 +8230,8 @@ function rSuivi() {
   h += '<div class="suivi-role">' + roleLabel + ' · ' + esc(currentUser.city) + '</div></div>';
   h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
   h += '</div><div class="suivi-actions">';
-  if (canAdminUsers) h += '<button onclick="showInviteForm()">+ Inviter</button>';
-  h += '<button onclick="doLogout()">Déconnexion</button>';
+  if (canAdminUsers) h += '<button onclick="showInviteForm()" style="background:var(--red);color:white;border:2px solid var(--red);padding:10px 24px;font-size:15px;font-weight:700;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.25)">+ Inviter</button>';
+  h += '<button onclick="doLogout()" style="background:var(--red);color:white;border:2px solid var(--red);padding:10px 24px;font-size:15px;font-weight:700;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.25)">Déconnexion</button>';
   h += '</div></div>';
 
   // KPIs
