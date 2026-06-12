@@ -6531,11 +6531,11 @@ function canSeeTeamData(user) {
 
 function canManageUsers(user) {
   if (!user) return false;
-  return isSuperAdmin(user);
+  return isSuperAdmin(user) || isSubAdmin(user);
 }
 
 function canManageUserAccess(user) {
-  return !!(user && isSuperAdmin(user));
+  return !!(user && (isSuperAdmin(user) || isSubAdmin(user)));
 }
 
 function applyNavigationAccess() {
@@ -8612,10 +8612,13 @@ function rSuivi() {
     h += '<div class="form-field"><label>Nom d\'utilisateur</label><input type="text" id="invUsername" placeholder="Ex: jean"></div>';
     h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPassword" placeholder="Ex: jean123"></div>';
     h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
-    var roleOptions = '<option value="Expert">Expert (voit ses données uniquement)</option>';
+    var roleOptions = '<option value="Ambassador">Ambassadeur (prospection terrain)</option>';
+    roleOptions += '<option value="Expert">Expert (voit ambassadeurs + ses données)</option>';
+    if (isSuperAdmin(currentUser) || isSubAdmin(currentUser)) {
+      roleOptions += '<option value="SubAdmin">Sub Admin (vue globale experts + ambassadeurs)</option>';
+    }
     if (isSuperAdmin(currentUser)) {
-      roleOptions += '<option value="SubAdmin">Sub Admin (coordination + données perso)</option>';
-      roleOptions += '<option value="SuperAdmin">Super Admin (réservé à Noah)</option>';
+      roleOptions += '<option value="SuperAdmin">Super Admin (vue globale totale)</option>';
     }
     h += '<div class="form-field"><label>Rôle</label><select id="invRole">' + roleOptions + '</select></div>';
     h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter l\'utilisateur</button></div>';
@@ -8628,7 +8631,13 @@ function rSuivi() {
         var permissions = normalizePermissions(u);
         h += '<div class="agent-card">';
         h += '<div class="agent-head"><strong>' + esc(u.fullName) + '</strong><span class="trend-chip flat">' + esc(u.username) + '</span></div>';
-        h += '<div class="form-field"><label>Portée des données</label><select id="accessScope-' + esc(u.username) + '" disabled><option value="own" selected>Données personnelles uniquement</option></select><small style="display:block;margin-top:8px;font-size:11px;color:var(--g500)">Vue globale réservée à Noah.</small></div>';
+        var uRole = u.role || 'Expert';
+        var roleOpts = '<option value="Ambassador"' + (uRole === 'Ambassador' ? ' selected' : '') + '>Ambassadeur</option>';
+        roleOpts += '<option value="Expert"' + (uRole === 'Expert' ? ' selected' : '') + '>Expert</option>';
+        roleOpts += '<option value="SubAdmin"' + (uRole === 'SubAdmin' ? ' selected' : '') + '>Sub Admin</option>';
+        if (isSuperAdmin(currentUser)) roleOpts += '<option value="SuperAdmin"' + (uRole === 'SuperAdmin' ? ' selected' : '') + '>Super Admin</option>';
+        h += '<div class="form-field"><label>Rôle</label><select id="accessRole-' + esc(u.username) + '">' + roleOpts + '</select></div>';
+        h += '<div class="form-field"><label>Portée des données</label><select id="accessScope-' + esc(u.username) + '" disabled><option value="own" selected>Données personnelles uniquement</option></select><small style="display:block;margin-top:8px;font-size:11px;color:var(--g500)">Portée définie automatiquement par le rôle.</small></div>';
         h += '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--g200);border-radius:14px;background:#fff6f6;font-size:12px;color:var(--g700)"><input type="checkbox" id="accessManage-' + esc(u.username) + '"' + (permissions.manageUsers ? ' checked' : '') + ' disabled> Gestion utilisateurs</label>';
         h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 16px">';
         PANE_ACCESS_CONFIG.forEach(function(pane) {
@@ -8648,7 +8657,8 @@ function rSuivi() {
       var role = roleBadgeLabel(u);
       var permissions = normalizePermissions(u);
       h += '<tr><td class="mono">' + esc(u.username) + '</td><td><b>' + esc(u.fullName) + '</b></td>';
-      h += '<td>' + (role === 'SUPER ADMIN' ? '<span style="color:var(--red);font-weight:700">SUPER ADMIN</span>' : (role === 'SUB ADMIN' ? '<span style="color:var(--saffron-deep);font-weight:700">SUB ADMIN</span>' : 'Expert')) + '</td>';
+      var roleColor = role === 'SUPER ADMIN' ? 'var(--red)' : role === 'SUB ADMIN' ? 'var(--saffron-deep)' : role === 'EXPERT' ? 'var(--ink)' : 'var(--green)';
+      h += '<td><span style="color:' + roleColor + ';font-weight:700">' + role + '</span></td>';
       h += '<td>' + esc(u.city) + '</td>';
       h += '<td>' + (permissions.dataScope === 'all' ? '<span style="color:var(--green);font-weight:700">Toute la donnée</span>' : 'Données perso') + '</td>';
       h += '<td>' + (permissions.manageUsers ? '<span style="color:var(--red);font-weight:700">Oui</span>' : 'Non') + '</td>';
@@ -9260,10 +9270,17 @@ async function submitInvite() {
 }
 
 async function submitUserAccess(username) {
-  if (!canManageUserAccess(currentUser)) { showToast('Accès réservé au Super Admin', true); return; }
+  if (!canManageUserAccess(currentUser)) { showToast('Accès réservé aux admins', true); return; }
   var scopeEl = document.getElementById('accessScope-' + username);
   var manageUsersEl = document.getElementById('accessManage-' + username);
+  var roleEl = document.getElementById('accessRole-' + username);
   if (!scopeEl) { showToast('Utilisateur introuvable', true); return; }
+  var newRole = roleEl ? roleEl.value : '';
+  if (newRole) {
+    if (!userOverrides[username]) userOverrides[username] = {};
+    userOverrides[username].role = newRole;
+    persistUserOverrides();
+  }
   var panes = PANE_ACCESS_CONFIG.filter(function(pane) {
     var checkbox = document.getElementById('access-' + username + '-' + pane.key);
     return checkbox && checkbox.checked;
@@ -9272,7 +9289,7 @@ async function submitUserAccess(username) {
     showToast('Au moins un onglet doit rester accessible', true);
     return;
   }
-  var res = await apiPost({ action: 'updateUserAccess', username: username, dataScope: scopeEl.value, panes: panes, manageUsers: !!(manageUsersEl && manageUsersEl.checked), requestedBy: currentUser ? currentUser.username : '' });
+  var res = await apiPost({ action: 'updateUserAccess', username: username, dataScope: scopeEl.value, panes: panes, manageUsers: !!(manageUsersEl && manageUsersEl.checked), role: newRole, requestedBy: currentUser ? currentUser.username : '' });
   if (res.success) {
     if (isBackendConfigured() && nateivaApiToken) {
       await refreshSyncedState();
