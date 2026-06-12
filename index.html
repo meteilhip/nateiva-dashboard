@@ -66,6 +66,31 @@ body{
     radial-gradient(ellipse at bottom left, rgba(13, 148, 136, 0.04), transparent 60%);
   min-height:100vh;
 }
+.app{animation:ddFadeIn .45s ease}
+.hero-content > *{animation:heroRise .72s cubic-bezier(.16,1,.3,1) both}
+.hero-content > *:nth-child(2){animation-delay:.08s}
+@keyframes heroRise{
+  from{opacity:0;transform:translateY(18px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes surfaceIn{
+  from{opacity:0;transform:translateY(16px);filter:saturate(.92)}
+  to{opacity:1;transform:translateY(0);filter:saturate(1)}
+}
+@keyframes sweepGlow{
+  from{transform:translateX(-130%) skewX(-18deg);opacity:0}
+  35%{opacity:.5}
+  to{transform:translateX(160%) skewX(-18deg);opacity:0}
+}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,
+  *::before,
+  *::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
 .mono{font-family:'JetBrains Mono',monospace;letter-spacing:0}
 .serif{font-family:'Fraunces',serif;letter-spacing:-.02em}
 .app{max-width:1480px;margin:0 auto;padding:24px 32px 60px}
@@ -175,8 +200,24 @@ body{
   align-items:center;
   gap:4px;
   letter-spacing:-.005em;
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+}
+.nav-btn::after{
+  content:'';
+  position:absolute;
+  inset:-35% auto -35% -20%;
+  width:42%;
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.42), rgba(255,255,255,0));
+  transform:translateX(-150%) skewX(-18deg);
+  opacity:0;
+  pointer-events:none;
 }
 .nav-btn:hover{background:var(--bg-warm);color:var(--ink)}
+.nav-btn:hover::after,
+.nav-btn.act::after,
+.nav-btn.priority-workspace:hover::after{animation:sweepGlow .75s ease}
 .nav-btn.act{
   background:linear-gradient(135deg, var(--ink), var(--g800));
   color:var(--paper);
@@ -224,6 +265,18 @@ body{
   margin:16px 0 32px;
   display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;
   box-shadow:var(--shadow-sm);
+  position:relative;
+  overflow:hidden;
+  animation:heroRise .85s cubic-bezier(.16,1,.3,1) both;
+}
+.filters::before{
+  content:'';
+  position:absolute;
+  inset:0 auto auto 0;
+  width:100%;
+  height:2px;
+  background:linear-gradient(90deg, rgba(220,38,38,.88), rgba(245,158,11,.85), rgba(13,148,136,.8));
+  opacity:.72;
 }
 .fld{display:flex;flex-direction:column;gap:6px;min-width:130px}
 .fld label{
@@ -364,6 +417,7 @@ body{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;
   padding:22px 22px 20px;position:relative;
   transition:all .3s cubic-bezier(.16,1,.3,1);overflow:hidden;cursor:default;
+  animation:surfaceIn .48s cubic-bezier(.16,1,.3,1) both;
 }
 .kpi::before{
   content:'';position:absolute;top:0;left:0;right:0;
@@ -428,6 +482,7 @@ body{
   border-radius:18px;padding:0;margin-bottom:24px;
   position:relative;overflow:hidden;
   transition:all .3s cubic-bezier(.16,1,.3,1);
+  animation:surfaceIn .52s cubic-bezier(.16,1,.3,1) both;
 }
 .metric:hover{box-shadow:var(--shadow-lg);border-color:var(--g300)}
 
@@ -1336,9 +1391,20 @@ body{
   min-width:220px;max-width:300px;flex:0 1 260px;border:none;border-radius:20px;
   padding:18px 18px;background:linear-gradient(135deg, var(--red), var(--red-deep));
   color:var(--paper);box-shadow:0 16px 36px rgba(220,38,38,.26);cursor:pointer;
-  transition:transform .2s ease, box-shadow .2s ease;text-align:center
+  transition:transform .2s ease, box-shadow .2s ease;text-align:center;
+  position:relative;overflow:hidden;isolation:isolate
+}
+.workspace-cta::after{
+  content:'';
+  position:absolute;
+  inset:-30% auto -30% -18%;
+  width:38%;
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.3), rgba(255,255,255,0));
+  transform:translateX(-160%) skewX(-20deg);
+  pointer-events:none;
 }
 .workspace-cta:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(220,38,38,.32)}
+.workspace-cta:hover::after{animation:sweepGlow .82s ease}
 .workspace-cta .eyebrow{
   display:block;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
   letter-spacing:.12em;text-transform:uppercase;opacity:.82;margin-bottom:10px
@@ -1363,6 +1429,7 @@ body{
 .suivi-kpi{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;
   padding:20px;position:relative;overflow:hidden;transition:all .3s;
+  animation:surfaceIn .48s cubic-bezier(.16,1,.3,1) both;
 }
 .suivi-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--g200)}
 .suivi-kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -1383,6 +1450,7 @@ body{
 .form-card{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;
   padding:28px 32px;margin-bottom:24px;
+  animation:surfaceIn .56s cubic-bezier(.16,1,.3,1) both;
 }
 .form-card h3{
   font-family:'Fraunces',serif;font-size:24px;font-weight:600;
@@ -1436,6 +1504,7 @@ body{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:14px;
   padding:18px 22px;display:flex;align-items:center;gap:18px;
   margin-bottom:10px;transition:all .3s;
+  animation:surfaceIn .46s cubic-bezier(.16,1,.3,1) both;
 }
 .rank-card:hover{transform:translateX(4px);box-shadow:var(--shadow)}
 .rank-card.me{border-color:var(--saffron);background:linear-gradient(135deg, var(--bg-warm), var(--paper));border-width:2px}
@@ -1537,6 +1606,7 @@ body{
 .planner-week{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .planner-day{
   border:1.5px solid var(--g200);border-radius:16px;background:linear-gradient(135deg, rgba(255,255,255,.98), rgba(248,250,252,.96));padding:14px;min-height:170px
+  ;animation:surfaceIn .48s cubic-bezier(.16,1,.3,1) both
 }
 .planner-day.today{border-color:rgba(13,148,136,.24);box-shadow:0 0 0 3px rgba(13,148,136,.08)}
 .planner-day.overdue{border-color:rgba(220,38,38,.2);background:linear-gradient(135deg, rgba(254,242,242,.98), rgba(255,255,255,.98))}
@@ -1559,7 +1629,8 @@ body{
 .planner-calendar-shell{margin-top:22px;display:grid;gap:16px}
 .planner-month{
   border:1px solid var(--g200);border-radius:18px;background:rgba(255,255,255,.94);padding:18px;
-  box-shadow:0 12px 24px rgba(15,23,42,.04)
+  box-shadow:0 12px 24px rgba(15,23,42,.04);
+  animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both
 }
 .planner-month h4{margin:0 0 12px;font-size:15px;color:var(--ink)}
 .planner-entry{
@@ -1702,7 +1773,8 @@ body{
 .stage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
 .stage-card{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:18px 18px 16px;
-  box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden
+  box-shadow:var(--shadow-sm);transition:all .25s;position:relative;overflow:hidden;
+  animation:surfaceIn .46s cubic-bezier(.16,1,.3,1) both
 }
 .stage-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
 .stage-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--red),var(--saffron))}
@@ -1788,7 +1860,8 @@ body{
 .week-meta strong{display:block;font-family:'Fraunces',serif;font-size:24px;color:var(--ink);line-height:1.1}
 .week-meta span{display:block;margin-top:4px;font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace}
 .compare-card{
-  border-radius:18px;padding:20px 22px;color:var(--paper);box-shadow:var(--shadow);margin-top:16px
+  border-radius:18px;padding:20px 22px;color:var(--paper);box-shadow:var(--shadow);margin-top:16px;
+  animation:surfaceIn .52s cubic-bezier(.16,1,.3,1) both
 }
 .compare-card.up{background:linear-gradient(135deg,var(--green),var(--green-bright))}
 .compare-card.down{background:linear-gradient(135deg,var(--red),var(--red-deep))}
@@ -1820,7 +1893,8 @@ body{
 }
 .agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .agent-card{
-  background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm)
+  background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm);
+  animation:surfaceIn .48s cubic-bezier(.16,1,.3,1) both
 }
 .agent-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}
 .agent-head strong{font-size:15px;color:var(--ink)}
@@ -1960,8 +2034,8 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v9.5 · Drill-down + Appels + Revenue</span>
-      <span class="meta-pill saffron" id="headerDate">11 JUIN 2026</span>
+      <span class="meta-pill red">v9.6 · Count Fix + Motion UX</span>
+      <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
     <div id="headerAuth" class="header-auth"></div>
@@ -6323,8 +6397,10 @@ function getBaseRawRows() {
 function shouldCreateSchoolFromFollowup(followup) {
   if (!followup) return false;
   if (followup.Source === 'calls-sheet' || followup.Imported) return false;
+  var meta = readFollowupMeta(followup);
   if (followup.FollowupType === 'CREATION') return true;
-  return !!(followup.SchoolType || followup.Category || followup.Effectif || followup.Location || followup.ContactRole);
+  if (cleanMetaValue(meta.entryOrigin) === 'new-school') return true;
+  return false;
 }
 
 function buildNewSchoolsFromFollowups() {
@@ -7115,7 +7191,9 @@ function readFollowupMeta(item) {
     callWhatsappDocs: cleanMetaValue((item && item.CallWhatsappDocs) || stored.callWhatsappDocs),
     callToSuperior: cleanMetaValue((item && item.CallToSuperior) || stored.callToSuperior),
     callVisit: cleanMetaValue((item && item.CallVisit) || stored.callVisit),
-    prospectionYear: cleanMetaValue((item && item.ProspectionYear) || stored.prospectionYear)
+    prospectionYear: cleanMetaValue((item && item.ProspectionYear) || stored.prospectionYear),
+    entryOrigin: cleanMetaValue((item && item.EntryOrigin) || stored.entryOrigin),
+    firstContactChannel: cleanMetaValue((item && item.FirstContactChannel) || stored.firstContactChannel)
   };
 }
 
@@ -7147,6 +7225,8 @@ function hydrateFollowupRecord(record) {
   if (meta.callToSuperior && !hydrated.CallToSuperior) hydrated.CallToSuperior = meta.callToSuperior;
   if (meta.callVisit && !hydrated.CallVisit) hydrated.CallVisit = meta.callVisit;
   if (meta.prospectionYear && !hydrated.ProspectionYear) hydrated.ProspectionYear = meta.prospectionYear;
+  if (meta.entryOrigin && !hydrated.EntryOrigin) hydrated.EntryOrigin = meta.entryOrigin;
+  if (meta.firstContactChannel && !hydrated.FirstContactChannel) hydrated.FirstContactChannel = meta.firstContactChannel;
   return hydrated;
 }
 
@@ -8035,7 +8115,10 @@ function rSuivi() {
   h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
   h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
   h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0">';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';`r`n  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory" onchange="updateStandingTip(\'fu\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';`r`n  h += '<div id="fuStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';`r`n  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';
+  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory" onchange="updateStandingTip(\'fu\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
+  h += '<div id="fuStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
+  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
   h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="fuRate" placeholder="Ex: 60" min="0" max="100"></div>';
   h += '<div class="form-field"><label>Ville</label><select id="fuCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
@@ -8099,7 +8182,10 @@ function rSuivi() {
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, que ce soit <b>par téléphone</b> ou <b>sur le terrain</b>. On reprend ici les questions clés du questionnaire original pour bien classer l\'école dès le premier contact.</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem" oninput="updateNewSchoolOwnershipNotice()"></div>';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';`r`n  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';`r`n  h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';`r`n  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';
+  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
+  h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
+  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
   h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="nsRate" placeholder="Ex: 60" min="0" max="100"></div>';
   h += '<div class="form-field"><label>Ville</label><select id="nsCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
@@ -8806,7 +8892,9 @@ async function submitNewSchoolDirect() {
     callWhatsappDocs: document.getElementById('nsWhatsappDocs').value,
     callToSuperior: document.getElementById('nsToSuperior').value,
     callVisit: document.getElementById('nsVisitFlag').value,
-    prospectionYear: document.getElementById('nsProspectionYear').value.trim()
+    prospectionYear: document.getElementById('nsProspectionYear').value.trim(),
+    entryOrigin: 'new-school',
+    firstContactChannel: document.getElementById('nsEntryType').value
   };
   
   var data = {
@@ -8875,7 +8963,11 @@ async function submitNewSchoolDirect() {
     CallVisit: questionnaireMeta.callVisit,
     visit: questionnaireMeta.callVisit,
     ProspectionYear: questionnaireMeta.prospectionYear,
-    prospectionYear: questionnaireMeta.prospectionYear
+    prospectionYear: questionnaireMeta.prospectionYear,
+    EntryOrigin: questionnaireMeta.entryOrigin,
+    entryOrigin: questionnaireMeta.entryOrigin,
+    FirstContactChannel: questionnaireMeta.firstContactChannel,
+    firstContactChannel: questionnaireMeta.firstContactChannel
   };
   setNewSchoolSubmitBusy(true);
   try {
