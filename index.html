@@ -3864,6 +3864,11 @@ function rHome(){
   const callExperts=dashboard.callAnalytics.experts;
   const callQuality=dashboard.callAnalytics.quality;
   const prospectionAnalytics=dashboard.prospectionAnalytics;
+  const importedCalls=dashboard.followups.filter(function(f){return f.ID && String(f.ID).startsWith('IMP-');}).length;
+  const platformCalls=dashboard.followups.filter(function(f){return f.ID && String(f.ID).startsWith('NSA-');}).length;
+  const calledSchools=new Set(dashboard.followups.map(function(f){return schoolKey(f.SchoolName);}).filter(Boolean));
+  const schoolsCalled=calledSchools.size;
+  const schoolCoverage=uniqueSchools>0?Math.round((schoolsCalled/uniqueSchools)*100):0;
   const quickLinks=[
     userCanAccessPane(currentUser,'suivi') ? '<a href="#" data-jump="suivi">🗂️ Workspace</a>' : '',
     userCanAccessPane(currentUser,'metrics') ? '<a href="#" data-jump="metrics">📊 BI & KPI</a>' : '',
