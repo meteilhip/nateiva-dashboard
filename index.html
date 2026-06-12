@@ -1960,7 +1960,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v9.4 · Drill-down + NLP + Revenue</span>
+      <span class="meta-pill red">v9.5 · Drill-down + Appels + Revenue</span>
       <span class="meta-pill saffron" id="headerDate">11 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -2517,7 +2517,7 @@ function buildSchoolRecords(rawRows, followups){
       if(meta.campusCount)rec.campusCount=meta.campusCount;
     }
     const note=normalizeText([item.Outcome,item.Status,cleanNotes,item.NextAction].join(' '));
-    if(/clos|closed|converti|gagn|signe|sign|paid|paye/.test(note)){
+    if(/\bclos\b|closed|converti|gagne|a signe|contrat signe|deal signe|signed|paid|paye/.test(note)){
       rec.won=true;
       if(dt && (!rec.closedAt || dt>rec.closedAt))rec.closedAt=dt;
       rec.closedBy=canonicalPersonName(item.Expert) || rec.closedBy || rec.expert;
