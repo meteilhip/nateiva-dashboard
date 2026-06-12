@@ -3,6 +3,16 @@ const { defaultPermissionsForRole, normalizePermissions, buildFollowupFingerprin
 
 function mapUser(row) {
   if (!row) return null;
+  const permissions = normalizePermissions({
+    username: row.username,
+    fullName: row.full_name,
+    role: row.role,
+    permissions: {
+      dataScope: row.data_scope,
+      manageUsers: !!row.manage_users,
+      panes: JSON.parse(row.panes_json || "[]")
+    }
+  });
   return {
     id: row.id,
     username: row.username,
@@ -10,11 +20,7 @@ function mapUser(row) {
     role: row.role,
     city: row.city,
     active: !!row.active,
-    permissions: {
-      dataScope: row.data_scope,
-      manageUsers: !!row.manage_users,
-      panes: JSON.parse(row.panes_json || "[]")
-    }
+    permissions
   };
 }
 
@@ -112,10 +118,18 @@ async function updateUserAccess(username, patch) {
 }
 
 async function listVisibleFollowups(viewer) {
+  const viewerCity = String(viewer && viewer.city ? viewer.city : "").trim().toUpperCase();
+  const enforceCity = viewerCity && viewerCity !== "ALL";
   const sql = viewer.permissions.dataScope === "all"
     ? `SELECT * FROM followups WHERE deleted_at IS NULL ORDER BY event_timestamp DESC, id DESC`
-    : `SELECT * FROM followups WHERE deleted_at IS NULL AND (LOWER(expert) = LOWER(?) OR LOWER(created_by_username) = LOWER(?)) ORDER BY event_timestamp DESC, id DESC`;
-  const params = viewer.permissions.dataScope === "all" ? [] : [viewer.fullName, viewer.username];
+    : `SELECT * FROM followups
+       WHERE deleted_at IS NULL
+         AND (LOWER(expert) = LOWER(?) OR LOWER(created_by_username) = LOWER(?))
+         ${enforceCity ? `AND (city IS NULL OR city = '' OR UPPER(city) = ?)` : ``}
+       ORDER BY event_timestamp DESC, id DESC`;
+  const params = viewer.permissions.dataScope === "all"
+    ? []
+    : (enforceCity ? [viewer.fullName, viewer.username, viewerCity] : [viewer.fullName, viewer.username]);
   const rows = await query(sql, params);
   return rows.map(mapFollowup);
 }

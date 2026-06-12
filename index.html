@@ -2351,6 +2351,7 @@ function getDashboardScope(){
     if(!allowed.size && !allowedExperts.size) return false;
     if(ST.city && item.City && item.City!==ST.city) return false;
     if(ST.expert && item.Expert && !samePerson(item.Expert,ST.expert)) return false;
+    if(ST.expert && !recordMatchesAssignedCity(ST.expert, item.City)) return false;
     if(ST.sec && item.Sector && item.Sector!==ST.sec) return false;
     const key=item.SchoolKey || schoolKey(item.SchoolName);
     return key ? allowed.has(key) : false;
@@ -2359,6 +2360,7 @@ function getDashboardScope(){
     if(!item || !item.Expert) return false;
     if(ST.city && item.City && item.City!==ST.city) return false;
     if(ST.expert && !samePerson(item.Expert,ST.expert)) return false;
+    if(ST.expert && !recordMatchesAssignedCity(ST.expert, item.City)) return false;
     if(ST.sec && item.Sector && item.Sector!==ST.sec) return false;
     const key=item.SchoolKey || schoolKey(item.SchoolName);
     if(key && allowed.has(key)) return false;
@@ -3997,6 +3999,15 @@ function updateFilterSummary() {
 
 function refreshFilters(){
   const rows=getFilterBaseRows();
+  const cities=[...new Set(rows.map(r=>r.v).filter(Boolean))].sort();
+  const cityEl=document.getElementById('fCity');
+  cityEl.innerHTML='<option value="">Toutes villes</option>';
+  cities.forEach(city=>{
+    const o=document.createElement('option');
+    o.value=city;
+    o.textContent=city === 'YAOUNDE' ? 'Yaoundé' : (city === 'DOUALA' ? 'Douala' : city);
+    cityEl.appendChild(o);
+  });
   const exp=[...new Set(rows.map(r=>r.e).filter(Boolean))].sort();
   const sx=document.getElementById('fExpert');
   sx.innerHTML='<option value="">Tous experts</option>';
@@ -4009,10 +4020,16 @@ function refreshFilters(){
   const sc=document.getElementById('fCat');
   sc.innerHTML='<option value="">Toutes catégories</option>';
   cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o)});
+  cityEl.value=cities.includes(ST.city)?ST.city:'';
   sx.value=exp.includes(ST.expert)?ST.expert:'';
   ss.value=secs.includes(ST.sec)?ST.sec:'';
   sc.value=cats.includes(ST.cat)?ST.cat:'';
   const locked=currentUser && !canSeeAllData(currentUser);
+  cityEl.disabled=locked && cities.length <= 1;
+  if(locked && cities.length === 1){
+    ST.city=cities[0];
+    cityEl.value=ST.city;
+  }
   sx.disabled=locked;
   if(locked){
     ST.expert=exp.find(function(e){ return samePerson(e,currentUser.fullName); }) || currentUser.fullName;
@@ -6093,7 +6110,7 @@ var PANE_ACCESS_CONFIG = [
 ];
 
 var DEFAULT_USERS = [
-  { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'DOUALA' },
+  { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'YAOUNDE' },
   { username: 'fabiola', password: 'fabiola123', fullName: 'Kendo Fabiola', role: 'Expert', city: 'DOUALA' },
   { username: 'ida', password: 'ida123', fullName: 'Emambo Ida', role: 'Expert', city: 'DOUALA' },
   { username: 'guy', password: 'guy123', fullName: 'Ntsa Guy', role: 'SubAdmin', city: 'YAOUNDE' },
@@ -6168,6 +6185,13 @@ function isSuperAdmin(userOrName) {
   return role === 'SuperAdmin' || isListedPerson(SUPER_ADMINS, userOrName);
 }
 
+function isNoahSuperAdmin(userOrName) {
+  if (!userOrName || !isSuperAdmin(userOrName)) return false;
+  var username = typeof userOrName === 'string' ? '' : String(userOrName.username || '').trim().toLowerCase();
+  var fullName = typeof userOrName === 'string' ? String(userOrName).trim().toLowerCase() : String(userOrName.fullName || '').trim().toLowerCase();
+  return username === 'noah' || fullName === 'noah';
+}
+
 function isSubAdmin(userOrName) {
   if (!userOrName) return false;
   var role = typeof userOrName === 'string' ? '' : (userOrName.role || '');
@@ -6193,17 +6217,19 @@ function canBypassSchoolOwnership(user) {
 }
 
 function getDefaultPermissions(user) {
-  var elevated = hasAdminRole(user);
+  var elevatedPanes = hasAdminRole(user);
+  var globalData = isNoahSuperAdmin(user);
   return {
-    panes: elevated ? allPaneKeys() : ['home', 'suivi', 'glossary'],
-    dataScope: elevated ? 'all' : 'own',
-    manageUsers: isSuperAdmin(user)
+    panes: elevatedPanes ? allPaneKeys() : ['home', 'suivi', 'glossary'],
+    dataScope: globalData ? 'all' : 'own',
+    manageUsers: globalData
   };
 }
 
 function normalizePermissions(user) {
   var defaults = getDefaultPermissions(user || {});
   var permissions = user && user.permissions ? user.permissions : {};
+  var canKeepGlobalData = isNoahSuperAdmin(user || {});
   var panes = Array.isArray(permissions.panes) && permissions.panes.length
     ? permissions.panes.filter(function(pane) { return allPaneKeys().indexOf(pane) > -1; })
     : defaults.panes.slice();
@@ -6211,8 +6237,8 @@ function normalizePermissions(user) {
   if (panes.indexOf('home') === -1) panes.unshift('home');
   return {
     panes: Array.from(new Set(panes)),
-    dataScope: permissions.dataScope === 'all' ? 'all' : (permissions.dataScope === 'own' ? 'own' : defaults.dataScope),
-    manageUsers: typeof permissions.manageUsers === 'boolean' ? permissions.manageUsers : defaults.manageUsers
+    dataScope: canKeepGlobalData && permissions.dataScope === 'all' ? 'all' : defaults.dataScope,
+    manageUsers: defaults.manageUsers
   };
 }
 
@@ -6248,16 +6274,16 @@ function userCanAccessPane(user, pane) {
 
 function canSeeAllData(user) {
   if (!user) return false;
-  return normalizePermissions(user).dataScope === 'all';
+  return isNoahSuperAdmin(user) && normalizePermissions(user).dataScope === 'all';
 }
 
 function canManageUsers(user) {
   if (!user) return false;
-  return isSuperAdmin(user) || isSubAdmin(user) || !!normalizePermissions(user).manageUsers;
+  return isNoahSuperAdmin(user);
 }
 
 function canManageUserAccess(user) {
-  return !!(user && isSuperAdmin(user));
+  return !!(user && isNoahSuperAdmin(user));
 }
 
 function applyNavigationAccess() {
@@ -6379,9 +6405,30 @@ function getAllRawRows() {
   return getBaseRawRows().concat(buildNewSchoolsFromFollowups());
 }
 
+function normalizeAssignedCity(city) {
+  return String(city || '').trim().toUpperCase();
+}
+
+function getAssignedCityForExpert(expertName) {
+  if (!expertName) return '';
+  var user = getAllUsers().find(function(item) {
+    return samePerson(item.fullName || item.username, expertName);
+  });
+  return normalizeAssignedCity(user && user.city ? user.city : '');
+}
+
+function recordMatchesAssignedCity(expertName, city) {
+  var assignedCity = getAssignedCityForExpert(expertName);
+  var recordCity = normalizeAssignedCity(city);
+  if (!assignedCity || assignedCity === 'ALL' || !recordCity) return true;
+  return recordCity === assignedCity;
+}
+
 function getWorkspaceRawForUser(expertName) {
   if (!expertName) return [];
-  return getAllRawRows().filter(function(r) { return samePerson(r.e, expertName); });
+  return getAllRawRows().filter(function(r) {
+    return samePerson(r.e, expertName) && recordMatchesAssignedCity(expertName, r.v);
+  });
 }
 
 function getKnownSchoolKeySet() {
@@ -6415,14 +6462,14 @@ function getVisibleRaw() {
   var allRows = getAllRawRows();
   if (!currentUser) return [];
   if (canSeeAllData(currentUser)) return allRows;
-  return allRows.filter(function(r) { return samePerson(r.e, currentUser.fullName); });
+  return getWorkspaceRawForUser(currentUser.fullName);
 }
 
 function getFilterBaseRows() {
   var allRows = getAllRawRows();
   if (!currentUser) return [];
   if (canSeeAllData(currentUser)) return allRows;
-  return allRows.filter(function(r) { return samePerson(r.e, currentUser.fullName); });
+  return getWorkspaceRawForUser(currentUser.fullName);
 }
 
 function buildImportedSheetFollowups() {
@@ -6528,7 +6575,9 @@ function isImportedCallFollowup(item) {
 function getWorkspaceFollowupsForUser(expertName) {
   if (!expertName) return [];
   return getAllFollowups().filter(function(f) {
-    return samePerson(f.Expert, expertName) && schoolBelongsToUserPortfolio(expertName, f.SchoolName);
+    return samePerson(f.Expert, expertName)
+      && recordMatchesAssignedCity(expertName, f.City)
+      && schoolBelongsToUserPortfolio(expertName, f.SchoolName);
   });
 }
 
@@ -6563,10 +6612,10 @@ renderAll();
 // --- Compute days on field = distinct days with at least one entry ---
 function getDaysOnField(expertName) {
   var daySet = new Set();
-  var visibleRaw = getAllRawRows();
+  var visibleRaw = getWorkspaceRawForUser(expertName);
   for (var i = 0; i < visibleRaw.length; i++) {
     var r = visibleRaw[i];
-    if (samePerson(r.e, expertName) && r.t) {
+    if (r.t) {
       var day = activeDayKey(r.t);
       if (day) daySet.add(day);
     }
@@ -6921,7 +6970,7 @@ function showToast(msg, isError) {
 
 // --- Expert stats from RAW + followups ---
 function computeExpertStats(expertName) {
-  var rawData = getAllRawRows().filter(function(r) { return samePerson(r.e, expertName); });
+  var rawData = getWorkspaceRawForUser(expertName);
   var fuData = getWorkspaceFollowupsForUser(expertName);
   var daysOnField = getDaysOnField(expertName);
   var totalProspections = rawData.length;
@@ -7865,6 +7914,13 @@ function rSuivi() {
   var isSuper = canSeeAllData(currentUser);
   var canAdminUsers = canManageUsers(currentUser);
   var roleLabel = roleBadgeLabel(currentUser);
+  var allowedCities = (!isSuper && currentUser.city && currentUser.city !== 'ALL')
+    ? [String(currentUser.city).trim().toUpperCase()]
+    : ['DOUALA', 'YAOUNDE'];
+  var cityOptions = allowedCities.map(function(city) {
+    var label = city === 'YAOUNDE' ? 'Yaoundé' : (city === 'DOUALA' ? 'Douala' : city);
+    return '<option value="' + esc(city) + '">' + esc(label) + '</option>';
+  }).join('');
   var workspaceRaw = getWorkspaceRawForUser(me);
   var workspaceFollowups = getWorkspaceFollowupsForUser(me);
   var stats = computeExpertStats(me);
@@ -7979,12 +8035,9 @@ function rSuivi() {
   h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
   h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
   h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0">';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
-  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory" onchange="updateStandingTip(\'fu\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
-  h += '<div id="fuStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
-  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="fuSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';`r`n  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory" onchange="updateStandingTip(\'fu\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';`r`n  h += '<div id="fuStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';`r`n  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
   h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="fuRate" placeholder="Ex: 60" min="0" max="100"></div>';
-  h += '<div class="form-field"><label>Ville</label><select id="fuCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Ville</label><select id="fuCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="fuQuartier" placeholder="Ex: Bojongo, Bastos, Biyem-Assi"></div>';
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="fuContactRole" placeholder="Ex: Principal, Directeur"></div>';
@@ -8046,12 +8099,9 @@ function rSuivi() {
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, que ce soit <b>par téléphone</b> ou <b>sur le terrain</b>. On reprend ici les questions clés du questionnaire original pour bien classer l\'école dès le premier contact.</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem" oninput="updateNewSchoolOwnershipNotice()"></div>';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="Mixte">Mixte</option></select></div>';
-  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
-  h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
-  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';`r`n  h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';`r`n  h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';`r`n  h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
   h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="nsRate" placeholder="Ex: 60" min="0" max="100"></div>';
-  h += '<div class="form-field"><label>Ville</label><select id="nsCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+  h += '<div class="form-field"><label>Ville</label><select id="nsCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="nsQuartier" placeholder="Ex: Bojongo, Bastos"></div>';
   h += '<div class="form-field"><label>Canal du 1er contact</label><select id="nsEntryType"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option></select></div>';
@@ -8283,22 +8333,22 @@ function rSuivi() {
     h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
     var roleOptions = '<option value="Expert">Expert (voit ses données uniquement)</option>';
     if (isSuperAdmin(currentUser)) {
-      roleOptions += '<option value="SubAdmin">Sub Admin (voit toute la donnée)</option>';
-      roleOptions += '<option value="SuperAdmin">Super Admin (voit tout + contrôle accès)</option>';
+      roleOptions += '<option value="SubAdmin">Sub Admin (coordination + données perso)</option>';
+      roleOptions += '<option value="SuperAdmin">Super Admin (réservé à Noah)</option>';
     }
     h += '<div class="form-field"><label>Rôle</label><select id="invRole">' + roleOptions + '</select></div>';
     h += '</div><div class="form-submit"><button class="btn-save" onclick="submitInvite()">Ajouter l\'utilisateur</button></div>';
 
     if (canManageUserAccess(currentUser)) {
       h += '<h4 style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--g600);text-transform:uppercase;letter-spacing:.12em;margin:28px 0 14px">Contrôle des accès</h4>';
-      h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Le super admin choisit ici quels onglets chaque utilisateur voit et s\'il reste sur ses propres données ou peut voir toute l\'équipe.</p>';
+      h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Noah reste le seul compte autorisé à avoir une vue globale. Tous les autres utilisateurs restent verrouillés sur leurs propres données, même si leurs onglets diffèrent.</p>';
       h += '<div class="agent-grid">';
       getAllUsers().filter(function(u) { return !samePerson(u.fullName || u.username, currentUser.fullName || currentUser.username); }).forEach(function(u) {
         var permissions = normalizePermissions(u);
         h += '<div class="agent-card">';
         h += '<div class="agent-head"><strong>' + esc(u.fullName) + '</strong><span class="trend-chip flat">' + esc(u.username) + '</span></div>';
-        h += '<div class="form-field"><label>Portée des données</label><select id="accessScope-' + esc(u.username) + '"><option value="own"' + (permissions.dataScope === 'own' ? ' selected' : '') + '>Données personnelles uniquement</option><option value="all"' + (permissions.dataScope === 'all' ? ' selected' : '') + '>Toute la donnée équipe</option></select></div>';
-        h += '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--g200);border-radius:14px;background:#fff6f6;font-size:12px;color:var(--g700)"><input type="checkbox" id="accessManage-' + esc(u.username) + '"' + (permissions.manageUsers ? ' checked' : '') + '> Gestion utilisateurs</label>';
+        h += '<div class="form-field"><label>Portée des données</label><select id="accessScope-' + esc(u.username) + '" disabled><option value="own" selected>Données personnelles uniquement</option></select><small style="display:block;margin-top:8px;font-size:11px;color:var(--g500)">Vue globale réservée à Noah.</small></div>';
+        h += '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--g200);border-radius:14px;background:#fff6f6;font-size:12px;color:var(--g700)"><input type="checkbox" id="accessManage-' + esc(u.username) + '"' + (permissions.manageUsers ? ' checked' : '') + ' disabled> Gestion utilisateurs</label>';
         h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 16px">';
         PANE_ACCESS_CONFIG.forEach(function(pane) {
           h += '<label style="display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--g200);border-radius:999px;background:var(--bg-warm);font-size:12px;color:var(--g700)"><input type="checkbox" id="access-' + esc(u.username) + '-' + pane.key + '"' + (permissions.panes.indexOf(pane.key) > -1 ? ' checked' : '') + '> ' + esc(pane.label) + '</label>';

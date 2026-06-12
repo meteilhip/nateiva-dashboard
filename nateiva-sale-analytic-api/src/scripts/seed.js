@@ -3,7 +3,7 @@ const { findUserByUsername, createUser } = require("../repository");
 const { closePool } = require("../db");
 
 const DEFAULT_USERS = [
-  { username: "ivan", password: "ivan123", fullName: "Ivan", role: "Expert", city: "DOUALA" },
+  { username: "ivan", password: "ivan123", fullName: "Ivan", role: "Expert", city: "YAOUNDE" },
   { username: "fabiola", password: "fabiola123", fullName: "Kendo Fabiola", role: "Expert", city: "DOUALA" },
   { username: "ida", password: "ida123", fullName: "Emambo Ida", role: "Expert", city: "DOUALA" },
   { username: "guy", password: "guy123", fullName: "Ntsa Guy", role: "SubAdmin", city: "YAOUNDE" },

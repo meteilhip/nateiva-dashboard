@@ -46,7 +46,7 @@ function canManageUsers(viewer) {
 }
 
 function canManageAccess(viewer) {
-  return !!viewer && viewer.role === "SuperAdmin";
+  return !!viewer && viewer.role === "SuperAdmin" && String(viewer.username || "").trim().toLowerCase() === "noah";
 }
 
 function canDeleteFollowup(viewer) {

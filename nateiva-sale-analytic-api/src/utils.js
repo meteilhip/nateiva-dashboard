@@ -9,22 +9,31 @@ function normalizeRole(role) {
   return "Expert";
 }
 
-function defaultPermissionsForRole(role) {
-  const normalized = normalizeRole(role);
+function isNoahAccount(userLike) {
+  if (!userLike) return false;
+  const username = String(userLike.username || "").trim().toLowerCase();
+  const fullName = String(userLike.fullName || userLike.full_name || "").trim().toLowerCase();
+  return username === "noah" || fullName === "noah";
+}
+
+function defaultPermissionsForRole(userLike) {
+  const normalized = normalizeRole(userLike && userLike.role ? userLike.role : userLike);
   const isPrivileged = normalized === "SuperAdmin" || normalized === "SubAdmin";
+  const isNoah = isNoahAccount(userLike);
   return {
-    dataScope: isPrivileged ? "all" : "own",
-    manageUsers: normalized === "SuperAdmin",
+    dataScope: normalized === "SuperAdmin" && isNoah ? "all" : "own",
+    manageUsers: normalized === "SuperAdmin" && isNoah,
     panes: normalized === "Expert" ? ["home", "suivi", "glossary"] : ALL_PANES.slice()
   };
 }
 
 function normalizePermissions(userLike) {
-  const defaults = defaultPermissionsForRole(userLike.role);
+  const defaults = defaultPermissionsForRole(userLike || {});
   const incoming = userLike && userLike.permissions ? userLike.permissions : {};
+  const isNoah = isNoahAccount(userLike);
   return {
-    dataScope: incoming.dataScope === "all" || incoming.dataScope === "own" ? incoming.dataScope : defaults.dataScope,
-    manageUsers: typeof incoming.manageUsers === "boolean" ? incoming.manageUsers : defaults.manageUsers,
+    dataScope: isNoah && incoming.dataScope === "all" ? "all" : defaults.dataScope,
+    manageUsers: defaults.manageUsers,
     panes: Array.isArray(incoming.panes) && incoming.panes.length ? incoming.panes.filter((pane) => ALL_PANES.includes(pane)) : defaults.panes
   };
 }
@@ -103,6 +112,7 @@ function boolToTiny(value) {
 module.exports = {
   ALL_PANES,
   normalizeRole,
+  isNoahAccount,
   defaultPermissionsForRole,
   normalizePermissions,
   samePerson,
