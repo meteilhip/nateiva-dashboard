@@ -6317,8 +6317,8 @@ function renderAll(){
   const f=gF();
   const scope=getDashboardScope();
   const uniqueCount=buildSchoolRecords(scope.rawRows,scope.followups).length;
-  document.getElementById('fCount').textContent=uniqueCount;
-  document.getElementById('fTotal').textContent='/ ' + uniqueCount + ' écoles uniques';
+  document.getElementById('fCount').textContent=f.length;
+  document.getElementById('fTotal').textContent='/ ' + f.length + ' entrées · ' + uniqueCount + ' écoles';
   rHome();
   rMetrics();
   rTeam();
@@ -7327,7 +7327,9 @@ function computeExpertStats(expertName) {
   var fuData = getWorkspaceFollowupsForUser(expertName);
   var daysOnField = getDaysOnField(expertName);
   var uniqueRecords = buildSchoolRecords(rawData, fuData);
-  var totalProspections = uniqueRecords.length;
+  var totalEntries = rawData.length;
+  var totalProspections = totalEntries;
+  var uniqueSchools = uniqueRecords.length;
   var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
   var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
@@ -7355,7 +7357,7 @@ function computeExpertStats(expertName) {
   }
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daysOnField, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+  return { daysOnField: daysOnField, totalProspections: totalProspections, totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
 function computeVisibleWorkspaceStats() {
@@ -7371,7 +7373,9 @@ function computeVisibleWorkspaceStats() {
     if (day) daySet.add(day);
   });
   var uniqueRecords = buildSchoolRecords(rawData, fuData);
-  var totalProspections = uniqueRecords.length;
+  var totalEntries = rawData.length;
+  var totalProspections = totalEntries;
+  var uniqueSchools = uniqueRecords.length;
   var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
   var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
@@ -7397,7 +7401,7 @@ function computeVisibleWorkspaceStats() {
   });
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daySet.size, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+  return { daysOnField: daySet.size, totalProspections: totalProspections, totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
 function drillDownExecKPI(metric, label) {
@@ -7406,7 +7410,7 @@ function drillDownExecKPI(metric, label) {
   var rows = rankings.map(function(r) {
     var val = 0;
     if (metric === 'score') val = r.score;
-    else if (metric === 'prospections') val = r.totalProspections;
+    else if (metric === 'prospections') val = r.totalEntries;
     else if (metric === 'hotDeals') val = r.hotDeals;
     else if (metric === 'calls') val = r.calls;
     else if (metric === 'callConnected') val = r.callConnected;
@@ -8365,7 +8369,7 @@ function rSuivi() {
     var agg = computeVisibleWorkspaceStats();
     var teamSize = suiviRankings.length;
     var topExpert = suiviRankings.length ? suiviRankings[0] : null;
-    var convRate = agg.totalProspections ? Math.round((agg.converted / agg.totalProspections) * 100) : 0;
+    var convRate = agg.uniqueSchools ? Math.round((agg.converted / agg.uniqueSchools) * 100) : 0;
     var contactRate = agg.calls ? Math.round((agg.callConnected / agg.calls) * 100) : 0;
 
     // Key Insights
@@ -8383,8 +8387,8 @@ function rSuivi() {
     h += '<div class="exec-section" style="animation-delay:.1s"><div class="exec-section-title">📈 Vue d\'ensemble <span class="exec-badge">' + teamSize + ' experts</span></div>';
     h += '<div class="exec-grid">';
     h += '<div class="exec-card hero-card" onclick="drillDownExecKPI(\'score\',\'Score total\')"><div class="ec-head"><div class="ec-icon">🏆</div>' + (topExpert ? '<div class="ec-trend up">#1 ' + esc(topExpert.expert) + '</div>' : '') + '</div><div class="ec-val">' + agg.score + '</div><div class="ec-lbl">Score total équipe</div><div class="ec-sub">Cliquez pour le détail par expert</div></div>';
-    h += '<div class="exec-card" onclick="drillDownExecKPI(\'prospections\',\'Prospections\')"><div class="ec-head"><div class="ec-icon">📊</div><div class="ec-trend flat">' + (agg.totalProspections > 0 ? Math.round(agg.totalProspections / teamSize) + '/expert' : '—') + '</div></div><div class="ec-val">' + agg.totalProspections + '</div><div class="ec-lbl">Prospections</div></div>';
-    h += '<div class="exec-card" onclick="drillDownExecKPI(\'hotDeals\',\'Deals chauds\')"><div class="ec-head"><div class="ec-icon">🔥</div><div class="ec-trend' + (agg.hotDeals > 10 ? ' up' : ' flat') + '">' + (agg.totalProspections ? Math.round((agg.hotDeals/agg.totalProspections)*100) + '%' : '0%') + '</div></div><div class="ec-val">' + agg.hotDeals + '</div><div class="ec-lbl">Deals chauds ≥60%</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'prospections\',\'Entrées de prospection\')"><div class="ec-head"><div class="ec-icon">📊</div><div class="ec-trend flat">' + (agg.totalEntries > 0 ? Math.round(agg.totalEntries / teamSize) + '/expert' : '—') + '</div></div><div class="ec-val">' + agg.totalEntries + '</div><div class="ec-lbl">Entrées terrain</div><div class="ec-sub">' + agg.uniqueSchools + ' écoles uniques</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'hotDeals\',\'Deals chauds\')"><div class="ec-head"><div class="ec-icon">🔥</div><div class="ec-trend' + (agg.hotDeals > 10 ? ' up' : ' flat') + '">' + (agg.uniqueSchools ? Math.round((agg.hotDeals/agg.uniqueSchools)*100) + '%' : '0%') + '</div></div><div class="ec-val">' + agg.hotDeals + '</div><div class="ec-lbl">Deals chauds ≥60%</div></div>';
     h += '</div></div>';
 
     // Section 2: Communication
@@ -8419,14 +8423,14 @@ function rSuivi() {
     suiviRankings.forEach(function(r) {
       h += '<div class="exec-expert-row" onclick="drillDownExecKPI(\'score\',\'Score — ' + esc(r.expert) + '\')">';
       h += '<div class="eer-avatar">' + r.expert.charAt(0).toUpperCase() + '</div>';
-      h += '<div class="eer-info"><div class="eer-name">#' + r.rank + ' ' + esc(r.expert) + '</div><div class="eer-meta">' + r.totalProspections + ' prosp. · ' + r.converted + ' conv. · ' + r.calls + ' appels</div></div>';
+      h += '<div class="eer-info"><div class="eer-name">#' + r.rank + ' ' + esc(r.expert) + '</div><div class="eer-meta">' + r.totalEntries + ' entrées · ' + r.uniqueSchools + ' écoles · ' + r.converted + ' conv. · ' + r.calls + ' appels</div></div>';
       h += '<div class="eer-val">' + r.score + '</div></div>';
     });
     h += '</div></div>';
   } else {
     h += '<div class="suivi-kpis">';
     h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalProspections + '</div><div class="sk-lbl">Prospections</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalEntries + '</div><div class="sk-lbl">Entrées terrain</div><div style="font-size:11px;color:var(--g400);margin-top:4px">' + stats.uniqueSchools + ' écoles uniques</div></div>';
     h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
     h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.calls + '</div><div class="sk-lbl">Appels saisis</div></div>';
     h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val">' + stats.callConnected + '</div><div class="sk-lbl">Contacts établis</div></div>';
@@ -8738,7 +8742,7 @@ function rSuivi() {
   rankingRows.forEach(function(r) {
     h += '<div class="rank-card ' + (r.expert === me ? 'me' : '') + '"><div class="rank-pos">' + r.rank + '</div>';
     h += '<div class="rank-info"><div class="rk-name">' + esc(r.expert) + (r.expert === me ? ' (vous)' : '') + '</div>';
-    h += '<div class="rk-meta"><span>' + r.totalProspections + ' prosp.</span><span>' + r.hotDeals + ' chauds</span><span>' + r.totalFollowups + ' follow-ups</span><span>' + r.converted + ' convertis</span><span>' + r.daysOnField + 'j terrain</span>';
+    h += '<div class="rk-meta"><span>' + r.totalEntries + ' entrées · ' + r.uniqueSchools + ' écoles</span><span>' + r.hotDeals + ' chauds</span><span>' + r.totalFollowups + ' follow-ups</span><span>' + r.converted + ' convertis</span><span>' + r.daysOnField + 'j terrain</span>';
     if (r.totalCost > 0) h += '<span style="color:var(--red)">' + fmt(r.totalCost) + ' FCFA</span>';
     h += '</div></div><div class="rank-score">' + r.score + '<small>points</small></div></div>';
   });
