@@ -7326,9 +7326,10 @@ function computeExpertStats(expertName) {
   var rawData = getWorkspaceRawForUser(expertName);
   var fuData = getWorkspaceFollowupsForUser(expertName);
   var daysOnField = getDaysOnField(expertName);
-  var totalProspections = rawData.length;
-  var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
-  var avgRate = rawData.length ? Math.round(rawData.reduce(function(s, r) { return s + (r.r || 0); }, 0) / rawData.length) : 0;
+  var uniqueRecords = buildSchoolRecords(rawData, fuData);
+  var totalProspections = uniqueRecords.length;
+  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
+  var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
   var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
   var converted = 0, inProgress = 0, relance = 0;
@@ -7369,9 +7370,10 @@ function computeVisibleWorkspaceStats() {
     var day = activeDayKey(f.Timestamp);
     if (day) daySet.add(day);
   });
-  var totalProspections = rawData.length;
-  var hotDeals = rawData.filter(function(r) { return r.r >= 60; }).length;
-  var avgRate = rawData.length ? Math.round(rawData.reduce(function(s, r) { return s + (r.r || 0); }, 0) / rawData.length) : 0;
+  var uniqueRecords = buildSchoolRecords(rawData, fuData);
+  var totalProspections = uniqueRecords.length;
+  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
+  var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
   var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
   var converted = 0, inProgress = 0, relance = 0;
