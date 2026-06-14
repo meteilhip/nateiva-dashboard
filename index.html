@@ -1514,6 +1514,55 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .suivi-kpi.score-card::before{background:var(--saffron)}
 .suivi-kpi.score-card .sk-val{color:var(--saffron-bright)}
 .suivi-kpi.score-card .sk-lbl{color:var(--g400)}
+.suivi-kpi.clickable{cursor:pointer}
+.suivi-kpi.clickable:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--saffron)}
+.suivi-kpi.clickable:active{transform:translateY(0) scale(.98)}
+
+.exec-section{margin-bottom:32px;animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both}
+.exec-section-title{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--ink);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.exec-section-title .exec-badge{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--saffron-soft);color:var(--saffron-deep);padding:3px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+
+.exec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:900px){.exec-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.exec-grid{grid-template-columns:1fr}}
+
+.exec-card{background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px;position:relative;overflow:hidden;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
+.exec-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.exec-card:active{transform:translateY(0) scale(.97)}
+.exec-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--g200);transition:background .3s}
+.exec-card:hover::before{background:var(--saffron)}
+.exec-card .ec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.exec-card .ec-icon{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--g50)}
+.exec-card .ec-trend{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px}
+.exec-card .ec-trend.up{background:var(--green-soft);color:var(--green)}
+.exec-card .ec-trend.down{background:var(--red-soft);color:var(--red)}
+.exec-card .ec-trend.flat{background:var(--g100);color:var(--g500)}
+.exec-card .ec-val{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.03em}
+.exec-card .ec-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g500);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-top:6px}
+.exec-card .ec-sub{font-size:12px;color:var(--g400);margin-top:8px;line-height:1.4}
+
+.exec-card.hero-card{background:linear-gradient(135deg,var(--ink),var(--g700));color:var(--paper);border-color:transparent;grid-column:span 2}
+.exec-card.hero-card .ec-val{color:var(--saffron-bright);font-size:42px}
+.exec-card.hero-card .ec-lbl{color:var(--g300)}
+.exec-card.hero-card .ec-sub{color:var(--g400)}
+.exec-card.hero-card .ec-icon{background:rgba(255,255,255,.1)}
+.exec-card.hero-card::before{background:var(--saffron)}
+
+.exec-breakdown{background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:24px;margin-bottom:24px;animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both}
+.exec-breakdown h4{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin-bottom:16px}
+.exec-breakdown-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.exec-expert-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:var(--g50);transition:all .25s;cursor:pointer}
+.exec-expert-row:hover{background:var(--bg-warm);transform:translateX(4px)}
+.exec-expert-row .eer-avatar{width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.exec-expert-row .eer-info{flex:1;min-width:0}
+.exec-expert-row .eer-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exec-expert-row .eer-meta{font-size:11px;color:var(--g500)}
+.exec-expert-row .eer-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:var(--ink);flex-shrink:0}
+
+.exec-insight{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));margin-bottom:12px;border:1px solid rgba(245,158,11,.15);animation:surfaceIn .4s ease both}
+.exec-insight .ei-icon{font-size:20px;flex-shrink:0;margin-top:2px}
+.exec-insight .ei-text{font-size:13px;line-height:1.5;color:var(--g700)}
+.exec-insight .ei-text strong{color:var(--ink)}
 
 .form-card{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;
@@ -2106,7 +2155,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v9.8 · Roles + Drill-down</span>
+      <span class="meta-pill red">v10.0 · Executive 360</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -2120,6 +2169,11 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
     <span class="nav-icon">🏠</span>
     <span class="nav-label">Dashboard</span>
     <span class="nav-desc">KPI & Progression</span>
+  </button>
+  <button class="nav-btn" data-pane="market">
+    <span class="nav-icon">🗺️</span>
+    <span class="nav-label">Marché</span>
+    <span class="nav-desc">Zones & Concurrents</span>
   </button>
   <button class="nav-btn priority-workspace act" data-pane="suivi">
     <span class="nav-icon">📋</span>
@@ -2135,11 +2189,6 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
     <span class="nav-icon">👥</span>
     <span class="nav-label">Équipe</span>
     <span class="nav-desc">Experts & Pipeline</span>
-  </button>
-  <button class="nav-btn" data-pane="market">
-    <span class="nav-icon">🗺️</span>
-    <span class="nav-label">Marché</span>
-    <span class="nav-desc">Zones & Concurrents</span>
   </button>
   <button class="nav-btn" data-pane="playbook">
     <span class="nav-icon">🎯</span>
@@ -6367,11 +6416,11 @@ var followupEditMode = 'create';
 var followupSubmitBusy = false;
 var newSchoolSubmitBusy = false;
 var PANE_ACCESS_CONFIG = [
-  { key: 'suivi', label: 'Workspace' },
   { key: 'home', label: 'Dashboard' },
+  { key: 'market', label: 'Marché' },
+  { key: 'suivi', label: 'Workspace' },
   { key: 'metrics', label: 'BI & KPI' },
   { key: 'team', label: 'Équipe' },
-  { key: 'market', label: 'Marché' },
   { key: 'playbook', label: 'Playbook' },
   { key: 'intel', label: 'NLP' },
   { key: 'glossary', label: 'Glossaire' }
@@ -7199,7 +7248,6 @@ function updateHeaderAuth() {
     var badge = roleBadgeLabel(currentUser);
     el.innerHTML = '<div class="auth-status">' +
       '<span class="auth-user">👤 <strong>' + esc(currentUser.fullName) + '</strong> (' + esc(badge) + ')</span>' +
-      '<button class="btn-logout-header" onclick="doLogout()">Déconnexion</button>' +
       '</div>';
   } else {
     el.innerHTML = '<div class="auth-status">' +
@@ -7348,6 +7396,51 @@ function computeVisibleWorkspaceStats() {
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
   return { daysOnField: daySet.size, totalProspections: totalProspections, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+}
+
+function drillDownExecKPI(metric, label) {
+  if (!_ddDashboard && !suiviRankings) return;
+  var rankings = suiviRankings || [];
+  var rows = rankings.map(function(r) {
+    var val = 0;
+    if (metric === 'score') val = r.score;
+    else if (metric === 'prospections') val = r.totalProspections;
+    else if (metric === 'hotDeals') val = r.hotDeals;
+    else if (metric === 'calls') val = r.calls;
+    else if (metric === 'callConnected') val = r.callConnected;
+    else if (metric === 'noAnswer') val = r.callNoAnswer + r.callUnreachable;
+    else if (metric === 'converted') val = r.converted;
+    else if (metric === 'totalCost') val = r.totalCost;
+    else if (metric === 'visits') val = r.visits;
+    else if (metric === 'whatsapp') val = r.whatsapp;
+    else if (metric === 'sms') val = r.sms;
+    else if (metric === 'followups') val = r.totalFollowups;
+    else if (metric === 'avgRate') val = r.avgRate;
+    else if (metric === 'relance') val = r.relance;
+    else if (metric === 'inProgress') val = r.inProgress;
+    return { expert: r.expert, val: val, rank: r.rank };
+  }).sort(function(a, b) { return b.val - a.val; });
+  var total = rows.reduce(function(s, r) { return s + r.val; }, 0);
+  var isMoney = metric === 'totalCost';
+  var isPercent = metric === 'avgRate';
+  var fmtVal = function(v) { return isMoney ? fmt(v) + ' FCFA' : (isPercent ? v + '%' : v); };
+  var maxVal = rows.length ? rows[0].val : 1;
+  var body = '<div style="margin-bottom:18px;display:flex;gap:12px;flex-wrap:wrap">';
+  body += '<div style="background:var(--ink);color:var(--saffron-bright);padding:12px 20px;border-radius:12px;font-family:Fraunces,serif;font-size:28px;font-weight:700">' + fmtVal(isPercent ? Math.round(total / (rows.length || 1)) : total) + '</div>';
+  body += '<div style="padding:12px 0"><div style="font-size:12px;color:var(--g500);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Total équipe</div><div style="font-size:13px;color:var(--g600)">' + rows.length + ' experts actifs</div></div></div>';
+  body += '<div style="display:flex;flex-direction:column;gap:8px">';
+  rows.forEach(function(r, i) {
+    var pct = maxVal ? Math.round((r.val / maxVal) * 100) : 0;
+    var colors = ['var(--saffron)', 'var(--teal)', 'var(--purple)', 'var(--green)', 'var(--red)', 'var(--red-bright)'];
+    var color = colors[i % colors.length];
+    body += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;background:var(--g50);transition:all .2s" onmouseenter="this.style.background=\'var(--bg-warm)\'" onmouseleave="this.style.background=\'var(--g50)\'">';
+    body += '<div style="width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">' + r.expert.charAt(0).toUpperCase() + '</div>';
+    body += '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;margin-bottom:4px">' + esc(r.expert) + '</div>';
+    body += '<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)"></div></div></div>';
+    body += '<div style="font-family:Fraunces,serif;font-size:20px;font-weight:700;color:var(--ink);flex-shrink:0">' + fmtVal(r.val) + '</div></div>';
+  });
+  body += '</div>';
+  showDrillDown('📊 ' + label + ' — Détail par expert', body);
 }
 
 function canDeleteFollowups(user) {
@@ -8255,7 +8348,7 @@ function rSuivi() {
 
   var h = '';
   h += '<div class="page-intro" data-num="8"><h2>Suivi de <span class="it">Prospection</span></h2>';
-  h += '<p>Tableau de bord ' + (roleLabel === 'SUPER ADMIN' ? '<b>Super Admin</b>' : (roleLabel === 'SUB ADMIN' ? '<b>Sous-admin</b>' : 'personnel')) + ' de <b>' + esc(me) + '</b>. Le <b>Workspace</b> reste votre portefeuille personnel pour saisir, relancer et clôturer vos propres écoles. Les analyses équipe restent dans le Dashboard et BI.</p></div>';
+  h += '<p>' + (roleLabel === 'SUPER ADMIN' ? '<b>Vue 360° Executive</b> — données agrégées de toute l\'équipe avec drill-down par expert. Cliquez sur chaque KPI pour voir le détail individuel.' : (roleLabel === 'SUB ADMIN' ? 'Tableau de bord <b>Sous-admin</b> — vue équipe et portefeuille personnel.' : 'Votre portefeuille personnel: saisir, relancer et clôturer vos écoles.')) + '</p></div>';
 
   // Header
   h += '<div class="suivi-header"><div class="suivi-user">';
@@ -8263,22 +8356,83 @@ function rSuivi() {
   h += '<div><div class="suivi-name">' + esc(me) + '</div>';
   h += '<div class="suivi-role">' + roleLabel + ' · ' + esc(currentUser.city) + '</div></div>';
   h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
-  h += '</div><div class="suivi-actions">';
-  if (canAdminUsers) h += '<button onclick="showInviteForm()" style="background:var(--red);color:white;border:2px solid var(--red);padding:10px 24px;font-size:15px;font-weight:700;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.25)">+ Inviter</button>';
-  h += '<button onclick="doLogout()" style="background:var(--red);color:white;border:2px solid var(--red);padding:10px 24px;font-size:15px;font-weight:700;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.25)">Déconnexion</button>';
   h += '</div></div>';
 
-  // KPIs
-  h += '<div class="suivi-kpis">';
-  h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalProspections + '</div><div class="sk-lbl">Prospections</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.calls + '</div><div class="sk-lbl">Appels saisis</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val">' + stats.callConnected + '</div><div class="sk-lbl">Contacts établis</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">📵</div><div class="sk-val">' + (stats.callNoAnswer + stats.callUnreachable) + '</div><div class="sk-lbl">Sans réponse / erreur</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
-  h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
-  h += '</div>';
+  // KPIs — SuperAdmin gets 360 executive view, others get personal view
+  if (isSuper) {
+    var agg = computeVisibleWorkspaceStats();
+    var teamSize = suiviRankings.length;
+    var topExpert = suiviRankings.length ? suiviRankings[0] : null;
+    var convRate = agg.totalProspections ? Math.round((agg.converted / agg.totalProspections) * 100) : 0;
+    var contactRate = agg.calls ? Math.round((agg.callConnected / agg.calls) * 100) : 0;
+
+    // Key Insights
+    var bestCaller = suiviRankings.slice().sort(function(a,b){return b.callConnected - a.callConnected;})[0];
+    var bestCloser = suiviRankings.slice().sort(function(a,b){return b.converted - a.converted;})[0];
+    h += '<div class="exec-insight"><span class="ei-icon">💡</span><span class="ei-text">';
+    if (topExpert) h += '<strong>' + esc(topExpert.expert) + '</strong> mène l\'équipe avec un score de ' + topExpert.score + '. ';
+    if (bestCaller && bestCaller.callConnected > 0) h += '<strong>' + esc(bestCaller.expert) + '</strong> a le plus de contacts établis (' + bestCaller.callConnected + '). ';
+    if (convRate > 0) h += 'Taux de conversion global: <strong>' + convRate + '%</strong>. ';
+    if (contactRate > 0) h += 'Taux de contact: <strong>' + contactRate + '%</strong>.';
+    if (!topExpert) h += 'Aucune donnée de prospection disponible.';
+    h += '</span></div>';
+
+    // Section 1: Vue d'ensemble
+    h += '<div class="exec-section" style="animation-delay:.1s"><div class="exec-section-title">📈 Vue d\'ensemble <span class="exec-badge">' + teamSize + ' experts</span></div>';
+    h += '<div class="exec-grid">';
+    h += '<div class="exec-card hero-card" onclick="drillDownExecKPI(\'score\',\'Score total\')"><div class="ec-head"><div class="ec-icon">🏆</div>' + (topExpert ? '<div class="ec-trend up">#1 ' + esc(topExpert.expert) + '</div>' : '') + '</div><div class="ec-val">' + agg.score + '</div><div class="ec-lbl">Score total équipe</div><div class="ec-sub">Cliquez pour le détail par expert</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'prospections\',\'Prospections\')"><div class="ec-head"><div class="ec-icon">📊</div><div class="ec-trend flat">' + (agg.totalProspections > 0 ? Math.round(agg.totalProspections / teamSize) + '/expert' : '—') + '</div></div><div class="ec-val">' + agg.totalProspections + '</div><div class="ec-lbl">Prospections</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'hotDeals\',\'Deals chauds\')"><div class="ec-head"><div class="ec-icon">🔥</div><div class="ec-trend' + (agg.hotDeals > 10 ? ' up' : ' flat') + '">' + (agg.totalProspections ? Math.round((agg.hotDeals/agg.totalProspections)*100) + '%' : '0%') + '</div></div><div class="ec-val">' + agg.hotDeals + '</div><div class="ec-lbl">Deals chauds ≥60%</div></div>';
+    h += '</div></div>';
+
+    // Section 2: Communication
+    h += '<div class="exec-section" style="animation-delay:.2s"><div class="exec-section-title">📞 Communication <span class="exec-badge">' + agg.totalFollowups + ' interactions</span></div>';
+    h += '<div class="exec-grid">';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'calls\',\'Appels\')"><div class="ec-head"><div class="ec-icon">📞</div></div><div class="ec-val">' + agg.calls + '</div><div class="ec-lbl">Appels</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'callConnected\',\'Contacts établis\')"><div class="ec-head"><div class="ec-icon">🤝</div><div class="ec-trend' + (contactRate >= 50 ? ' up' : contactRate > 0 ? ' down' : ' flat') + '">' + contactRate + '% taux</div></div><div class="ec-val">' + agg.callConnected + '</div><div class="ec-lbl">Contacts établis</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'noAnswer\',\'Sans réponse\')"><div class="ec-head"><div class="ec-icon">📵</div></div><div class="ec-val">' + (agg.callNoAnswer + agg.callUnreachable) + '</div><div class="ec-lbl">Sans réponse</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'whatsapp\',\'WhatsApp\')"><div class="ec-head"><div class="ec-icon">💬</div></div><div class="ec-val">' + agg.whatsapp + '</div><div class="ec-lbl">WhatsApp</div></div>';
+    h += '</div></div>';
+
+    // Section 3: Conversion & Pipeline
+    h += '<div class="exec-section" style="animation-delay:.3s"><div class="exec-section-title">🎯 Conversion & Pipeline <span class="exec-badge">' + convRate + '% conversion</span></div>';
+    h += '<div class="exec-grid">';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'converted\',\'Convertis\')"><div class="ec-head"><div class="ec-icon">✅</div><div class="ec-trend' + (agg.converted > 0 ? ' up' : ' flat') + '">' + convRate + '%</div></div><div class="ec-val">' + agg.converted + '</div><div class="ec-lbl">Convertis</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'inProgress\',\'En cours\')"><div class="ec-head"><div class="ec-icon">⏳</div></div><div class="ec-val">' + agg.inProgress + '</div><div class="ec-lbl">En cours</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'relance\',\'Relances\')"><div class="ec-head"><div class="ec-icon">🔄</div></div><div class="ec-val">' + agg.relance + '</div><div class="ec-lbl">Relances</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'avgRate\',\'Taux moyen\')"><div class="ec-head"><div class="ec-icon">📈</div></div><div class="ec-val">' + agg.avgRate + '%</div><div class="ec-lbl">Taux moyen</div></div>';
+    h += '</div></div>';
+
+    // Section 4: Terrain & Coûts
+    h += '<div class="exec-section" style="animation-delay:.4s"><div class="exec-section-title">🚶 Terrain & Coûts <span class="exec-badge">' + fmt(agg.totalCost) + ' FCFA</span></div>';
+    h += '<div class="exec-grid">';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'visits\',\'Visites terrain\')"><div class="ec-head"><div class="ec-icon">🚶</div></div><div class="ec-val">' + agg.visits + '</div><div class="ec-lbl">Visites terrain</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'totalCost\',\'Coûts terrain\')"><div class="ec-head"><div class="ec-icon">💰</div></div><div class="ec-val">' + fmt(agg.totalCost) + '</div><div class="ec-lbl">Coûts (FCFA)</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'sms\',\'SMS\')"><div class="ec-head"><div class="ec-icon">📱</div></div><div class="ec-val">' + agg.sms + '</div><div class="ec-lbl">SMS envoyés</div></div>';
+    h += '<div class="exec-card" onclick="drillDownExecKPI(\'followups\',\'Total suivis\')"><div class="ec-head"><div class="ec-icon">📋</div></div><div class="ec-val">' + agg.totalFollowups + '</div><div class="ec-lbl">Total suivis</div></div>';
+    h += '</div></div>';
+
+    // Expert Leaderboard mini
+    h += '<div class="exec-breakdown"><h4>🏅 Classement rapide</h4><div class="exec-breakdown-grid">';
+    suiviRankings.forEach(function(r) {
+      h += '<div class="exec-expert-row" onclick="drillDownExecKPI(\'score\',\'Score — ' + esc(r.expert) + '\')">';
+      h += '<div class="eer-avatar">' + r.expert.charAt(0).toUpperCase() + '</div>';
+      h += '<div class="eer-info"><div class="eer-name">#' + r.rank + ' ' + esc(r.expert) + '</div><div class="eer-meta">' + r.totalProspections + ' prosp. · ' + r.converted + ' conv. · ' + r.calls + ' appels</div></div>';
+      h += '<div class="eer-val">' + r.score + '</div></div>';
+    });
+    h += '</div></div>';
+  } else {
+    h += '<div class="suivi-kpis">';
+    h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalProspections + '</div><div class="sk-lbl">Prospections</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.calls + '</div><div class="sk-lbl">Appels saisis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val">' + stats.callConnected + '</div><div class="sk-lbl">Contacts établis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📵</div><div class="sk-val">' + (stats.callNoAnswer + stats.callUnreachable) + '</div><div class="sk-lbl">Sans réponse / erreur</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
+    h += '</div>';
+  }
 
   h += '<div class="workspace-action-center">';
   h += '<div class="workspace-action-copy"><h3>🎯 Actions principales</h3><p>Les deux actions les plus importantes restent seules au centre: créer un nouveau suivi ou enregistrer une nouvelle école. Chaque saisie remonte ensuite dans l\'historique, le rappel calendrier et l\'impact funnel.</p></div>';
