@@ -3460,6 +3460,35 @@ function drillDownCategory(standingKey,stageKey){
   var title=(standingKey||'Toutes catégories')+(stageKey?' · '+stageKey:'');
   showDrillDown('📋 '+esc(title)+' · '+filtered.length+' écoles',html);
 }
+function drillDownGeo(city,zone,standing){
+  if(!_ddDashboard)return;
+  var records=_ddDashboard.records||[];
+  var filtered=records.filter(function(r){
+    if(city && (r.city||'')!==city) return false;
+    if(zone && (r.zone||'').toUpperCase().trim()!==zone.toUpperCase().trim()) return false;
+    if(standing && (r.standing||'SANS_CATEGORIE')!==standing) return false;
+    return true;
+  });
+  var byStage={};var byExpert={};var byType={};
+  filtered.forEach(function(r){
+    var sl=DASHBOARD_STAGES.find(function(s){return s.key===r.stage;});
+    byStage[sl?sl.label:r.stage]=(byStage[sl?sl.label:r.stage]||0)+1;
+    byExpert[canonicalPersonName(r.expert)||'?']=(byExpert[canonicalPersonName(r.expert)||'?']||0)+1;
+    byType[r.standing||'Non défini']=(byType[r.standing||'Non défini']||0)+1;
+  });
+  var totalVal=filtered.reduce(function(s,r){return s+(r.amount||0);},0);
+  var hotCount=filtered.filter(function(r){return r.stage==='chaud'||r.stage==='gagne';}).length;
+  var html='<div class="dd-stat-row"><span class="dd-stat-label">Écoles</span><span class="dd-stat-value">'+filtered.length+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Hot/Gagné</span><span class="dd-stat-value">'+hotCount+'</span></div>';
+  html+='<div class="dd-stat-row"><span class="dd-stat-label">Valeur pipeline</span><span class="dd-stat-value">'+moneyFCFA(totalVal)+'</span></div>';
+  html+='<div class="dd-tab-bar"><button class="dd-tab active" onclick="ddSwitchTab(this,\'ddGeoStage\')">Par étape</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddGeoExpert\')">Par expert</button><button class="dd-tab" onclick="ddSwitchTab(this,\'ddGeoType\')">Par standing</button></div>';
+  html+='<div id="ddGeoStage">'+ddStatList(byStage)+'</div>';
+  html+='<div id="ddGeoExpert" style="display:none">'+ddStatList(byExpert)+'</div>';
+  html+='<div id="ddGeoType" style="display:none">'+ddStatList(byType)+'</div>';
+  html+='<h4 style="margin:16px 0 8px;font-size:14px">Écoles</h4><div class="dd-school-list">'+filtered.slice(0,40).map(ddSchoolItem).join('')+'</div>';
+  var title=(zone||city||'Toutes zones')+(standing?' · '+standing:'');
+  showDrillDown('📍 '+esc(title)+' · '+filtered.length+' écoles',html);
+}
 function ddCallItem(item){
   var school=esc(item.SchoolName||'École inconnue');
   var expert=esc(canonicalPersonName(item.Expert)||'?');
@@ -3952,12 +3981,14 @@ function renderCategoryHeatmap(records) {
       var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g300); opacity:0.4;';
       var cellBgStyle = val ? 'background: ' + bg + ';' : '';
       
-      matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '">';
+      var cityCellClick = val ? ' cursor:pointer;' : '';
+      var cityCellOnclick = val ? ' onclick="drillDownGeo(\'' + city.replace(/'/g,"\\'") + '\',\'\',\'' + cat.key.replace(/'/g,"\\'") + '\')"' : '';
+      matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + cityCellClick + '"' + cityCellOnclick + '>';
       matrix2Html += '        ' + (val || '<span style="color:var(--g300); opacity:0.3;">·</span>');
       matrix2Html += '      </td>';
     });
-    
-    matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g200); color:var(--ink);">' + cityTotal + '</td>';
+
+    matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g200); color:var(--ink); cursor:pointer;" onclick="drillDownGeo(\'' + city.replace(/'/g,"\\'") + '\',\'\',\'\')">' + cityTotal + '</td>';
     matrix2Html += '    </tr>';
 
     // Render Zone Rows in this city
@@ -3965,24 +3996,26 @@ function renderCategoryHeatmap(records) {
     cityZones.forEach(function(zone) {
       var zoneTotal = 0;
       matrix2Html += '    <tr>';
-      matrix2Html += '      <td style="padding-left:24px; color:var(--g700); font-size:12px;">📍 ' + esc(zone) + '</td>';
-      
+      matrix2Html += '      <td style="padding-left:24px; color:var(--g700); font-size:12px; cursor:pointer;" onclick="drillDownGeo(\'\',\'' + zone.replace(/'/g,"\\'") + '\',\'\')">📍 ' + esc(zone) + '</td>';
+
       STANDING_CATEGORIES.forEach(function(cat) {
         if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
         var val = catZonesMatrix[cat.key][zone] || 0;
         zoneTotal += val;
-        
+
         var opacity = val ? 0.08 + (val / maxZoneCellVal) * 0.92 : 0.03;
         var bg = 'hsla(' + cat.hue + ', ' + cat.sat + '%, ' + cat.light + '%, ' + opacity.toFixed(2) + ')';
         var textStyle = val ? 'font-weight:700; color: ' + (opacity > 0.45 ? '#fff' : 'var(--ink)') + ';' : 'color:var(--g300); opacity:0.4;';
         var cellBgStyle = val ? 'background: ' + bg + ';' : '';
-        
-        matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + '" title="' + val + ' à ' + zone + ' dans la catégorie ' + cat.label + '">';
+
+        var zoneCellClick = val ? ' cursor:pointer;' : '';
+        var zoneCellOnclick = val ? ' onclick="drillDownGeo(\'\',\'' + zone.replace(/'/g,"\\'") + '\',\'' + cat.key.replace(/'/g,"\\'") + '\')"' : '';
+        matrix2Html += '      <td class="num" style="text-align:center; ' + cellBgStyle + textStyle + zoneCellClick + '"' + zoneCellOnclick + ' title="' + val + ' à ' + zone + ' dans la catégorie ' + cat.label + '">';
         matrix2Html += '        ' + (val || '<span style="color:var(--g300); opacity:0.3;">·</span>');
         matrix2Html += '      </td>';
       });
-      
-      matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50);">' + zoneTotal + '</td>';
+
+      matrix2Html += '      <td class="num" style="text-align:center; font-weight:700; background:var(--g50); cursor:pointer;" onclick="drillDownGeo(\'\',\'' + zone.replace(/'/g,"\\'") + '\',\'\')">' + zoneTotal + '</td>';
       matrix2Html += '    </tr>';
     });
   });
@@ -5256,12 +5289,14 @@ function rTeam(){
   }).sort((a,b)=>b[2]-a[2]);
   
   // Velocity check
-  const closeable=f.filter(r=>r.r>=80).length;
-  const negociation=f.filter(r=>r.r>=60 && r.r<80).length;
-  const consider=f.filter(r=>r.r>=40 && r.r<60).length;
-  const earlyq=f.filter(r=>r.r>=20 && r.r<40).length;
-  const dead=f.filter(r=>r.r!=null && r.r<20).length;
-  const noEval=f.filter(r=>r.r==null).length;
+  const scope=getDashboardScope();
+  const funnelRecords=buildSchoolRecords(scope.rawRows,scope.followups);
+  const closeable=funnelRecords.filter(r=>r.rate>=80).length;
+  const negociation=funnelRecords.filter(r=>r.rate>=60 && r.rate<80).length;
+  const consider=funnelRecords.filter(r=>r.rate>=40 && r.rate<60).length;
+  const earlyq=funnelRecords.filter(r=>r.rate>=20 && r.rate<40).length;
+  const dead=funnelRecords.filter(r=>r.rate!=null && r.rate<20).length;
+  const noEval=funnelRecords.filter(r=>r.rate==null).length;
   const blocked=f.filter(r=>/fondateur|absent|hi[ée]rarchie|d[ée]cision/i.test((r.co||'')+(r.re||''))).length;
   const ambassadeurs=f.filter(r=>/ambassad/i.test((r.co||'')+(r.re||'')));
   const hot=f.filter(r=>r.r!=null&&r.r>=60).sort((a,b)=>b.r-a.r).slice(0,20);
@@ -5381,7 +5416,7 @@ function rTeam(){
         <span class="anno">Distribution par chaleur</span>
       </div>
       <div class="funnel">
-        <div class="funnel-step dark"><div class="name">Total Prospections<small>Toutes écoles visitées</small></div><div class="ct">${tot}</div></div>
+        <div class="funnel-step dark"><div class="name">Total Écoles<small>Écoles uniques prospectées</small></div><div class="ct">${funnelRecords.length}</div></div>
         <div class="funnel-step" style="margin-left:24px"><div class="name">Closeable 80-100%<small>Signature imminente</small></div><div class="ct">${closeable}</div></div>
         <div class="funnel-step" style="margin-left:48px"><div class="name">Négociation 60-79%<small>Décideur engagé</small></div><div class="ct">${negociation}</div></div>
         <div class="funnel-step" style="margin-left:72px"><div class="name">Considération 40-59%<small>Intérêt avec relance</small></div><div class="ct">${consider}</div></div>
@@ -5502,10 +5537,10 @@ function rMarket(){
           <h3>📍 DOUALA</h3>
           <div class="desc">${sd.n} prospections · Bureau Bonabéri</div>
           <div class="four" style="margin-top:14px">
-            <div class="kpi red"><div class="lbl">Total</div><div class="val">${sd.n}</div></div>
+            <div class="kpi red clickable" onclick="drillDownGeo('DOUALA','','')"><div class="lbl">Total</div><div class="val">${sd.n}</div></div>
             <div class="kpi dark"><div class="lbl">Taux Moy</div><div class="val">${sd.avg.toFixed(0)}<small>%</small></div></div>
-            <div class="kpi green"><div class="lbl">Hot</div><div class="val">${sd.hot}</div></div>
-            <div class="kpi saffron"><div class="lbl">Closeable</div><div class="val">${sd.closeable}</div></div>
+            <div class="kpi green clickable" onclick="drillDownGeo('DOUALA','','')"><div class="lbl">Hot</div><div class="val">${sd.hot}</div></div>
+            <div class="kpi saffron clickable" onclick="drillDownGeo('DOUALA','','')"><div class="lbl">Closeable</div><div class="val">${sd.closeable}</div></div>
           </div>
           <div class="note teal" style="margin-top:14px"><b>Insight Bonabéri:</b> 155 sur 244 prospections Douala sont à BONABÉRI — où est notre bureau. Concurrent #1: <b>LOGESCO</b> (HQ Douala, Facebook 1280 likes). #2 local: LA GESTION SCOLAIRE.</div>
         </div>
@@ -5513,10 +5548,10 @@ function rMarket(){
           <h3>📍 YAOUNDÉ</h3>
           <div class="desc">${sy.n} prospections · Bureau Mimboman</div>
           <div class="four" style="margin-top:14px">
-            <div class="kpi saffron"><div class="lbl">Total</div><div class="val">${sy.n}</div></div>
+            <div class="kpi saffron clickable" onclick="drillDownGeo('YAOUNDE','','')"><div class="lbl">Total</div><div class="val">${sy.n}</div></div>
             <div class="kpi dark"><div class="lbl">Taux Moy</div><div class="val">${sy.avg.toFixed(0)}<small>%</small></div></div>
-            <div class="kpi green"><div class="lbl">Hot</div><div class="val">${sy.hot}</div></div>
-            <div class="kpi teal"><div class="lbl">Closeable</div><div class="val">${sy.closeable}</div></div>
+            <div class="kpi green clickable" onclick="drillDownGeo('YAOUNDE','','')"><div class="lbl">Hot</div><div class="val">${sy.hot}</div></div>
+            <div class="kpi teal clickable" onclick="drillDownGeo('YAOUNDE','','')"><div class="lbl">Closeable</div><div class="val">${sy.closeable}</div></div>
           </div>
           <div class="note" style="margin-top:14px"><b>Insight Yaoundé:</b> Concurrent #1: <b>SIMPALA</b> (Cyrille Feugang, 2012, 100% cloud). #2: TURBOSCHOOL (Windows desktop). Angle: mobile-first + Ambassadeur 40%.</div>
         </div>
@@ -5535,7 +5570,7 @@ function rMarket(){
     else if(s.avg>=40)lvl='h-3';
     else if(s.avg>=30)lvl='h-2';
     else if(s.avg>=20)lvl='h-1';
-    h+=`<div class="heat-cell ${lvl}">
+    h+=`<div class="heat-cell ${lvl}" style="cursor:pointer" onclick="drillDownGeo('','${esc(s.name).replace(/'/g,"\\'")}','')">
       <div class="h-name">${esc(s.name)}</div>
       <div class="h-val">${s.avg.toFixed(0)}%</div>
       <div class="h-sub">${s.n} prospects · ${s.hot} hot · ${s.city.slice(0,3)}</div>
@@ -8251,6 +8286,7 @@ function rSuivi() {
   h += '<div class="workspace-primary-actions">';
   h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l\'effet sur le funnel.</small></button>';
   h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle école</strong><small>Créez une fiche école claire avec contact, zone, standing et base de relance.</small></button>';
+  if (canManageUsers(currentUser)) h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
   h += '</div>';
   h += '<div class="workspace-action-note">';
   h += '<span class="timeline-pill">🧭 Process map · saisie → historique → rappel → funnel</span>';
