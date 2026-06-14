@@ -6266,8 +6266,10 @@ function renderAll(){
   refreshFilters();
   updateFilterSummary();
   const f=gF();
-  document.getElementById('fCount').textContent=f.length;
-  document.getElementById('fTotal').textContent='/ ' + getVisibleRaw().length + ' prospections';
+  const scope=getDashboardScope();
+  const uniqueCount=buildSchoolRecords(scope.rawRows,scope.followups).length;
+  document.getElementById('fCount').textContent=uniqueCount;
+  document.getElementById('fTotal').textContent='/ ' + uniqueCount + ' écoles uniques';
   rHome();
   rMetrics();
   rTeam();
@@ -6509,10 +6511,7 @@ function getDefaultPermissions(user) {
 
 function normalizePermissions(user) {
   var defaults = getDefaultPermissions(user || {});
-  var permissions = user && user.permissions ? user.permissions : {};
-  var panes = Array.isArray(permissions.panes) && permissions.panes.length
-    ? permissions.panes.filter(function(pane) { return allPaneKeys().indexOf(pane) > -1; })
-    : defaults.panes.slice();
+  var panes = defaults.panes.slice();
   if (!panes.length) panes = ['home'];
   if (panes.indexOf('home') === -1) panes.unshift('home');
   return {
@@ -8286,7 +8285,7 @@ function rSuivi() {
   h += '<div class="workspace-primary-actions">';
   h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l\'effet sur le funnel.</small></button>';
   h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle école</strong><small>Créez une fiche école claire avec contact, zone, standing et base de relance.</small></button>';
-  if (canManageUsers(currentUser)) h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
+  h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
   h += '</div>';
   h += '<div class="workspace-action-note">';
   h += '<span class="timeline-pill">🧭 Process map · saisie → historique → rappel → funnel</span>';
