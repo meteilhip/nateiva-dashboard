@@ -7449,6 +7449,40 @@ function drillDownExecKPI(metric, label) {
   showDrillDown('📊 ' + label + ' — Détail par expert', body);
 }
 
+function drillDownQualification(field, title) {
+  var experts = [];
+  var seen = {};
+  var allRows = getAllRawRows();
+  for (var i = 0; i < allRows.length; i++) {
+    if (allRows[i].e && !seen[allRows[i].e]) { seen[allRows[i].e] = true; experts.push(allRows[i].e); }
+  }
+  var body = '<div style="display:flex;flex-direction:column;gap:16px">';
+  experts.forEach(function(expertName) {
+    var eRaw = getWorkspaceRawForUser(expertName);
+    var eFu = getWorkspaceFollowupsForUser(expertName);
+    var eq = buildQualificationSummary(eRaw, eFu);
+    var items = eq[field] || [];
+    if (!items.length && !eq.total) return;
+    body += '<div style="background:var(--g50);border-radius:12px;padding:16px">';
+    body += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+    body += '<div style="width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + expertName.charAt(0).toUpperCase() + '</div>';
+    body += '<div><div style="font-weight:600;font-size:14px">' + esc(expertName) + '</div>';
+    body += '<div style="font-size:11px;color:var(--g500)">' + eq.total + ' écoles · ' + eq.qualified + ' qualifiées · ' + eq.effectifKnown + ' avec effectif · ' + fmt(eq.totalStudents) + ' élèves</div></div></div>';
+    if (items.length) {
+      body += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      items.forEach(function(item) {
+        body += '<span style="background:var(--paper);border:1px solid var(--g200);padding:4px 10px;border-radius:8px;font-size:12px">' + esc(item.label) + ' · <b>' + item.value + '</b></span>';
+      });
+      body += '</div>';
+    } else {
+      body += '<div style="font-size:12px;color:var(--g400);font-style:italic">Aucune donnée pour cette catégorie</div>';
+    }
+    body += '</div>';
+  });
+  body += '</div>';
+  showDrillDown('🧾 ' + title + ' — Par expert', body);
+}
+
 function canDeleteFollowups(user) {
   if (!user) return false;
   var username = typeof user === 'string' ? user : (user.username || '');
@@ -8341,7 +8375,9 @@ function rSuivi() {
   var impactReminder = lastImpact ? getReminderMeta(lastImpact.nextDate) : null;
   var planner = buildPlannerModel(myFollowups);
   var schoolRecordMap = getHistorySchoolRecordMap(workspaceRaw, workspaceFollowups);
-  var qualification = buildQualificationSummary(workspaceRaw, workspaceFollowups);
+  var qualRaw = isSuper ? getVisibleRaw() : (canSeeTeamData(currentUser) ? getVisibleRaw() : workspaceRaw);
+  var qualFu = isSuper ? getVisibleFollowups() : (canSeeTeamData(currentUser) ? getVisibleFollowups() : workspaceFollowups);
+  var qualification = buildQualificationSummary(qualRaw, qualFu);
 
   var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : t === 'VISIT' ? '🚶 VISITE' : '📝 CRÉATION'; };
   var fuDate = function(ts) { return formatFollowupDateTime(ts); };
@@ -8471,18 +8507,20 @@ function rSuivi() {
     h += '</div></div>';
   }
 
+  var qualScopeLabel = isSuper ? 'Toute l\'équipe' : (canSeeTeamData(currentUser) ? 'Votre équipe' : 'Votre portefeuille');
+  var qualFollowupCount = isSuper ? getVisibleFollowups().length : (canSeeTeamData(currentUser) ? getVisibleFollowups().length : myFollowups.length);
   h += '<div class="form-card"><h3>Qualification & <span class="it">segmentation</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Le questionnaire reprend la logique terrain + appels de vos feuilles source, puis transforme cela en vue exploitable: type d\'école, quartier, effectif, mode online/offline, système actuel et signaux d\'urgence.</p>';
+  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">' + qualScopeLabel + ' — ' + qualification.total + ' écoles analysées. Type d\'école, quartier, effectif, mode online/offline, système actuel et signaux d\'urgence.</p>';
   h += '<div class="agent-grid">';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + '</span></div>';
-  h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif renseigné</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés connus</span></div><div><b>' + qualification.averageStudents + '</b><span>moyenne d\'élèves</span></div><div><b>' + myFollowups.length + '</b><span>suivis personnels</span></div></div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">source terrain + suivi</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline · hybride</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top portefeuille</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
-  h += '<div class="agent-card"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
+  h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + ' (' + (qualification.total ? Math.round(qualification.qualified / qualification.total * 100) : 0) + '%)</span></div>';
+  h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés</span></div><div><b>' + qualification.averageStudents + '</b><span>moy. élèves/école</span></div><div><b>' + qualFollowupCount + '</b><span>suivis ' + (isSuper ? 'équipe' : 'visibles') + '</span></div></div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'levels\',\'Niveau d\\\'établissement\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">' + qualScopeLabel + '</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'productTypes\',\'Produit discuté\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'appModes\',\'Version discutée\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline · hybride</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'quartiers\',\'Quartiers\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top ' + qualScopeLabel.toLowerCase() + '</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'systems\',\'Systèmes en place\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'internet\',\'Qualité Internet\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
+  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'power\',\'Qualité Électricité\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
   h += '</div></div>';
 
   // Sub-tabs
