@@ -7404,28 +7404,67 @@ function computeVisibleWorkspaceStats() {
   return { daysOnField: daySet.size, totalProspections: totalProspections, totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
+function computeExpertStatsFromVisible(expertName) {
+  var rawData = getVisibleRaw().filter(function(r) { return samePerson(r.e, expertName); });
+  var fuData = getVisibleFollowups().filter(function(f) { return samePerson(f.Expert, expertName); });
+  var uniqueRecords = buildSchoolRecords(rawData, fuData);
+  var totalEntries = rawData.length;
+  var uniqueSchools = uniqueRecords.length;
+  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
+  var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
+  var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
+  var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
+  var converted = 0, inProgress = 0, relance = 0;
+  fuData.forEach(function(f) {
+    if (f.FollowupType === 'CALL') {
+      calls++;
+      var cb = categorizeCallStatus(f);
+      if (cb === 'connected') callConnected++;
+      else if (cb === 'message') callMessage++;
+      else if (cb === 'no_answer') callNoAnswer++;
+      else if (cb === 'unreachable') callUnreachable++;
+      else callOther++;
+    } else if (f.FollowupType === 'WHATSAPP') whatsapp++;
+    else if (f.FollowupType === 'SMS') sms++;
+    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
+    if (f.Status === 'Converti') converted++;
+    else if (f.Status === 'En cours') inProgress++;
+    else if (f.Status === 'Relance') relance++;
+  });
+  var totalFollowups = calls + whatsapp + sms + visits;
+  var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
+  return { totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+}
+
 function drillDownExecKPI(metric, label) {
-  if (!_ddDashboard && !suiviRankings) return;
-  var rankings = suiviRankings || [];
-  var rows = rankings.map(function(r) {
+  var visRaw = getVisibleRaw();
+  var visFu = getVisibleFollowups();
+  var expertSet = {};
+  visRaw.forEach(function(r) { if (r.e) expertSet[canonicalPersonKey(r.e)] = canonicalPersonName(r.e); });
+  visFu.forEach(function(f) { if (f.Expert) expertSet[canonicalPersonKey(f.Expert)] = canonicalPersonName(f.Expert); });
+  var expertNames = Object.values(expertSet);
+
+  var rows = expertNames.map(function(eName) {
+    var s = computeExpertStatsFromVisible(eName);
     var val = 0;
-    if (metric === 'score') val = r.score;
-    else if (metric === 'prospections') val = r.totalEntries;
-    else if (metric === 'hotDeals') val = r.hotDeals;
-    else if (metric === 'calls') val = r.calls;
-    else if (metric === 'callConnected') val = r.callConnected;
-    else if (metric === 'noAnswer') val = r.callNoAnswer + r.callUnreachable;
-    else if (metric === 'converted') val = r.converted;
-    else if (metric === 'totalCost') val = r.totalCost;
-    else if (metric === 'visits') val = r.visits;
-    else if (metric === 'whatsapp') val = r.whatsapp;
-    else if (metric === 'sms') val = r.sms;
-    else if (metric === 'followups') val = r.totalFollowups;
-    else if (metric === 'avgRate') val = r.avgRate;
-    else if (metric === 'relance') val = r.relance;
-    else if (metric === 'inProgress') val = r.inProgress;
-    return { expert: r.expert, val: val, rank: r.rank };
-  }).sort(function(a, b) { return b.val - a.val; });
+    if (metric === 'score') val = s.score;
+    else if (metric === 'prospections') val = s.totalEntries;
+    else if (metric === 'hotDeals') val = s.hotDeals;
+    else if (metric === 'calls') val = s.calls;
+    else if (metric === 'callConnected') val = s.callConnected;
+    else if (metric === 'noAnswer') val = s.callNoAnswer + s.callUnreachable;
+    else if (metric === 'converted') val = s.converted;
+    else if (metric === 'totalCost') val = s.totalCost;
+    else if (metric === 'visits') val = s.visits;
+    else if (metric === 'whatsapp') val = s.whatsapp;
+    else if (metric === 'sms') val = s.sms;
+    else if (metric === 'followups') val = s.totalFollowups;
+    else if (metric === 'avgRate') val = s.avgRate;
+    else if (metric === 'relance') val = s.relance;
+    else if (metric === 'inProgress') val = s.inProgress;
+    return { expert: eName, val: val };
+  }).filter(function(r) { return r.val > 0 || metric === 'score'; }).sort(function(a, b) { return b.val - a.val; });
+
   var total = rows.reduce(function(s, r) { return s + r.val; }, 0);
   var isMoney = metric === 'totalCost';
   var isPercent = metric === 'avgRate';
