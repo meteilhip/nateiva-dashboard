@@ -2223,7 +2223,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
 <div class="filters">
   <div class="fld">
     <label>Ville</label>
-    <select id="fCity"><option value="">Toutes (2)</option><option>DOUALA</option><option>YAOUNDE</option></select>
+    <select id="fCity"><option value="">Toutes</option></select>
   </div>
   <div class="fld">
     <label>Expert</label>
@@ -3873,10 +3873,15 @@ function renderCategoryHeatmap(records) {
     return zoneTotals[z] >= 5;
   });
 
-  var doualaZones = activeZones.filter(function(z) { return zoneCities[z] === 'DOUALA'; })
-    .sort(function(a,b) { return zoneTotals[b] - zoneTotals[a]; });
-  var yaoundeZones = activeZones.filter(function(z) { return zoneCities[z] === 'YAOUNDE'; })
-    .sort(function(a,b) { return zoneTotals[b] - zoneTotals[a]; });
+  var zonesByCity = {};
+  activeZones.forEach(function(z) {
+    var c = zoneCities[z] || 'AUTRE';
+    if (!zonesByCity[c]) zonesByCity[c] = [];
+    zonesByCity[c].push(z);
+  });
+  Object.keys(zonesByCity).forEach(function(c) {
+    zonesByCity[c].sort(function(a,b) { return zoneTotals[b] - zoneTotals[a]; });
+  });
 
   // Find max cell count for matrices to calculate shading
   var maxStageCellVal = 1;
@@ -4020,7 +4025,7 @@ function renderCategoryHeatmap(records) {
     var cityTotal = 0;
     // Render City Total Row
     matrix2Html += '    <tr style="background:var(--g100); font-weight:700;">';
-    matrix2Html += '      <td style="font-weight:700; color:var(--ink);">🏙️ ' + esc(city) + ' (Total)</td>';
+    matrix2Html += '      <td style="font-weight:700; color:var(--ink);">🏙️ ' + esc(getCityLabel(city)) + ' (Total)</td>';
     
     STANDING_CATEGORIES.forEach(function(cat) {
       if (catTotals[cat.key] === 0 && cat.key === 'SANS_CATEGORIE') return;
@@ -4043,7 +4048,7 @@ function renderCategoryHeatmap(records) {
     matrix2Html += '    </tr>';
 
     // Render Zone Rows in this city
-    var cityZones = city === 'DOUALA' ? doualaZones : yaoundeZones;
+    var cityZones = zonesByCity[city] || [];
     cityZones.forEach(function(zone) {
       var zoneTotal = 0;
       matrix2Html += '    <tr>';
@@ -4278,7 +4283,7 @@ function refreshFilters(){
   cities.forEach(city=>{
     const o=document.createElement('option');
     o.value=city;
-    o.textContent=city === 'YAOUNDE' ? 'Yaoundé' : (city === 'DOUALA' ? 'Douala' : city);
+    o.textContent=getCityLabel(city);
     cityEl.appendChild(o);
   });
   const exp=[...new Set(rows.map(r=>r.e).filter(Boolean))].sort();
@@ -6428,6 +6433,29 @@ var PANE_ACCESS_CONFIG = [
   { key: 'glossary', label: 'Glossaire' }
 ];
 
+var CAMEROON_CITIES = [
+  { value: 'DOUALA', label: 'Douala', region: 'Littoral' },
+  { value: 'YAOUNDE', label: 'Yaoundé', region: 'Centre' },
+  { value: 'BAFOUSSAM', label: 'Bafoussam', region: 'Ouest' },
+  { value: 'BAMENDA', label: 'Bamenda', region: 'Nord-Ouest' },
+  { value: 'GAROUA', label: 'Garoua', region: 'Nord' },
+  { value: 'MAROUA', label: 'Maroua', region: 'Extrême-Nord' },
+  { value: 'NGAOUNDERE', label: 'Ngaoundéré', region: 'Adamaoua' },
+  { value: 'BERTOUA', label: 'Bertoua', region: 'Est' },
+  { value: 'EBOLOWA', label: 'Ebolowa', region: 'Sud' },
+  { value: 'BUEA', label: 'Buea', region: 'Sud-Ouest' },
+  { value: 'KRIBI', label: 'Kribi', region: 'Sud' },
+  { value: 'LIMBE', label: 'Limbé', region: 'Sud-Ouest' },
+  { value: 'NKONGSAMBA', label: 'Nkongsamba', region: 'Littoral' },
+  { value: 'KUMBA', label: 'Kumba', region: 'Sud-Ouest' },
+  { value: 'DSCHANG', label: 'Dschang', region: 'Ouest' },
+  { value: 'EDEA', label: 'Edéa', region: 'Littoral' }
+];
+function getCityLabel(code) {
+  var c = CAMEROON_CITIES.find(function(x) { return x.value === code; });
+  return c ? c.label : code;
+}
+
 var DEFAULT_USERS = [
   { username: 'ivan', password: 'ivan123', fullName: 'Ivan', role: 'Expert', city: 'YAOUNDE' },
   { username: 'fabiola', password: 'fabiola123', fullName: 'Kendo Fabiola', role: 'Expert', city: 'DOUALA' },
@@ -8458,10 +8486,9 @@ function rSuivi() {
   var roleLabel = roleBadgeLabel(currentUser);
   var allowedCities = (!isSuper && currentUser.city && currentUser.city !== 'ALL')
     ? [String(currentUser.city).trim().toUpperCase()]
-    : ['DOUALA', 'YAOUNDE'];
+    : CAMEROON_CITIES.map(function(c) { return c.value; });
   var cityOptions = allowedCities.map(function(city) {
-    var label = city === 'YAOUNDE' ? 'Yaoundé' : (city === 'DOUALA' ? 'Douala' : city);
-    return '<option value="' + esc(city) + '">' + esc(label) + '</option>';
+    return '<option value="' + esc(city) + '">' + esc(getCityLabel(city)) + '</option>';
   }).join('');
   var workspaceRaw = getWorkspaceRawForUser(me);
   var workspaceFollowups = getWorkspaceFollowupsForUser(me);
@@ -9033,7 +9060,7 @@ function rSuivi() {
     h += '<div class="form-field"><label>Nom complet</label><input type="text" id="invFullName" placeholder="Ex: Kamga Jean"></div>';
     h += '<div class="form-field"><label>Nom d\'utilisateur</label><input type="text" id="invUsername" placeholder="Ex: jean"></div>';
     h += '<div class="form-field"><label>Mot de passe</label><input type="text" id="invPassword" placeholder="Ex: jean123"></div>';
-    h += '<div class="form-field"><label>Ville</label><select id="invCity"><option value="DOUALA">Douala</option><option value="YAOUNDE">Yaoundé</option></select></div>';
+    h += '<div class="form-field"><label>Ville</label><select id="invCity">' + CAMEROON_CITIES.map(function(c) { return '<option value="' + esc(c.value) + '">' + esc(c.label) + '</option>'; }).join('') + '</select></div>';
     var roleOptions = '<option value="Ambassador">Ambassadeur (prospection terrain)</option>';
     roleOptions += '<option value="Expert">Expert (voit ambassadeurs + ses données)</option>';
     if (isSuperAdmin(currentUser) || isSubAdmin(currentUser)) {
