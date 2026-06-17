@@ -6436,11 +6436,10 @@ var DEFAULT_USERS = [
   { username: 'brice', password: 'brice123', fullName: 'Mbeuka brice', role: 'SubAdmin', city: 'DOUALA' },
   { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Expert', city: 'YAOUNDE' },
   { username: 'coordo', password: 'coordo2026', fullName: 'Coordo', role: 'SubAdmin', city: 'ALL' },
-  { username: 'clotaire', password: 'clotaire2026', fullName: 'Clotaire', role: 'SubAdmin', city: 'ALL' },
   { username: 'noah', password: 'noah2026', fullName: 'Noah', role: 'SuperAdmin', city: 'ALL' }
 ];
 
-var LETTER_EMAIL_USERS = ['noah', 'guy', 'coordo', 'clotaire'];
+var LETTER_EMAIL_USERS = ['noah', 'guy', 'coordo'];
 function canSeeLetterEmail(user) {
   if (!user) return false;
   return LETTER_EMAIL_USERS.indexOf(String(user.username || '').toLowerCase()) !== -1;
@@ -7303,15 +7302,67 @@ async function doLogin() {
     }
     closeLogin();
     errEl.style.display = 'none';
-    showToast('Bienvenue ' + currentUser.fullName + '!');
     resetDashboardFilters();
     ST.expert = canSeeAllData(currentUser) ? '' : currentUser.fullName;
     renderAll();
     updateVercelToolbarVisibility();
+    var firstLoginKey = 'nateiva_first_login_' + currentUser.username;
+    if (!localStorage.getItem(firstLoginKey)) {
+      localStorage.setItem(firstLoginKey, '1');
+      showPasswordResetPrompt();
+    } else {
+      showToast('Bienvenue ' + currentUser.fullName + '!');
+    }
   } else {
     errEl.textContent = res.error || 'Erreur de connexion';
     errEl.style.display = 'block';
   }
+}
+
+function showPasswordResetPrompt() {
+  if (!currentUser) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'pwResetOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:10000;animation:ddFadeIn .3s ease';
+  overlay.innerHTML = '<div style="background:var(--paper);border-radius:18px;padding:32px;max-width:420px;width:90%;box-shadow:var(--shadow-lg);animation:cardPop .4s cubic-bezier(.16,1,.3,1)">' +
+    '<h3 style="font-family:Fraunces,serif;font-size:22px;margin-bottom:8px">👋 Bienvenue ' + esc(currentUser.fullName) + ' !</h3>' +
+    '<p style="font-size:13px;color:var(--g500);margin-bottom:20px;line-height:1.6">C\'est votre première connexion. Souhaitez-vous changer votre mot de passe ?</p>' +
+    '<div id="pwResetFields" style="display:none;margin-bottom:16px">' +
+    '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:700;color:var(--g600);display:block;margin-bottom:4px">Nouveau mot de passe</label><input type="password" id="pwNew" style="width:100%;padding:10px 14px;border:1.5px solid var(--g200);border-radius:10px;font-size:14px" placeholder="Minimum 4 caractères"></div>' +
+    '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:700;color:var(--g600);display:block;margin-bottom:4px">Confirmer le mot de passe</label><input type="password" id="pwConfirm" style="width:100%;padding:10px 14px;border:1.5px solid var(--g200);border-radius:10px;font-size:14px" placeholder="Retapez le mot de passe"></div>' +
+    '<div id="pwResetError" style="display:none;color:var(--red);font-size:12px;margin-top:6px"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+    '<button onclick="dismissPasswordReset()" style="padding:10px 20px;border:1.5px solid var(--g200);border-radius:10px;background:var(--paper);font-weight:600;cursor:pointer;font-size:13px">Non merci</button>' +
+    '<button id="pwResetBtn" onclick="toggleOrSavePassword()" style="padding:10px 20px;border:none;border-radius:10px;background:var(--ink);color:var(--paper);font-weight:600;cursor:pointer;font-size:13px">Oui, changer</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+}
+
+function toggleOrSavePassword() {
+  var fields = document.getElementById('pwResetFields');
+  var btn = document.getElementById('pwResetBtn');
+  if (fields.style.display === 'none') {
+    fields.style.display = '';
+    btn.textContent = 'Enregistrer';
+    document.getElementById('pwNew').focus();
+    return;
+  }
+  var pw = document.getElementById('pwNew').value;
+  var confirm = document.getElementById('pwConfirm').value;
+  var errEl = document.getElementById('pwResetError');
+  if (pw.length < 4) { errEl.textContent = 'Le mot de passe doit faire au moins 4 caractères'; errEl.style.display = 'block'; return; }
+  if (pw !== confirm) { errEl.textContent = 'Les mots de passe ne correspondent pas'; errEl.style.display = 'block'; return; }
+  userOverrides[currentUser.username] = userOverrides[currentUser.username] || {};
+  userOverrides[currentUser.username].password = pw;
+  localStorage.setItem('nateiva_user_overrides', JSON.stringify(userOverrides));
+  dismissPasswordReset(true);
+}
+
+function dismissPasswordReset(saved) {
+  var overlay = document.getElementById('pwResetOverlay');
+  if (overlay) overlay.remove();
+  showToast(saved ? 'Mot de passe mis à jour !' : 'Bienvenue ' + (currentUser ? currentUser.fullName : '') + ' !');
 }
 
 function doLogout() {
