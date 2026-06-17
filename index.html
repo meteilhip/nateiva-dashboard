@@ -8675,7 +8675,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="fuCategory" onchange="updateStandingTip(\'fu\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div id="fuStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="fuEffectif" placeholder="Ex: 350" min="0"></div>';
-  h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="fuRate" placeholder="Ex: 60" min="0" max="100"></div>';
+  h += '<div class="form-field"><label>Probabilité de conversion estimée (%)</label><input type="number" id="fuRate" placeholder="Ex: 60" min="0" max="100"></div>';
   h += '<div class="form-field"><label>Ville</label><select id="fuCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="fuSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="fuQuartier" placeholder="Ex: Bojongo, Bastos, Biyem-Assi"></div>';
@@ -8761,7 +8761,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
-  h += '<div class="form-field"><label>Taux de conversion estimé (%)</label><input type="number" id="nsRate" placeholder="Ex: 60" min="0" max="100"></div>';
+  h += '<div class="form-field"><label>Probabilité de conversion estimée (%)</label><input type="number" id="nsRate" placeholder="Ex: 60" min="0" max="100"></div>';
   h += '<div class="form-field"><label>Ville</label><select id="nsCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="nsQuartier" placeholder="Ex: Bojongo, Bastos"></div>';
