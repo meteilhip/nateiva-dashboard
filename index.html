@@ -2174,6 +2174,11 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
     <span class="nav-label">Dashboard</span>
     <span class="nav-desc">KPI & Progression</span>
   </button>
+  <button class="nav-btn" data-pane="playbook">
+    <span class="nav-icon">🎯</span>
+    <span class="nav-label">Playbook</span>
+    <span class="nav-desc">Scripts & Closing</span>
+  </button>
   <button class="nav-btn" data-pane="market">
     <span class="nav-icon">🗺️</span>
     <span class="nav-label">Marché</span>
@@ -2193,11 +2198,6 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
     <span class="nav-icon">👥</span>
     <span class="nav-label">Équipe</span>
     <span class="nav-desc">Experts & Pipeline</span>
-  </button>
-  <button class="nav-btn" data-pane="playbook">
-    <span class="nav-icon">🎯</span>
-    <span class="nav-label">Playbook</span>
-    <span class="nav-desc">Vendre & Closer</span>
   </button>
   <button class="nav-btn" data-pane="intel">
     <span class="nav-icon">🧠</span>
@@ -6634,11 +6634,11 @@ var followupSubmitBusy = false;
 var newSchoolSubmitBusy = false;
 var PANE_ACCESS_CONFIG = [
   { key: 'home', label: 'Dashboard' },
+  { key: 'playbook', label: 'Playbook' },
   { key: 'market', label: 'Marché' },
   { key: 'suivi', label: 'Workspace' },
   { key: 'metrics', label: 'BI & KPI' },
   { key: 'team', label: 'Équipe' },
-  { key: 'playbook', label: 'Playbook' },
   { key: 'intel', label: 'NLP' },
   { key: 'glossary', label: 'Glossaire' }
 ];
@@ -6808,7 +6808,7 @@ function getDefaultPermissions(user) {
   var expert = isExpert(user);
   var globalData = isSuperAdmin(user) || isSubAdmin(user);
   return {
-    panes: (elevated || expert) ? allPaneKeys() : ['home', 'suivi', 'glossary'],
+    panes: (elevated || expert) ? allPaneKeys() : ['home', 'playbook', 'suivi', 'glossary'],
     dataScope: globalData ? 'all' : (expert ? 'team' : 'own'),
     manageUsers: isSuperAdmin(user)
   };
