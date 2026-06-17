@@ -8580,7 +8580,7 @@ function rSuivi() {
   h += '<div class="workspace-action-copy"><h3>🎯 Actions principales</h3><p>Les deux actions les plus importantes restent seules au centre: créer un nouveau suivi ou enregistrer une nouvelle école. Chaque saisie remonte ensuite dans l\'historique, le rappel calendrier et l\'impact funnel.</p></div>';
   h += '<div class="workspace-primary-actions">';
   h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l\'effet sur le funnel.</small></button>';
-  h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle école</strong><small>Créez une fiche école claire avec contact, zone, standing et base de relance.</small></button>';
+  h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle entrée</strong><small>Créez une fiche école, courrier ou email avec contact, zone, standing et suivi.</small></button>';
   h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
   h += '</div>';
   h += '<div class="workspace-action-note">';
@@ -8688,6 +8688,7 @@ function rSuivi() {
     h += '<div id="fuLetterEmailFields" style="display:none;grid-column:1/-1">';
     h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06));padding:20px;border-radius:14px;border:1.5px solid rgba(124,58,237,.15);margin-bottom:14px">';
     h += '<h4 style="grid-column:1/-1;color:var(--purple);margin-bottom:4px">📨 Détails Courrier / Email</h4>';
+    h += '<div class="form-field"><label>Type de destinataire</label><select id="fuRecipientType"><option value="">-- Préciser --</option><option value="École privée">École privée</option><option value="École publique">École publique</option><option value="Université">Université</option><option value="Sponsor">Sponsor / Mécène</option><option value="Organisation">Organisation / ONG</option><option value="Ambassade">Ambassade / Consulat</option><option value="Entreprise">Entreprise partenaire</option><option value="Ministère">Ministère / Administration</option><option value="Autre">Autre</option></select></div>';
     h += '<div class="form-field"><label>Déposé par / Envoyé par</label><input type="text" id="fuDepositor" placeholder="Ex: Guy, Coordo, Noah"></div>';
     h += '<div class="form-field"><label>Mode de dépôt / envoi</label><select id="fuDeliveryMode"><option value="">-- Préciser --</option><option value="Main propre">Main propre</option><option value="Secrétariat">Via secrétariat</option><option value="Gardien">Via gardien / vigile</option><option value="Boîte aux lettres">Boîte aux lettres</option><option value="Email direct">Email direct</option><option value="Email via formulaire">Email via formulaire site</option><option value="Email CC">Email avec CC</option></select></div>';
     h += '<div class="form-field"><label>Destinataire</label><input type="text" id="fuRecipient" placeholder="Ex: Fondateur, Directeur, Secrétaire"></div>';
@@ -8725,11 +8726,11 @@ function rSuivi() {
 
   // Panel: Add school directly
   h += '<div class="suivi-panel" id="stab-addschool">';
-  h += '<div class="form-card" id="newSchoolForm"><h3>Nouvelle <span class="it">école</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, que ce soit <b>par téléphone</b> ou <b>sur le terrain</b>. On reprend ici les questions clés du questionnaire original pour bien classer l\'école dès le premier contact.</p>';
+  h += '<div class="form-card" id="newSchoolForm"><h3>Nouvelle <span class="it">entrée</span></h3>';
+  h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, ou pour enregistrer un <b>courrier</b> ou <b>email</b> envoyé à une école, un sponsor, une ambassade, une université ou toute organisation. On reprend les questions clés pour bien classer l\'entrée dès le premier contact.</p>';
   h += '<div class="form-grid">';
-  h += '<div class="form-field"><label>Nom de l\'école</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem" oninput="updateNewSchoolOwnershipNotice()"></div>';
-  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option></select></div>';
+  h += '<div class="form-field"><label>Nom de l\'école / organisation</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem, Ambassade de France" oninput="updateNewSchoolOwnershipNotice()"></div>';
+  h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="École publique">École publique</option><option value="Sponsor">Sponsor / Mécène</option><option value="Organisation">Organisation / ONG</option><option value="Ambassade">Ambassade / Consulat</option><option value="Entreprise">Entreprise partenaire</option><option value="Autre">Autre</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
   h += '<div class="form-field"><label>Effectif (élèves)</label><input type="number" id="nsEffectif" placeholder="Ex: 350" min="0"></div>';
@@ -8737,7 +8738,9 @@ function rSuivi() {
   h += '<div class="form-field"><label>Ville</label><select id="nsCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="nsQuartier" placeholder="Ex: Bojongo, Bastos"></div>';
-  h += '<div class="form-field"><label>Canal du 1er contact</label><select id="nsEntryType"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option></select></div>';
+  h += '<div class="form-field"><label>Canal du 1er contact</label><select id="nsEntryType" onchange="toggleNsLetterEmailFields()"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option>';
+  if (canSeeLetterEmail(currentUser)) h += '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>';
+  h += '</select></div>';
   h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="nsRecordedAt" readonly></div>';
   h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="nsLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
   h += '<div class="form-field"><label>Nom du contact principal</label><input type="text" id="nsContactName" placeholder="Ex: M. Nkoum"></div>';
@@ -8770,7 +8773,24 @@ function rSuivi() {
   h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="nsNextDate"></div>';
   h += '<div class="form-field full"><div id="nsSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
   h += '<div class="form-field full"><label>Notes / remarques initiales</label><textarea id="nsNotes" placeholder="Décrivez le premier échange, l\'objection ou le besoin principal..."></textarea></div>';
-  h += '</div><div class="form-submit"><button class="btn-save" id="newSchoolSubmitBtn" onclick="submitNewSchoolDirect()">Enregistrer l\'école</button></div></div></div>';
+  if (canSeeLetterEmail(currentUser)) {
+    h += '<div id="nsLetterEmailFields" style="display:none;grid-column:1/-1">';
+    h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06));padding:20px;border-radius:14px;border:1.5px solid rgba(124,58,237,.15);margin-bottom:14px">';
+    h += '<h4 style="grid-column:1/-1;color:var(--purple);margin-bottom:4px">📨 Détails Courrier / Email</h4>';
+    h += '<div class="form-field"><label>Type de destinataire</label><select id="nsRecipientType"><option value="">-- Préciser --</option><option value="École privée">École privée</option><option value="École publique">École publique</option><option value="Université">Université</option><option value="Sponsor">Sponsor / Mécène</option><option value="Organisation">Organisation / ONG</option><option value="Ambassade">Ambassade / Consulat</option><option value="Entreprise">Entreprise partenaire</option><option value="Ministère">Ministère / Administration</option><option value="Autre">Autre</option></select></div>';
+    h += '<div class="form-field"><label>Déposé par / Envoyé par</label><input type="text" id="nsDepositor" placeholder="Ex: Guy, Coordo, Noah"></div>';
+    h += '<div class="form-field"><label>Mode de dépôt / envoi</label><select id="nsDeliveryMode"><option value="">-- Préciser --</option><option value="Main propre">Main propre</option><option value="Secrétariat">Via secrétariat</option><option value="Gardien">Via gardien / vigile</option><option value="Boîte aux lettres">Boîte aux lettres</option><option value="Email direct">Email direct</option><option value="Email via formulaire">Email via formulaire site</option><option value="Email CC">Email avec CC</option></select></div>';
+    h += '<div class="form-field"><label>Destinataire</label><input type="text" id="nsRecipient" placeholder="Ex: Fondateur, Directeur, Ambassadeur, DG"></div>';
+    h += '<div class="form-field"><label>Lieu de dépôt</label><input type="text" id="nsDepotLocation" placeholder="Ex: Bureau principal, Accueil, Secrétariat"></div>';
+    h += '<div class="form-field"><label>Date de dépôt / envoi</label><input type="date" id="nsDepotDate"></div>';
+    h += '<div class="form-field"><label>Réponse reçue ?</label><select id="nsResponseReceived"><option value="">En attente</option><option value="Oui">Oui</option><option value="Non">Non</option><option value="Relance nécessaire">Relance nécessaire</option></select></div>';
+    h += '<div class="form-field"><label>Date de réponse</label><input type="date" id="nsResponseDate" onchange="calcNsDaysToAnswer()"></div>';
+    h += '<div class="form-field"><label>Jours pour réponse</label><input type="number" id="nsDaysToAnswer" placeholder="Auto-calculé" readonly></div>';
+    h += '<div class="form-field"><label>Qui a fait le suivi</label><input type="text" id="nsFollowedUpBy" placeholder="Ex: Noah, Guy"></div>';
+    h += '<div class="form-field full"><label>Contenu résumé du courrier / email</label><textarea id="nsLetterContent" placeholder="Objet et points clés du courrier ou email envoyé..."></textarea></div>';
+    h += '</div></div>';
+  }
+  h += '</div><div class="form-submit"><button class="btn-save" id="newSchoolSubmitBtn" onclick="submitNewSchoolDirect()">Enregistrer l\'entrée</button></div></div></div>';
 
   // Panel: Planner
   h += '<div class="suivi-panel" id="stab-planner"><div class="form-card"><h3>🗓️ Rappels <span class="it">& planning</span></h3>';
@@ -9132,6 +9152,30 @@ function toggleLetterEmailFields() {
   }
 }
 
+function toggleNsLetterEmailFields() {
+  var wrap = document.getElementById('nsLetterEmailFields');
+  if (!wrap) return;
+  var nsType = document.getElementById('nsEntryType').value;
+  var show = nsType === 'EMAIL' || nsType === 'LETTER';
+  wrap.style.display = show ? '' : 'none';
+  if (show) {
+    var depotDate = document.getElementById('nsDepotDate');
+    if (depotDate && !depotDate.value) depotDate.value = new Date().toISOString().slice(0, 10);
+    var depositor = document.getElementById('nsDepositor');
+    if (depositor && !depositor.value && currentUser) depositor.value = currentUser.fullName;
+  }
+}
+
+function calcNsDaysToAnswer() {
+  var depotEl = document.getElementById('nsDepotDate');
+  var respEl = document.getElementById('nsResponseDate');
+  var daysEl = document.getElementById('nsDaysToAnswer');
+  if (depotEl && respEl && daysEl && depotEl.value && respEl.value) {
+    var diff = Math.round((new Date(respEl.value) - new Date(depotEl.value)) / (1000 * 60 * 60 * 24));
+    daysEl.value = diff >= 0 ? diff : '';
+  }
+}
+
 function prefillSchool() {
   var sel = document.getElementById('fuSchool');
   var cw = document.getElementById('fuSchoolCustomWrap');
@@ -9325,6 +9369,7 @@ async function submitFollowup() {
     callToSuperior: document.getElementById('fuToSuperior').value,
     callVisit: document.getElementById('fuVisitFlag').value,
     prospectionYear: document.getElementById('fuProspectionYear').value.trim(),
+    recipientType: document.getElementById('fuRecipientType') ? document.getElementById('fuRecipientType').value : '',
     depositor: document.getElementById('fuDepositor') ? document.getElementById('fuDepositor').value.trim() : '',
     deliveryMode: document.getElementById('fuDeliveryMode') ? document.getElementById('fuDeliveryMode').value : '',
     recipient: document.getElementById('fuRecipient') ? document.getElementById('fuRecipient').value.trim() : '',
@@ -9401,7 +9446,29 @@ async function submitFollowup() {
     CallVisit: questionnaireMeta.callVisit,
     visit: questionnaireMeta.callVisit,
     ProspectionYear: questionnaireMeta.prospectionYear,
-    prospectionYear: questionnaireMeta.prospectionYear
+    prospectionYear: questionnaireMeta.prospectionYear,
+    RecipientType: questionnaireMeta.recipientType,
+    recipientType: questionnaireMeta.recipientType,
+    Depositor: questionnaireMeta.depositor,
+    depositor: questionnaireMeta.depositor,
+    DeliveryMode: questionnaireMeta.deliveryMode,
+    deliveryMode: questionnaireMeta.deliveryMode,
+    Recipient: questionnaireMeta.recipient,
+    recipient: questionnaireMeta.recipient,
+    DepotLocation: questionnaireMeta.depotLocation,
+    depotLocation: questionnaireMeta.depotLocation,
+    DepotDate: questionnaireMeta.depotDate,
+    depotDate: questionnaireMeta.depotDate,
+    ResponseReceived: questionnaireMeta.responseReceived,
+    responseReceived: questionnaireMeta.responseReceived,
+    ResponseDate: questionnaireMeta.responseDate,
+    responseDate: questionnaireMeta.responseDate,
+    DaysToAnswer: questionnaireMeta.daysToAnswer,
+    daysToAnswer: questionnaireMeta.daysToAnswer,
+    FollowedUpBy: questionnaireMeta.followedUpBy,
+    followedUpBy: questionnaireMeta.followedUpBy,
+    LetterContent: questionnaireMeta.letterContent,
+    letterContent: questionnaireMeta.letterContent
   };
   setFollowupSubmitBusy(true);
   try {
@@ -9538,7 +9605,18 @@ async function submitNewSchoolDirect() {
     callVisit: document.getElementById('nsVisitFlag').value,
     prospectionYear: document.getElementById('nsProspectionYear').value.trim(),
     entryOrigin: 'new-school',
-    firstContactChannel: document.getElementById('nsEntryType').value
+    firstContactChannel: document.getElementById('nsEntryType').value,
+    recipientType: (document.getElementById('nsRecipientType') || {}).value || '',
+    depositor: (document.getElementById('nsDepositor') || {}).value || '',
+    deliveryMode: (document.getElementById('nsDeliveryMode') || {}).value || '',
+    recipient: (document.getElementById('nsRecipient') || {}).value || '',
+    depotLocation: (document.getElementById('nsDepotLocation') || {}).value || '',
+    depotDate: (document.getElementById('nsDepotDate') || {}).value || '',
+    responseReceived: (document.getElementById('nsResponseReceived') || {}).value || '',
+    responseDate: (document.getElementById('nsResponseDate') || {}).value || '',
+    daysToAnswer: (document.getElementById('nsDaysToAnswer') || {}).value || '',
+    followedUpBy: (document.getElementById('nsFollowedUpBy') || {}).value || '',
+    letterContent: (document.getElementById('nsLetterContent') || {}).value || ''
   };
   
   var data = {
@@ -9611,7 +9689,29 @@ async function submitNewSchoolDirect() {
     EntryOrigin: questionnaireMeta.entryOrigin,
     entryOrigin: questionnaireMeta.entryOrigin,
     FirstContactChannel: questionnaireMeta.firstContactChannel,
-    firstContactChannel: questionnaireMeta.firstContactChannel
+    firstContactChannel: questionnaireMeta.firstContactChannel,
+    RecipientType: questionnaireMeta.recipientType,
+    recipientType: questionnaireMeta.recipientType,
+    Depositor: questionnaireMeta.depositor,
+    depositor: questionnaireMeta.depositor,
+    DeliveryMode: questionnaireMeta.deliveryMode,
+    deliveryMode: questionnaireMeta.deliveryMode,
+    Recipient: questionnaireMeta.recipient,
+    recipient: questionnaireMeta.recipient,
+    DepotLocation: questionnaireMeta.depotLocation,
+    depotLocation: questionnaireMeta.depotLocation,
+    DepotDate: questionnaireMeta.depotDate,
+    depotDate: questionnaireMeta.depotDate,
+    ResponseReceived: questionnaireMeta.responseReceived,
+    responseReceived: questionnaireMeta.responseReceived,
+    ResponseDate: questionnaireMeta.responseDate,
+    responseDate: questionnaireMeta.responseDate,
+    DaysToAnswer: questionnaireMeta.daysToAnswer,
+    daysToAnswer: questionnaireMeta.daysToAnswer,
+    FollowedUpBy: questionnaireMeta.followedUpBy,
+    followedUpBy: questionnaireMeta.followedUpBy,
+    LetterContent: questionnaireMeta.letterContent,
+    letterContent: questionnaireMeta.letterContent
   };
   setNewSchoolSubmitBusy(true);
   try {
