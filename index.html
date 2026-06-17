@@ -1655,6 +1655,8 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .fu-item.type-WHATSAPP{border-left-color:var(--green)}
 .fu-item.type-SMS{border-left-color:var(--saffron)}
 .fu-item.type-VISIT{border-left-color:var(--red)}
+.fu-item.type-EMAIL{border-left-color:var(--purple)}
+.fu-item.type-LETTER{border-left-color:#2563EB}
 .fu-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
 .fu-school{font-weight:700;font-size:15px;color:var(--ink)}
 .fu-type{
@@ -2155,7 +2157,7 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v10.0 · Executive 360</span>
+      <span class="meta-pill red">v10.1 · Courrier & Emails</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -6433,8 +6435,16 @@ var DEFAULT_USERS = [
   { username: 'guy', password: 'guy123', fullName: 'Ntsa Guy', role: 'SubAdmin', city: 'YAOUNDE' },
   { username: 'brice', password: 'brice123', fullName: 'Mbeuka brice', role: 'SubAdmin', city: 'DOUALA' },
   { username: 'taylor', password: 'taylor123', fullName: 'Kessi Taylor', role: 'Expert', city: 'YAOUNDE' },
+  { username: 'coordo', password: 'coordo2026', fullName: 'Coordo', role: 'SubAdmin', city: 'ALL' },
+  { username: 'clotaire', password: 'clotaire2026', fullName: 'Clotaire', role: 'SubAdmin', city: 'ALL' },
   { username: 'noah', password: 'noah2026', fullName: 'Noah', role: 'SuperAdmin', city: 'ALL' }
 ];
+
+var LETTER_EMAIL_USERS = ['noah', 'guy', 'coordo', 'clotaire'];
+function canSeeLetterEmail(user) {
+  if (!user) return false;
+  return LETTER_EMAIL_USERS.indexOf(String(user.username || '').toLowerCase()) !== -1;
+}
 
 // Load invited users from localStorage
 var invitedUsers = JSON.parse(localStorage.getItem('nateiva_invited_users') || '[]');
@@ -8418,7 +8428,7 @@ function rSuivi() {
   var qualFu = isSuper ? getVisibleFollowups() : (canSeeTeamData(currentUser) ? getVisibleFollowups() : workspaceFollowups);
   var qualification = buildQualificationSummary(qualRaw, qualFu);
 
-  var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : t === 'VISIT' ? '🚶 VISITE' : '📝 CRÉATION'; };
+  var fuTypeIcon = function(t) { return t === 'CALL' ? '📞 APPEL' : t === 'WHATSAPP' ? '💬 WHATSAPP' : t === 'SMS' ? '📱 SMS' : t === 'VISIT' ? '🚶 VISITE' : t === 'EMAIL' ? '📧 EMAIL' : t === 'LETTER' ? '📨 COURRIER' : '📝 CRÉATION'; };
   var fuDate = function(ts) { return formatFollowupDateTime(ts); };
   var tagCloud = function(items, emptyLabel) {
     if (!items || !items.length) return '<span>Aucune donnée qualifiée pour le moment</span>';
@@ -8568,6 +8578,7 @@ function rSuivi() {
   h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
+  if (canSeeLetterEmail(currentUser)) h += '<button class="suivi-tab" data-stab="courrier">📨 Courrier & Emails</button>';
   if (isSuper) h += '<button class="suivi-tab" data-stab="team">Équipe complète</button>';
   if (canAdminUsers) h += '<button class="suivi-tab" data-stab="invite">Gestion utilisateurs</button>';
   h += '</div>';
@@ -8604,7 +8615,9 @@ function rSuivi() {
   h += '</div>';
   h += '<div class="form-field full"><div id="fuSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
   h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="fuRecordedAt" readonly></div>';
-  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option></select></div>';
+  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType" onchange="toggleLetterEmailFields()"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option>';
+  if (canSeeLetterEmail(currentUser)) h += '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>';
+  h += '</select></div>';
   h += '<div class="form-field"><label>Heure auto du contact</label><input type="text" id="fuCallStart" readonly></div>';
   h += '<div class="form-field"><label>Durée observée</label><input type="time" id="fuCallDuration" step="1"></div>';
   h += '<div class="form-field"><label>Nom du contact</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor"></div>';
@@ -8620,6 +8633,22 @@ function rSuivi() {
   h += '<div class="form-field"><label>Transmission au supérieur</label><select id="fuToSuperior"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
   h += '<div class="form-field"><label>Visite / descente prévue</label><select id="fuVisitFlag"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
   h += '<div class="form-field" id="fuCostWrap"><label>Coût déplacement (FCFA)</label><input type="number" id="fuCost" placeholder="500" min="0" value="0"></div>';
+  if (canSeeLetterEmail(currentUser)) {
+    h += '<div id="fuLetterEmailFields" style="display:none;grid-column:1/-1">';
+    h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06));padding:20px;border-radius:14px;border:1.5px solid rgba(124,58,237,.15);margin-bottom:14px">';
+    h += '<h4 style="grid-column:1/-1;color:var(--purple);margin-bottom:4px">📨 Détails Courrier / Email</h4>';
+    h += '<div class="form-field"><label>Déposé par / Envoyé par</label><input type="text" id="fuDepositor" placeholder="Ex: Guy, Coordo, Noah"></div>';
+    h += '<div class="form-field"><label>Mode de dépôt / envoi</label><select id="fuDeliveryMode"><option value="">-- Préciser --</option><option value="Main propre">Main propre</option><option value="Secrétariat">Via secrétariat</option><option value="Gardien">Via gardien / vigile</option><option value="Boîte aux lettres">Boîte aux lettres</option><option value="Email direct">Email direct</option><option value="Email via formulaire">Email via formulaire site</option><option value="Email CC">Email avec CC</option></select></div>';
+    h += '<div class="form-field"><label>Destinataire</label><input type="text" id="fuRecipient" placeholder="Ex: Fondateur, Directeur, Secrétaire"></div>';
+    h += '<div class="form-field"><label>Lieu de dépôt</label><input type="text" id="fuDepotLocation" placeholder="Ex: Bureau principal, Accueil, Secrétariat"></div>';
+    h += '<div class="form-field"><label>Date de dépôt / envoi</label><input type="date" id="fuDepotDate"></div>';
+    h += '<div class="form-field"><label>Réponse reçue ?</label><select id="fuResponseReceived"><option value="">En attente</option><option value="Oui">Oui</option><option value="Non">Non</option><option value="Relance nécessaire">Relance nécessaire</option></select></div>';
+    h += '<div class="form-field"><label>Date de réponse</label><input type="date" id="fuResponseDate"></div>';
+    h += '<div class="form-field"><label>Jours pour réponse</label><input type="number" id="fuDaysToAnswer" placeholder="Auto-calculé" readonly></div>';
+    h += '<div class="form-field"><label>Qui a fait le suivi</label><input type="text" id="fuFollowedUpBy" placeholder="Ex: Noah, Guy"></div>';
+    h += '<div class="form-field full"><label>Contenu résumé du courrier / email</label><textarea id="fuLetterContent" placeholder="Objet et points clés du courrier ou email..."></textarea></div>';
+    h += '</div></div>';
+  }
   h += '<div class="form-field"><label>Prochaine action</label><input type="text" id="fuNextAction" placeholder="Rappeler lundi..."></div>';
   h += '<div class="form-field"><label>Date prochaine action</label><input type="date" id="fuNextDate"></div>';
   h += '<div class="form-field"><label>Canal de suivi préféré</label><select id="fuPreferredChannel"><option value="">-- À préciser --</option><option value="Appel">Appel</option><option value="WhatsApp">WhatsApp</option><option value="Visite">Visite</option><option value="Email">Email</option></select></div>';
@@ -8757,9 +8786,10 @@ function rSuivi() {
   h += '<span class="timeline-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '">📍 ' + planner.urgent.length + ' urgentes</span>';
   h += '<span class="timeline-pill">🧱 Suppression ' + (canDeleteFollowups(currentUser) ? 'autorisée pour Noah' : 'verrouillée') + '</span>';
   h += '</div>';
-  if (myFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucun follow-up enregistré.</p>';
+  var historyFollowups = canSeeLetterEmail(currentUser) ? myFollowups : myFollowups.filter(function(f) { return f.FollowupType !== 'EMAIL' && f.FollowupType !== 'LETTER'; });
+  if (historyFollowups.length === 0) h += '<p style="color:var(--g500);text-align:center;padding:40px">Aucun follow-up enregistré.</p>';
   h += '<div class="followup-list">';
-  myFollowups.forEach(function(f) {
+  historyFollowups.forEach(function(f) {
     var record = schoolRecordMap[schoolKey(f.SchoolName)] || null;
     var stageMeta = getStageMeta(record ? record.stage : 'nouveau');
     var reminder = getReminderMeta(f.NextDate);
@@ -8862,9 +8892,58 @@ function rSuivi() {
 
   // Panel: Team (super admin only)
   if (isSuper) {
+  if (canSeeLetterEmail(currentUser)) {
+    var allFu = isSuper ? getAllFollowups() : getVisibleFollowups();
+    var letterEmails = allFu.filter(function(f) { return f.FollowupType === 'EMAIL' || f.FollowupType === 'LETTER'; }).sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
+    var leEmails = letterEmails.filter(function(f) { return f.FollowupType === 'EMAIL'; });
+    var leLetters = letterEmails.filter(function(f) { return f.FollowupType === 'LETTER'; });
+    var leAwaitingResponse = letterEmails.filter(function(f) { var m = readFollowupMeta(f); return !m.responseReceived || m.responseReceived === '' || m.responseReceived === 'Relance nécessaire'; });
+    var leResponded = letterEmails.filter(function(f) { var m = readFollowupMeta(f); return m.responseReceived === 'Oui'; });
+    h += '<div class="suivi-panel" id="stab-courrier"><div class="form-card"><h3>📨 Courrier & <span class="it">Emails</span></h3>';
+    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Suivi des lettres déposées et emails envoyés aux écoles. Visible uniquement pour Noah, Guy, Coordo et Clotaire.</p>';
+    h += '<div class="suivi-kpis" style="margin-bottom:20px">';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--purple)"><div class="sk-icon">📧</div><div class="sk-val">' + leEmails.length + '</div><div class="sk-lbl">Emails envoyés</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid #2563EB"><div class="sk-icon">📨</div><div class="sk-val">' + leLetters.length + '</div><div class="sk-lbl">Lettres déposées</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--saffron)"><div class="sk-icon">⏳</div><div class="sk-val">' + leAwaitingResponse.length + '</div><div class="sk-lbl">En attente réponse</div></div>';
+    h += '<div class="suivi-kpi" style="border-top:3px solid var(--green)"><div class="sk-icon">✅</div><div class="sk-val">' + leResponded.length + '</div><div class="sk-lbl">Réponses reçues</div></div>';
+    h += '</div>';
+    if (letterEmails.length === 0) {
+      h += '<div style="text-align:center;padding:40px 20px;color:var(--g400)"><div style="font-size:48px;margin-bottom:12px">📭</div><p>Aucun courrier ou email enregistré pour le moment.</p><p style="font-size:12px;margin-top:8px">Utilisez le formulaire <b>Nouveau suivi</b> et sélectionnez le type <b>📧 Email</b> ou <b>📨 Lettre</b>.</p></div>';
+    } else {
+      letterEmails.forEach(function(f) {
+        var meta = readFollowupMeta(f);
+        var isLetter = f.FollowupType === 'LETTER';
+        var respStatus = meta.responseReceived === 'Oui' ? '✅ Répondu' : (meta.responseReceived === 'Relance nécessaire' ? '🔴 Relance' : '⏳ En attente');
+        var respClass = meta.responseReceived === 'Oui' ? 'color:var(--green)' : (meta.responseReceived === 'Relance nécessaire' ? 'color:var(--red)' : 'color:var(--saffron)');
+        h += '<div class="fu-item type-' + f.FollowupType + '" style="margin-bottom:10px">';
+        h += '<div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
+        h += '<div style="display:flex;gap:8px;align-items:center">';
+        h += '<span style="font-weight:700;' + respClass + '">' + respStatus + '</span>';
+        h += '<span class="fu-type ' + f.FollowupType + '">' + (isLetter ? '📨 COURRIER' : '📧 EMAIL') + '</span></div></div>';
+        h += '<div class="fu-body">';
+        if (meta.letterContent) h += '<div style="margin-bottom:6px"><b>Contenu:</b> ' + esc(meta.letterContent) + '</div>';
+        if (meta.depositor) h += '<span style="margin-right:12px">👤 <b>' + esc(meta.depositor) + '</b></span>';
+        if (meta.deliveryMode) h += '<span style="margin-right:12px">📦 ' + esc(meta.deliveryMode) + '</span>';
+        if (meta.recipient) h += '<span style="margin-right:12px">🎯 ' + esc(meta.recipient) + '</span>';
+        if (meta.depotLocation) h += '<span style="margin-right:12px">📍 ' + esc(meta.depotLocation) + '</span>';
+        h += '</div>';
+        h += '<div class="fu-footer">';
+        h += '<span>' + (meta.depotDate || new Date(f.Timestamp).toLocaleDateString('fr-FR')) + '</span>';
+        if (f.Expert) h += '<span>Expert: <b>' + esc(f.Expert) + '</b></span>';
+        if (meta.followedUpBy) h += '<span>Suivi par: <b>' + esc(meta.followedUpBy) + '</b></span>';
+        if (meta.responseDate) h += '<span>Réponse: ' + esc(meta.responseDate) + '</span>';
+        if (meta.daysToAnswer) h += '<span><b>' + meta.daysToAnswer + 'j</b> pour répondre</span>';
+        if (f.Status) h += '<span>' + esc(f.Status) + '</span>';
+        h += '</div></div>';
+      });
+    }
+    h += '</div></div>';
+  }
+
     h += '<div class="suivi-panel" id="stab-team"><div class="form-card"><h3>Vue <span class="it">équipe complète</span></h3>';
-    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Total: ' + getAllFollowups().length + ' follow-ups enregistrés</p>';
-    getAllFollowups().sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); }).forEach(function(f) {
+    var teamFollowups = getAllFollowups().filter(function(f) { return f.FollowupType !== 'EMAIL' && f.FollowupType !== 'LETTER'; });
+    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:16px">Total: ' + teamFollowups.length + ' follow-ups enregistrés</p>';
+    teamFollowups.sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); }).forEach(function(f) {
       h += '<div class="fu-item type-' + f.FollowupType + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
       h += '<div style="display:flex;gap:8px;align-items:center"><span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
       h += '<span class="fu-type ' + f.FollowupType + '">' + f.FollowupType + '</span></div></div>';
@@ -8973,6 +9052,33 @@ function rSuivi() {
   updateNewSchoolOwnershipNotice();
   startEntryAutoClock();
   activateSuiviPanel(suiviPreferredTab || 'planner');
+}
+
+function toggleLetterEmailFields() {
+  var wrap = document.getElementById('fuLetterEmailFields');
+  if (!wrap) return;
+  var fuType = document.getElementById('fuType').value;
+  var show = fuType === 'EMAIL' || fuType === 'LETTER';
+  wrap.style.display = show ? '' : 'none';
+  if (show) {
+    var depotDate = document.getElementById('fuDepotDate');
+    if (depotDate && !depotDate.value) depotDate.value = new Date().toISOString().slice(0, 10);
+    var depositor = document.getElementById('fuDepositor');
+    if (depositor && !depositor.value && currentUser) depositor.value = currentUser.fullName;
+  }
+  var respDate = document.getElementById('fuResponseDate');
+  if (respDate) {
+    respDate.addEventListener('change', function() {
+      var depotEl = document.getElementById('fuDepotDate');
+      var daysEl = document.getElementById('fuDaysToAnswer');
+      if (depotEl && daysEl && depotEl.value && respDate.value) {
+        var d1 = new Date(depotEl.value);
+        var d2 = new Date(respDate.value);
+        var diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+        daysEl.value = diff >= 0 ? diff : '';
+      }
+    });
+  }
 }
 
 function prefillSchool() {
@@ -9167,7 +9273,17 @@ async function submitFollowup() {
     callWhatsappDocs: document.getElementById('fuWhatsappDocs').value,
     callToSuperior: document.getElementById('fuToSuperior').value,
     callVisit: document.getElementById('fuVisitFlag').value,
-    prospectionYear: document.getElementById('fuProspectionYear').value.trim()
+    prospectionYear: document.getElementById('fuProspectionYear').value.trim(),
+    depositor: document.getElementById('fuDepositor') ? document.getElementById('fuDepositor').value.trim() : '',
+    deliveryMode: document.getElementById('fuDeliveryMode') ? document.getElementById('fuDeliveryMode').value : '',
+    recipient: document.getElementById('fuRecipient') ? document.getElementById('fuRecipient').value.trim() : '',
+    depotLocation: document.getElementById('fuDepotLocation') ? document.getElementById('fuDepotLocation').value.trim() : '',
+    depotDate: document.getElementById('fuDepotDate') ? document.getElementById('fuDepotDate').value : '',
+    responseReceived: document.getElementById('fuResponseReceived') ? document.getElementById('fuResponseReceived').value : '',
+    responseDate: document.getElementById('fuResponseDate') ? document.getElementById('fuResponseDate').value : '',
+    daysToAnswer: document.getElementById('fuDaysToAnswer') ? document.getElementById('fuDaysToAnswer').value : '',
+    followedUpBy: document.getElementById('fuFollowedUpBy') ? document.getElementById('fuFollowedUpBy').value.trim() : '',
+    letterContent: document.getElementById('fuLetterContent') ? document.getElementById('fuLetterContent').value.trim() : ''
   };
   var data = {
     action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
