@@ -6372,12 +6372,65 @@ function animateCounters(){
 // =============================================================
 // SUIVI — STATE (must be before renderAll)
 // =============================================================
+var nateivaMemoryStorage = {};
+function createSafeStorageFacade() {
+  function getNativeStorage() {
+    try {
+      var nativeStorage = window.localStorage;
+      var probeKey = '__nateiva_storage_probe__';
+      nativeStorage.setItem(probeKey, '1');
+      nativeStorage.removeItem(probeKey);
+      return nativeStorage;
+    } catch (error) {
+      return null;
+    }
+  }
+  return {
+    getItem: function(key) {
+      var nativeStorage = getNativeStorage();
+      if (nativeStorage) {
+        try {
+          var nativeValue = nativeStorage.getItem(key);
+          if (nativeValue !== null && nativeValue !== undefined) nateivaMemoryStorage[key] = nativeValue;
+          return nativeValue;
+        } catch (error) {}
+      }
+      return Object.prototype.hasOwnProperty.call(nateivaMemoryStorage, key) ? nateivaMemoryStorage[key] : null;
+    },
+    setItem: function(key, value) {
+      var nextValue = String(value);
+      nateivaMemoryStorage[key] = nextValue;
+      var nativeStorage = getNativeStorage();
+      if (nativeStorage) {
+        try { nativeStorage.setItem(key, nextValue); } catch (error) {}
+      }
+    },
+    removeItem: function(key) {
+      delete nateivaMemoryStorage[key];
+      var nativeStorage = getNativeStorage();
+      if (nativeStorage) {
+        try { nativeStorage.removeItem(key); } catch (error) {}
+      }
+    }
+  };
+}
+var localStorage = createSafeStorageFacade();
+function safeStorageParse(key, fallbackValue) {
+  var rawValue = localStorage.getItem(key);
+  if (rawValue === null || rawValue === undefined || rawValue === '') return fallbackValue;
+  try {
+    return JSON.parse(rawValue);
+  } catch (error) {
+    localStorage.removeItem(key);
+    return fallbackValue;
+  }
+}
 var APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
 var NATEIVA_SALE_ANALYTIC_API_URL = 'https://nateiva-sale-analytic-api.57.129.133.115.sslip.io';
-var currentUser = JSON.parse(localStorage.getItem('nateiva_user') || 'null');
-var suiviFollowups = JSON.parse(localStorage.getItem('nateiva_followups') || '[]');
+var currentUser = safeStorageParse('nateiva_user', null);
+var suiviFollowups = safeStorageParse('nateiva_followups', []);
 var nateivaApiToken = localStorage.getItem('nateiva_sale_analytic_token') || '';
-var serverUsers = JSON.parse(localStorage.getItem('nateiva_server_users') || '[]');
+var serverUsers = safeStorageParse('nateiva_server_users', []);
 var nateivaDeviceId = localStorage.getItem('nateiva_sale_analytic_device_id') || '';
 var importedSheetFollowups = [];
 var suiviRankings = [];
@@ -6416,7 +6469,7 @@ var VERIFIED_CALL_PATCHES = [
 ];
 var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
 var FOLLOWUP_META_MARKER = '[NATEIVA_META]';
-var entryImpactByUser = JSON.parse(localStorage.getItem(ENTRY_IMPACT_STORAGE_KEY) || '{}');
+var entryImpactByUser = safeStorageParse(ENTRY_IMPACT_STORAGE_KEY, {});
 var suiviPreferredTab = 'planner';
 var followupEditId = '';
 var followupEditMode = 'create';
@@ -6474,8 +6527,8 @@ function canSeeLetterEmail(user) {
 }
 
 // Load invited users from localStorage
-var invitedUsers = JSON.parse(localStorage.getItem('nateiva_invited_users') || '[]');
-var userOverrides = JSON.parse(localStorage.getItem('nateiva_user_overrides') || '{}');
+var invitedUsers = safeStorageParse('nateiva_invited_users', []);
+var userOverrides = safeStorageParse('nateiva_user_overrides', {});
 
 if (!nateivaDeviceId) {
   nateivaDeviceId = 'NSA-DEVICE-' + Date.now() + '-' + Math.random().toString(16).slice(2, 10);
@@ -6488,6 +6541,15 @@ function isBackendConfigured() {
 
 function getApiBaseUrl() {
   return String(NATEIVA_SALE_ANALYTIC_API_URL || '').replace(/\/+$/, '');
+}
+
+function buildBackendErrorResult(message, detail) {
+  var cleanMessage = String(message || 'Serveur Nateiva indisponible').trim();
+  var cleanDetail = String(detail || '').trim();
+  return {
+    success: false,
+    error: cleanDetail ? (cleanMessage + ' — ' + cleanDetail) : cleanMessage
+  };
 }
 
 function setApiToken(token) {
@@ -7022,7 +7084,7 @@ function getDaysOnField(expertName) {
   return daySet.size;
 }
 
-// --- API calls (with offline fallback to localStorage) ---
+// --- API calls (backend-first; local fallback only when backend is not configured) ---
 async function backendRequest(path, options) {
   var cfg = options || {};
   var headers = Object.assign({}, cfg.headers || {});
@@ -7031,9 +7093,17 @@ async function backendRequest(path, options) {
   var resp = await fetch(getApiBaseUrl() + path, {
     method: cfg.method || 'GET',
     headers: headers,
-    body: cfg.body ? JSON.stringify(cfg.body) : undefined
+    body: cfg.body ? JSON.stringify(cfg.body) : undefined,
+    cache: 'no-store'
   });
-  return await resp.json();
+  var rawText = await resp.text();
+  var payload = rawText ? JSON.parse(rawText) : {};
+  if (!resp.ok) {
+    return payload && typeof payload === 'object'
+      ? Object.assign({ success: false, error: payload.error || ('Erreur API ' + resp.status) }, payload)
+      : buildBackendErrorResult('Erreur API ' + resp.status);
+  }
+  return payload;
 }
 
 async function apiCall(action, params) {
@@ -7045,7 +7115,10 @@ async function apiCall(action, params) {
       if (action === 'bootstrap') {
         return await backendRequest('/api/bootstrap');
       }
-    } catch (e) {}
+      return buildBackendErrorResult('Action API non prise en charge', action);
+    } catch (e) {
+      return buildBackendErrorResult('Connexion au serveur impossible', e && e.message ? e.message : '');
+    }
   }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(action, params);
   try {
@@ -7063,6 +7136,9 @@ async function apiPost(data) {
       if (data.action === 'addFollowup') {
         return await backendRequest('/api/followups', { method: 'POST', body: Object.assign({}, data, { deviceId: nateivaDeviceId }) });
       }
+      if (data.action === 'updateFollowup') {
+        return await backendRequest('/api/followups/' + encodeURIComponent(data.id || ''), { method: 'PUT', body: Object.assign({}, data, { deviceId: nateivaDeviceId }) });
+      }
       if (data.action === 'addUser') {
         return await backendRequest('/api/users', { method: 'POST', body: data });
       }
@@ -7072,7 +7148,10 @@ async function apiPost(data) {
       if (data.action === 'syncLocalState') {
         return await backendRequest('/api/sync/local-state', { method: 'POST', body: Object.assign({}, data, { deviceId: nateivaDeviceId }) });
       }
-    } catch (e) {}
+      return buildBackendErrorResult('Action API non prise en charge', data && data.action ? data.action : '');
+    } catch (e) {
+      return buildBackendErrorResult('Sauvegarde serveur impossible', e && e.message ? e.message : '');
+    }
   }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return localFallback(data.action, data);
   try {
@@ -7085,18 +7164,20 @@ async function apiDeleteFollowup(id) {
   if (isBackendConfigured()) {
     try {
       return await backendRequest('/api/followups/' + encodeURIComponent(id), { method: 'DELETE' });
-    } catch (e) {}
+    } catch (e) {
+      return buildBackendErrorResult('Suppression serveur impossible', e && e.message ? e.message : '');
+    }
   }
   return localFallback('deleteFollowup', { id: id });
 }
 
 async function refreshSyncedState() {
-  if (!currentUser || !nateivaApiToken || !isBackendConfigured()) return { success: false };
+  if (!nateivaApiToken || !isBackendConfigured()) return { success: false };
   var res = await apiCall('bootstrap', {});
   if (res && res.success) {
     applyBackendBootstrap(res);
     resetDashboardFilters();
-    ST.expert = canSeeAllData(currentUser) ? '' : currentUser.fullName;
+    ST.expert = currentUser && canSeeAllData(currentUser) ? '' : (currentUser ? currentUser.fullName : '');
     renderAll();
   }
   return res;
@@ -9882,7 +9963,7 @@ async function initializeNateivaSaleAnalyticSession() {
     localStorage.removeItem('nateiva_user');
     renderAll();
   }
-  if (currentUser && isBackendConfigured() && nateivaApiToken) {
+  if (isBackendConfigured() && nateivaApiToken) {
     var res = await refreshSyncedState();
     if (!res || !res.success) {
       currentUser = null;

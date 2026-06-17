@@ -134,6 +134,29 @@ async function listVisibleFollowups(viewer) {
   return rows.map(mapFollowup);
 }
 
+function canViewerAccessFollowupRow(viewer, row) {
+  if (!viewer || !row) return false;
+  if (viewer.permissions && viewer.permissions.dataScope === "all") return true;
+  const viewerCity = String(viewer.city || "").trim().toUpperCase();
+  const rowCity = String(row.city || "").trim().toUpperCase();
+  const sameExpert = String(row.expert || "").trim().toLowerCase() === String(viewer.fullName || "").trim().toLowerCase();
+  const sameCreator = String(row.created_by_username || "").trim().toLowerCase() === String(viewer.username || "").trim().toLowerCase();
+  const cityAllowed = !viewerCity || viewerCity === "ALL" || !rowCity || rowCity === viewerCity;
+  return cityAllowed && (sameExpert || sameCreator);
+}
+
+async function findFollowupByServerUid(serverUid) {
+  const rows = await query(
+    `SELECT *
+     FROM followups
+     WHERE server_uid = ?
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    [serverUid]
+  );
+  return rows[0] || null;
+}
+
 async function findFollowupByLegacyOrFingerprint(legacyId, fingerprint) {
   const rows = await query(
     `SELECT * FROM followups
@@ -228,6 +251,111 @@ async function upsertFollowup(input) {
   return mapFollowup(rows[0]);
 }
 
+async function updateFollowup(serverUid, viewer, input) {
+  const existing = await findFollowupByServerUid(serverUid);
+  if (!existing) return null;
+  if (!canViewerAccessFollowupRow(viewer, existing)) {
+    const denied = new Error("Accès refusé à cette entrée");
+    denied.code = "FORBIDDEN";
+    throw denied;
+  }
+
+  const nextRecord = {
+    ID: existing.server_uid,
+    LegacyID: existing.legacy_id || "",
+    Timestamp: input.Timestamp || existing.event_timestamp || new Date().toISOString(),
+    Expert: input.Expert || existing.expert || "",
+    SchoolName: input.SchoolName || existing.school_name || "",
+    ContactName: input.ContactName || "",
+    ContactPhone: input.ContactPhone || "",
+    FollowupType: input.FollowupType || existing.followup_type || "FOLLOWUP",
+    Notes: input.Notes || "",
+    Outcome: input.Outcome || "",
+    NextAction: input.NextAction || "",
+    NextDate: input.NextDate || "",
+    Cost: input.Cost || 0,
+    Status: input.Status || "En cours",
+    City: input.City || "",
+    Sector: input.Sector || "",
+    SchoolType: input.SchoolType || "",
+    Category: input.Category || "",
+    Effectif: input.Effectif || "",
+    Location: input.Location || "",
+    ContactRole: input.ContactRole || "",
+    Source: existing.source || input.Source || "nateiva-sale-analytic-api"
+  };
+  const fingerprint = buildFollowupFingerprint(nextRecord);
+  const duplicateRows = await query(
+    `SELECT server_uid
+     FROM followups
+     WHERE fingerprint = ?
+       AND server_uid <> ?
+     LIMIT 1`,
+    [fingerprint, serverUid]
+  );
+  if (duplicateRows.length) {
+    const duplicate = new Error("Cette mise à jour dupliquerait une autre entrée");
+    duplicate.code = "DUPLICATE";
+    throw duplicate;
+  }
+
+  await query(
+    `UPDATE followups
+     SET fingerprint = ?,
+         event_timestamp = ?,
+         expert = ?,
+         school_name = ?,
+         contact_name = ?,
+         contact_phone = ?,
+         followup_type = ?,
+         notes = ?,
+         outcome = ?,
+         next_action = ?,
+         next_date = ?,
+         cost = ?,
+         status = ?,
+         city = ?,
+         sector = ?,
+         school_type = ?,
+         category = ?,
+         effectif = ?,
+         location = ?,
+         contact_role = ?,
+         source = ?,
+         device_id = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE server_uid = ?`,
+    [
+      fingerprint,
+      nextRecord.Timestamp,
+      nextRecord.Expert,
+      nextRecord.SchoolName,
+      nextRecord.ContactName,
+      nextRecord.ContactPhone,
+      nextRecord.FollowupType,
+      nextRecord.Notes,
+      nextRecord.Outcome,
+      nextRecord.NextAction,
+      nextRecord.NextDate,
+      nextRecord.Cost,
+      nextRecord.Status,
+      nextRecord.City,
+      nextRecord.Sector,
+      nextRecord.SchoolType,
+      nextRecord.Category,
+      nextRecord.Effectif,
+      nextRecord.Location,
+      nextRecord.ContactRole,
+      nextRecord.Source,
+      input.DeviceId || existing.device_id || "",
+      serverUid
+    ]
+  );
+
+  const updated = await findFollowupByServerUid(serverUid);
+  return updated ? mapFollowup(updated) : null;
+}
+
 async function deleteFollowup(serverUid, deletedByUsername) {
   const rows = await query(
     `SELECT * FROM followups
@@ -277,6 +405,7 @@ module.exports = {
   createUser,
   updateUserAccess,
   upsertFollowup,
+  updateFollowup,
   deleteFollowup,
   logSyncEvent,
   getBootstrapPayload

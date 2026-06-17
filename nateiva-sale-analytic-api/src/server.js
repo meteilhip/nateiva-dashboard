@@ -2,16 +2,24 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
+
+function isAllowedOrigin(origin) {
+  if (!origin || !allowedOrigins.length) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (/^https:\/\/nateiva-sale-analytic-api\.[^/]+\.sslip\.io$/i.test(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin)) return true;
+  return false;
+}
 
 app.use(express.json({ limit: "5mb" }));
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`Origin not allowed: ${origin}`));
@@ -126,6 +134,47 @@ app.post("/api/followups", authRequired, async function createFollowupHandler(re
     });
     return res.json({ success: true, followup });
   } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/followups/:id", authRequired, async function updateFollowupHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const followup = await updateFollowup(String(req.params.id || "").trim(), viewer, {
+      ...req.body,
+      Timestamp: req.body.timestamp || req.body.Timestamp || new Date().toISOString(),
+      Expert: req.body.expert || req.body.Expert || viewer.fullName,
+      SchoolName: req.body.schoolName || req.body.SchoolName || "",
+      ContactName: req.body.contactName || req.body.ContactName || "",
+      ContactPhone: req.body.contactPhone || req.body.ContactPhone || "",
+      FollowupType: req.body.followupType || req.body.FollowupType || "FOLLOWUP",
+      Notes: req.body.notes || req.body.Notes || "",
+      Outcome: req.body.outcome || req.body.Outcome || "",
+      NextAction: req.body.nextAction || req.body.NextAction || "",
+      NextDate: req.body.nextDate || req.body.NextDate || "",
+      Cost: req.body.cost || req.body.Cost || 0,
+      Status: req.body.status || req.body.Status || "En cours",
+      City: req.body.city || req.body.City || "",
+      Sector: req.body.sector || req.body.Sector || "",
+      SchoolType: req.body.schoolType || req.body.SchoolType || "",
+      Category: req.body.category || req.body.Category || "",
+      Effectif: req.body.effectif || req.body.Effectif || "",
+      Location: req.body.location || req.body.Location || "",
+      ContactRole: req.body.contactRole || req.body.ContactRole || "",
+      DeviceId: req.body.deviceId || ""
+    });
+    if (!followup) {
+      return res.status(404).json({ success: false, error: "Entrée introuvable" });
+    }
+    return res.json({ success: true, followup, message: "Suivi mis à jour avec succès" });
+  } catch (error) {
+    if (error && error.code === "FORBIDDEN") {
+      return res.status(403).json({ success: false, error: error.message });
+    }
+    if (error && error.code === "DUPLICATE") {
+      return res.status(409).json({ success: false, error: error.message });
+    }
     return res.status(500).json({ success: false, error: error.message });
   }
 });
