@@ -877,6 +877,8 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .funnel-step.dark .name{color:var(--paper)}
 .funnel-step.dark .name small{color:var(--g400)}
 .funnel-step.dark .ct{color:var(--saffron-bright)}
+.funnel-decider{font-size:12px;margin-top:6px;padding:4px 10px;border-radius:8px;background:rgba(16,185,129,.1);color:var(--g700);font-family:'JetBrains Mono',monospace;letter-spacing:-.02em}
+.funnel-step.dark .funnel-decider{background:rgba(255,255,255,.1);color:var(--g300)}
 
 /* HOT LIST */
 .hotlist{display:flex;flex-direction:column;gap:10px}
@@ -2790,11 +2792,15 @@ function buildStageTotals(records){
   return DASHBOARD_STAGES.map(function(stage){
     const schools=records.filter(function(record){ return record.stage===stage.key; });
     const amount=schools.reduce(function(sum,record){ return sum+(record.amount||0); },0);
+    var deciderReached=schools.filter(function(r){ return /d[ée]cideur\s*joint/i.test(r.decisionReach||''); }).length;
+    var deciderPct=schools.length ? Math.round(deciderReached/schools.length*100) : 0;
     return Object.assign({},stage,{
       schools,
       count:schools.length,
       percent:schools.length ? Math.round((schools.length/total)*100) : 0,
-      amount
+      amount,
+      deciderReached:deciderReached,
+      deciderPct:deciderPct
     });
   });
 }
@@ -3260,6 +3266,7 @@ function renderStageMetric(stage, showRevenue){
     </div>
     <div class="stage-track"><span style="width:${Math.min(stage.percent,100)}%"></span></div>
     <div class="stage-foot"><span>${stage.percent}%</span><span>${showRevenue ? moneyCompact(stage.amount) : stage.desc}</span></div>
+    <div class="funnel-decider" style="margin-top:8px">👔 ${stage.deciderReached||0}/${stage.count} décideurs atteints (${stage.deciderPct||0}%)</div>
   </article>`;
 }
 
@@ -5347,12 +5354,30 @@ function rTeam(){
   // Velocity check
   const scope=getDashboardScope();
   const funnelRecords=buildSchoolRecords(scope.rawRows,scope.followups);
-  const closeable=funnelRecords.filter(r=>r.rate>=80).length;
-  const negociation=funnelRecords.filter(r=>r.rate>=60 && r.rate<80).length;
-  const consider=funnelRecords.filter(r=>r.rate>=40 && r.rate<60).length;
-  const earlyq=funnelRecords.filter(r=>r.rate>=20 && r.rate<40).length;
-  const dead=funnelRecords.filter(r=>r.rate!=null && r.rate<20).length;
-  const noEval=funnelRecords.filter(r=>r.rate==null).length;
+  const closeableArr=funnelRecords.filter(r=>r.rate>=80);
+  const negociationArr=funnelRecords.filter(r=>r.rate>=60 && r.rate<80);
+  const considerArr=funnelRecords.filter(r=>r.rate>=40 && r.rate<60);
+  const earlyqArr=funnelRecords.filter(r=>r.rate>=20 && r.rate<40);
+  const deadArr=funnelRecords.filter(r=>r.rate!=null && r.rate<20);
+  const noEvalArr=funnelRecords.filter(r=>r.rate==null);
+  const closeable=closeableArr.length;
+  const negociation=negociationArr.length;
+  const consider=considerArr.length;
+  const earlyq=earlyqArr.length;
+  const dead=deadArr.length;
+  const noEval=noEvalArr.length;
+  function deciderStats(arr) {
+    var reached = arr.filter(function(r) { return /d[ée]cideur\s*joint/i.test(r.decisionReach || ''); }).length;
+    var pct = arr.length ? Math.round(reached / arr.length * 100) : 0;
+    return { reached: reached, total: arr.length, pct: pct };
+  }
+  const dTotal=deciderStats(funnelRecords);
+  const dCloseable=deciderStats(closeableArr);
+  const dNego=deciderStats(negociationArr);
+  const dConsider=deciderStats(considerArr);
+  const dEarlyq=deciderStats(earlyqArr);
+  const dDead=deciderStats(deadArr);
+  const dNoEval=deciderStats(noEvalArr);
   const blocked=f.filter(r=>/fondateur|absent|hi[ée]rarchie|d[ée]cision/i.test((r.co||'')+(r.re||''))).length;
   const ambassadeurs=f.filter(r=>/ambassad/i.test((r.co||'')+(r.re||'')));
   const hot=f.filter(r=>r.r!=null&&r.r>=60).sort((a,b)=>b.r-a.r).slice(0,20);
@@ -5472,13 +5497,13 @@ function rTeam(){
         <span class="anno">Distribution par chaleur</span>
       </div>
       <div class="funnel">
-        <div class="funnel-step dark"><div class="name">Total Écoles<small>Écoles uniques prospectées</small></div><div class="ct">${funnelRecords.length}</div></div>
-        <div class="funnel-step" style="margin-left:24px"><div class="name">Closeable 80-100%<small>Signature imminente</small></div><div class="ct">${closeable}</div></div>
-        <div class="funnel-step" style="margin-left:48px"><div class="name">Négociation 60-79%<small>Décideur engagé</small></div><div class="ct">${negociation}</div></div>
-        <div class="funnel-step" style="margin-left:72px"><div class="name">Considération 40-59%<small>Intérêt avec relance</small></div><div class="ct">${consider}</div></div>
-        <div class="funnel-step" style="margin-left:96px"><div class="name">Qualification 20-39%<small>Premier contact</small></div><div class="ct">${earlyq}</div></div>
-        <div class="funnel-step" style="margin-left:120px;opacity:.7"><div class="name">Faible &lt;20%<small>Parker 6 mois</small></div><div class="ct">${dead}</div></div>
-        <div class="funnel-step" style="margin-left:144px;background:var(--g50);opacity:.6"><div class="name">Non Évalué<small>À requalifier</small></div><div class="ct">${noEval}</div></div>
+        <div class="funnel-step dark"><div class="name">Total Écoles<small>Écoles uniques prospectées</small></div><div class="ct">${funnelRecords.length}</div><div class="funnel-decider">👔 Décideur atteint: <b>${dTotal.reached}/${dTotal.total}</b> (${dTotal.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:24px"><div class="name">Closeable 80-100%<small>Signature imminente</small></div><div class="ct">${closeable}</div><div class="funnel-decider">👔 ${dCloseable.reached}/${dCloseable.total} décideurs (${dCloseable.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:48px"><div class="name">Négociation 60-79%<small>Décideur engagé</small></div><div class="ct">${negociation}</div><div class="funnel-decider">👔 ${dNego.reached}/${dNego.total} décideurs (${dNego.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:72px"><div class="name">Considération 40-59%<small>Intérêt avec relance</small></div><div class="ct">${consider}</div><div class="funnel-decider">👔 ${dConsider.reached}/${dConsider.total} décideurs (${dConsider.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:96px"><div class="name">Qualification 20-39%<small>Premier contact</small></div><div class="ct">${earlyq}</div><div class="funnel-decider">👔 ${dEarlyq.reached}/${dEarlyq.total} décideurs (${dEarlyq.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:120px;opacity:.7"><div class="name">Faible &lt;20%<small>Parker 6 mois</small></div><div class="ct">${dead}</div><div class="funnel-decider">👔 ${dDead.reached}/${dDead.total} décideurs (${dDead.pct}%)</div></div>
+        <div class="funnel-step" style="margin-left:144px;background:var(--g50);opacity:.6"><div class="name">Non Évalué<small>À requalifier</small></div><div class="ct">${noEval}</div><div class="funnel-decider">👔 ${dNoEval.reached}/${dNoEval.total} décideurs (${dNoEval.pct}%)</div></div>
       </div>
     </div>
     
