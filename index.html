@@ -2700,6 +2700,71 @@ function countDistinctDays(rows,key){
   return days.size;
 }
 
+function isSyntheticRawRow(row){
+  return !!(row && row.isNewSchool);
+}
+
+function getActivityRawRows(rawRows){
+  return (rawRows||[]).filter(function(row){
+    return !isSyntheticRawRow(row);
+  });
+}
+
+function buildActivitySummary(rawRows, followups){
+  const activityRawRows=getActivityRawRows(rawRows);
+  const items=Array.isArray(followups) ? followups : [];
+  const todayKey=activeDayKey(new Date());
+  const todayRawRows=activityRawRows.filter(function(row){
+    return activeDayKey(row && row.t)===todayKey;
+  });
+  const todayFollowups=items.filter(function(item){
+    return activeDayKey(item && item.Timestamp)===todayKey;
+  });
+  const todayCallCount=todayFollowups.filter(function(item){
+    return String(item && item.FollowupType || '').toUpperCase()==='CALL';
+  }).length;
+  const todayVisitCount=todayFollowups.filter(function(item){
+    return String(item && item.FollowupType || '').toUpperCase()==='VISIT';
+  }).length;
+  const todayOtherCount=todayFollowups.filter(function(item){
+    const type=String(item && item.FollowupType || '').toUpperCase();
+    return type && type!=='CALL' && type!=='VISIT';
+  }).length;
+  const callInputs=items.filter(function(item){
+    return String(item && item.FollowupType || '').toUpperCase()==='CALL';
+  }).length;
+  const visitInputs=items.filter(function(item){
+    return String(item && item.FollowupType || '').toUpperCase()==='VISIT';
+  }).length;
+  const activeDays=new Set(
+    activityRawRows.map(function(row){ return activeDayKey(row && row.t); })
+      .concat(items.map(function(item){ return activeDayKey(item && item.Timestamp); }))
+      .filter(Boolean)
+  ).size;
+  const activeExperts=new Set(
+    todayRawRows.map(function(row){ return canonicalPersonName(row && row.e || ''); })
+      .concat(todayFollowups.map(function(item){ return canonicalPersonName(item && item.Expert || ''); }))
+      .filter(Boolean)
+  ).size;
+  return {
+    rawInputs:activityRawRows.length,
+    callInputs:callInputs,
+    visitInputs:visitInputs,
+    terrainInputs:activityRawRows.length+visitInputs,
+    totalInputs:activityRawRows.length+items.length,
+    activeDays:activeDays,
+    today:{
+      total:todayRawRows.length+todayFollowups.length,
+      raw:todayRawRows.length,
+      followups:todayFollowups.length,
+      terrain:todayRawRows.length+todayVisitCount,
+      calls:todayCallCount,
+      other:todayOtherCount,
+      activeExperts:activeExperts
+    }
+  };
+}
+
 function parseCount(value){
   const num=parseInt(String(value||'').replace(/\D/g,''),10);
   return Number.isFinite(num) ? num : 0;
@@ -3131,6 +3196,7 @@ function buildStageTotals(records){
 }
 
 function buildWeeklySeries(rawRows, followups, weeksBack){
+  const activityRawRows=getActivityRawRows(rawRows);
   const currentWeek=weekStartDate(new Date());
   const weeks=[];
   for(let i=weeksBack-1;i>=0;i--){
@@ -3154,7 +3220,7 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
   }
   const weekMap=new Map(weeks.map(function(week){ return [week.key,week]; }));
 
-  rawRows.forEach(function(row){
+  activityRawRows.forEach(function(row){
     const key=weekKey(row.t);
     const bucket=weekMap.get(key);
     if(!bucket)return;
@@ -3173,6 +3239,7 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
     const key=weekKey(item.Timestamp);
     const bucket=weekMap.get(key);
     if(!bucket)return;
+    const meta=readFollowupMeta(item);
     const day=activeDayKey(item.Timestamp);
     if(day){
       bucket.activeDays.add(day);
@@ -3183,7 +3250,14 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
     if(item.FollowupType==='CALL')bucket.calls++;
     if(item.FollowupType==='VISIT')bucket.terrain++;
     const school=schoolKey(item.SchoolName);
-    if(school)bucket.schoolKeys.add(school);
+    if(school){
+      bucket.schoolKeys.add(school);
+      const note=[item.Outcome,item.Status,getFollowupPlainNotes(item),item.NextAction].join(' ');
+      const rate=Number((meta && meta.rate) || item.Rate || 0);
+      if((Number.isFinite(rate) && rate>=60) || /\bclos\b|closed|converti|gagne|won|signed|deal signe|contrat signe|paid|paye/i.test(note)){
+        bucket.hotKeys.add(school);
+      }
+    }
   });
 
   return weeks.map(function(week,index){
@@ -3207,6 +3281,7 @@ function buildWeeklySeries(rawRows, followups, weeksBack){
 }
 
 function buildMonthlySeries(rawRows, followups, monthsBack){
+  const activityRawRows=getActivityRawRows(rawRows);
   const currentMonth=monthStartDate(new Date());
   const months=[];
   for(let i=monthsBack-1;i>=0;i--){
@@ -3223,7 +3298,7 @@ function buildMonthlySeries(rawRows, followups, monthsBack){
   }
   const monthMap=new Map(months.map(function(month){ return [month.key,month]; }));
 
-  rawRows.forEach(function(row){
+  activityRawRows.forEach(function(row){
     const key=monthKey(row.t);
     const bucket=monthMap.get(key);
     if(!bucket)return;
@@ -3239,12 +3314,20 @@ function buildMonthlySeries(rawRows, followups, monthsBack){
     const key=monthKey(item.Timestamp);
     const bucket=monthMap.get(key);
     if(!bucket)return;
+    const meta=readFollowupMeta(item);
     const day=activeDayKey(item.Timestamp);
     if(day)bucket.activeDays.add(day);
     if(item.FollowupType==='CALL')bucket.calls++;
     if(item.FollowupType==='VISIT')bucket.terrain++;
     const school=schoolKey(item.SchoolName);
-    if(school)bucket.schoolKeys.add(school);
+    if(school){
+      bucket.schoolKeys.add(school);
+      const note=[item.Outcome,item.Status,getFollowupPlainNotes(item),item.NextAction].join(' ');
+      const rate=Number((meta && meta.rate) || item.Rate || 0);
+      if((Number.isFinite(rate) && rate>=60) || /\bclos\b|closed|converti|gagne|won|signed|deal signe|contrat signe|paid|paye/i.test(note)){
+        bucket.hotKeys.add(school);
+      }
+    }
   });
 
   return months.map(function(month,index){
@@ -3524,6 +3607,7 @@ function buildDashboardModel(){
   const pipeline=buildStageTotals(records);
   const weekly=buildWeeklySeries(scope.rawRows,scope.followups,8);
   const monthly=buildMonthlySeries(scope.rawRows,scope.followups,6);
+  const activity=buildActivitySummary(scope.rawRows,scope.followups);
   const layers=buildAreaLayers(records);
   const scopedExperts=[...new Set(scope.rawRows.map(function(row){ return row.e; }).filter(Boolean))];
   const callAnalytics=buildCallAnalytics(scope.followups,scopedExperts);
@@ -3531,13 +3615,13 @@ function buildDashboardModel(){
   const hotStage=pipeline.find(function(stage){ return stage.key==='chaud'; }) || {count:0,amount:0};
   const warmStage=pipeline.find(function(stage){ return stage.key==='tiede'; }) || {count:0,amount:0};
   const wonStage=pipeline.find(function(stage){ return stage.key==='gagne'; }) || {count:0,amount:0};
-  const totalInputs=scope.rawRows.length+scope.followups.length;
+  const totalInputs=activity.totalInputs;
   const visibleCallFollowups=scope.followups.filter(function(item){ return item.FollowupType==='CALL'; });
   const importedDetailedCallCount=visibleCallFollowups.filter(function(item){ return isImportedCallFollowup(item); }).length;
   const systemCallCount=visibleCallFollowups.filter(function(item){ return !isImportedCallFollowup(item); }).length;
-  const callInputs=visibleCallFollowups.length;
-  const terrainInputs=scope.rawRows.length+scope.followups.filter(function(item){ return item.FollowupType==='VISIT'; }).length;
-  const activeDays=new Set(scope.rawRows.map(function(row){ return activeDayKey(row.t); }).concat(scope.followups.map(function(item){ return activeDayKey(item.Timestamp); })).filter(Boolean)).size;
+  const callInputs=activity.callInputs;
+  const terrainInputs=activity.terrainInputs;
+  const activeDays=activity.activeDays;
   const hotRate=records.length ? Math.round((((hotStage.count||0)+(wonStage.count||0))/records.length)*100) : 0;
   const importedSourceCallCount=canSeeAllData(currentUser)
     ? Math.max((LIVE_DATA && LIVE_DATA.callCount) || 0, importedDetailedCallCount, VERIFIED_CALL_SOURCE_COUNT)
@@ -3566,13 +3650,14 @@ function buildDashboardModel(){
     terrainInputs,
     activeDays,
     velocity:activeDays ? totalInputs/activeDays : 0,
+    today:activity.today,
     hotRate,
     currentWeek:weekly[weekly.length-1]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
     previousWeek:weekly[weekly.length-2]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
     agentProgress:canSeeAllData(currentUser) ? buildAgentProgress(scope.rawRows,scope.followups) : [],
-    sourceProspectionRows:(LIVE_DATA && LIVE_DATA.prospectionSheetRows) || (((LIVE_DATA && LIVE_DATA.prospectionCount) || getAllRawRows().length) + 1),
+    sourceProspectionRows:scope.rawRows.length ? scope.rawRows.length + 1 : 0,
     sourceCallRows:sourceCallRows,
-    sourceProspectionCount:(LIVE_DATA && LIVE_DATA.prospectionCount) || getAllRawRows().length,
+    sourceProspectionCount:scope.rawRows.length,
     sourceCallCount:sourceCallCount,
     importedCallSourceCount:importedSourceCallCount,
     importedDetailedCallCount:importedDetailedCallCount,
@@ -4799,12 +4884,13 @@ function rHome(){
       ];
 
   // ---------- LIVE PULSE (modern UX v11) ----------
-  var _today=new Date(); var _todayKey=_today.toISOString().slice(0,10);
-  var _todayFups=dashboard.followups.filter(function(f){
-    var ts=String(f.Timestamp||''); return ts.indexOf(_todayKey)===0 || ts.indexOf(_todayKey.replace(/-/g,'/'))===0;
-  });
-  var _todayCount=_todayFups.length;
-  var _activeExperts=new Set(_todayFups.map(function(f){return f.Expert;}).filter(Boolean)).size;
+  var _todayMetrics=dashboard.today || {total:0,terrain:0,calls:0,other:0,activeExperts:0};
+  var _todayCount=_todayMetrics.total || 0;
+  var _activeExperts=_todayMetrics.activeExperts || 0;
+  var _todayBreakdown=[_activeExperts + ' expert' + (_activeExperts>1?'s':'') + ' en action'];
+  if ((_todayMetrics.terrain || 0) > 0) _todayBreakdown.push((_todayMetrics.terrain || 0) + ' terrain');
+  if ((_todayMetrics.calls || 0) > 0) _todayBreakdown.push((_todayMetrics.calls || 0) + ' appels');
+  if ((_todayMetrics.other || 0) > 0) _todayBreakdown.push((_todayMetrics.other || 0) + ' autres');
   var _latestWin=null;
   for (var i=dashboard.followups.length-1;i>=0;i--){
     var f=dashboard.followups[i];
@@ -4852,7 +4938,7 @@ function rHome(){
           <span class="stat-icon" style="background:var(--red-soft);color:var(--red)">⚡</span>
         </div>
         <div class="stat-val"><span class="count-up" data-target="${_todayCount}">0</span></div>
-        <div class="stat-sub">${_activeExperts} expert${_activeExperts>1?'s':''} en action</div>
+        <div class="stat-sub">${_todayBreakdown.join(' · ')}</div>
       </div>
       <div class="stat-modern lift">
         <div class="stat-head">
