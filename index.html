@@ -4667,6 +4667,19 @@ document.querySelectorAll('.nav-btn').forEach(t=>{
     t.classList.add('act');
     document.getElementById('p-'+t.dataset.pane).classList.add('act');
     window.scrollTo({top:0,behavior:'smooth'});
+    if (!renderedPanes[t.dataset.pane]) {
+      var p = t.dataset.pane;
+      if (p === 'home') rHome();
+      else if (p === 'metrics') rMetrics();
+      else if (p === 'team') rTeam();
+      else if (p === 'market') rMarket();
+      else if (p === 'playbook') rPlaybook();
+      else if (p === 'intel') rIntel();
+      else if (p === 'glossary') rGlossary();
+      else if (p === 'suivi') rSuivi();
+      renderedPanes[p] = true;
+    }
+
     setTimeout(()=>{
       document.querySelectorAll('#p-'+t.dataset.pane+' .bar-row').forEach(b=>b.classList.add('animate'));
     },50);
@@ -6954,6 +6967,7 @@ function rGlossary(){
 // =============================================================
 // MAIN
 // =============================================================
+var renderedPanes = {};
 function renderAll(){
   refreshFilters();
   updateFilterSummary();
@@ -6962,14 +6976,18 @@ function renderAll(){
   const uniqueCount=buildSchoolRecords(scope.rawRows,scope.followups).length;
   document.getElementById('fCount').textContent=f.length;
   document.getElementById('fTotal').textContent='/ ' + f.length + ' entrées · ' + uniqueCount + ' écoles';
-  rHome();
-  rMetrics();
-  rTeam();
-  rMarket();
-  rPlaybook();
-  rIntel();
-  rGlossary();
-  rSuivi();
+  renderedPanes = {};
+  var activeBtn = document.querySelector('.nav-btn.act');
+  var p = activeBtn ? activeBtn.dataset.pane : 'home';
+  if (p === 'home') rHome();
+  else if (p === 'metrics') rMetrics();
+  else if (p === 'team') rTeam();
+  else if (p === 'market') rMarket();
+  else if (p === 'playbook') rPlaybook();
+  else if (p === 'intel') rIntel();
+  else if (p === 'glossary') rGlossary();
+  else if (p === 'suivi') rSuivi();
+  renderedPanes[p] = true;
   applyNavigationAccess();
   updateHeaderAuth();
   setTimeout(()=>{
