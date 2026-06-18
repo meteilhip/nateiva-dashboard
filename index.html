@@ -7995,13 +7995,21 @@ function localFallback(action, params) {
 }
 
 // --- Header Auth ---
+function doLogout() {
+  currentUser = null;
+  localStorage.removeItem('nateiva_user');
+  if (typeof setApiToken === 'function') setApiToken('');
+  location.reload();
+}
+
 function updateHeaderAuth() {
   var el = document.getElementById('headerAuth');
   if (!el) return;
   if (currentUser) {
     var badge = roleBadgeLabel(currentUser);
-    el.innerHTML = '<div class="auth-status">' +
-      '<span class="auth-user">👤 <strong>' + esc(currentUser.fullName) + '</strong> (' + esc(badge) + ')</span>' +
+    el.innerHTML = '<div class="auth-status" style="display:flex; align-items:center; gap:10px;">' +
+      '<span class="auth-user">🛡️ <strong>' + esc(currentUser.fullName) + '</strong> (' + esc(badge) + ')</span>' +
+      '<button class="btn-login-header" onclick="doLogout()" style="background:var(--red); color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600;">Déconnexion</button>' +
       '</div>';
   } else {
     el.innerHTML = '<div class="auth-status">' +
