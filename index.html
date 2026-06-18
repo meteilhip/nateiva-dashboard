@@ -7076,8 +7076,8 @@ var nateivaDeviceId = localStorage.getItem('nateiva_sale_analytic_device_id') ||
 var importedSheetFollowups = [];
 var suiviRankings = [];
 var SUPER_ADMINS = ['Noah'];
-var SUB_ADMINS = ['Mbeuka brice', 'Ntsa Guy'];
-var REVENUE_VIEWERS = ['Noah', 'Mbeuka brice', 'Ntsa Guy'];
+var SUB_ADMINS = ['Mbeuka brice', 'Ntsa Guy', 'Coordo'];
+var REVENUE_VIEWERS = ['Noah', 'Mbeuka brice', 'Ntsa Guy', 'Coordo'];
 var LIVE_DATA = window.NATEIVA_IMPORTED_DATA || {};
 var VERIFIED_CALL_SOURCE_COUNT = 130;
 var VERIFIED_CALL_SOURCE_ROWS = 131;
@@ -7375,6 +7375,7 @@ function applyNavigationAccess() {
     pane.style.display = isAllowed ? '' : 'none';
     if (!isAllowed) pane.classList.remove('act');
   });
+  var activeBtn = document.querySelector('.nav-btn.act');
   if (!activeBtn || allowed.indexOf(activeBtn.dataset.pane) === -1) {
     var firstAllowed = document.querySelector('.nav-btn[data-pane="' + allowed[0] + '"]');
     if (firstAllowed) {
