@@ -8,6 +8,7 @@ const DEFAULT_USERS = [
   { username: "ida", password: "ida123", fullName: "Emambo Ida", role: "Expert", city: "DOUALA" },
   { username: "guy", password: "guy123", fullName: "Ntsa Guy", role: "SubAdmin", city: "YAOUNDE" },
   { username: "brice", password: "brice123", fullName: "Mbeuka brice", role: "SubAdmin", city: "DOUALA" },
+  { username: "coordo", password: "coordo2026", fullName: "Coordo", role: "SubAdmin", city: "ALL" },
   { username: "taylor", password: "taylor123", fullName: "Kessi Taylor", role: "Expert", city: "YAOUNDE" },
   { username: "noah", password: "noah2026", fullName: "Noah", role: "SuperAdmin", city: "ALL" }
 ];
