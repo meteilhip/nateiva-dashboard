@@ -6959,7 +6959,6 @@ function rGlossary(){
 // =============================================================
 // MAIN
 // =============================================================
-var renderedPanes = {};
 function renderAll(){
   refreshFilters();
   updateFilterSummary();
@@ -6968,18 +6967,14 @@ function renderAll(){
   const uniqueCount=buildSchoolRecords(scope.rawRows,scope.followups).length;
   document.getElementById('fCount').textContent=f.length;
   document.getElementById('fTotal').textContent='/ ' + f.length + ' entrées · ' + uniqueCount + ' écoles';
-  renderedPanes = {};
-  var activeBtn = document.querySelector('.nav-btn.act');
-  var p = activeBtn ? activeBtn.dataset.pane : 'home';
-  if (p === 'home') rHome();
-  else if (p === 'metrics') rMetrics();
-  else if (p === 'team') rTeam();
-  else if (p === 'market') rMarket();
-  else if (p === 'playbook') rPlaybook();
-  else if (p === 'intel') rIntel();
-  else if (p === 'glossary') rGlossary();
-  else if (p === 'suivi') rSuivi();
-  renderedPanes[p] = true;
+  rHome();
+  rMetrics();
+  rTeam();
+  rMarket();
+  rPlaybook();
+  rIntel();
+  rGlossary();
+  rSuivi();
   applyNavigationAccess();
   updateHeaderAuth();
   setTimeout(()=>{
@@ -7380,7 +7375,6 @@ function applyNavigationAccess() {
     pane.style.display = isAllowed ? '' : 'none';
     if (!isAllowed) pane.classList.remove('act');
   });
-  var activeBtn = document.querySelector('.nav-btn.act');
   if (!activeBtn || allowed.indexOf(activeBtn.dataset.pane) === -1) {
     var firstAllowed = document.querySelector('.nav-btn[data-pane="' + allowed[0] + '"]');
     if (firstAllowed) {
