@@ -2594,7 +2594,10 @@ button,select,input,textarea{outline:none}
     </div>
     <div class="login-field">
       <label>Mot de passe</label>
-      <input type="password" id="loginPass" placeholder="Votre mot de passe" autocomplete="off">
+      <div style="position:relative;">
+        <input type="password" id="loginPass" placeholder="Votre mot de passe" autocomplete="off" style="padding-right: 40px; box-sizing:border-box;">
+        <button onclick="togglePasswordVisibility()" type="button" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:20px; padding:0; outline:none;" id="toggleEyeIcon">👁️</button>
+      </div>
     </div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Se connecter</button>
     <div class="login-error" id="loginError"></div>
@@ -8050,7 +8053,19 @@ function closeLogin() {
 document.getElementById('loginPass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 document.getElementById('loginUser').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
 
-async function doLogin() {
+async function togglePasswordVisibility() {
+  var pwd = document.getElementById('loginPass');
+  var icon = document.getElementById('toggleEyeIcon');
+  if (pwd.type === 'password') {
+    pwd.type = 'text';
+    icon.textContent = '🙈';
+  } else {
+    pwd.type = 'password';
+    icon.textContent = '👁️';
+  }
+}
+
+function doLogin() {
   var user = document.getElementById('loginUser').value.trim().toLowerCase();
   var pass = document.getElementById('loginPass').value;
   var errEl = document.getElementById('loginError');
