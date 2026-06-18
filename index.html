@@ -4670,18 +4670,7 @@ document.querySelectorAll('.nav-btn').forEach(t=>{
     t.classList.add('act');
     document.getElementById('p-'+t.dataset.pane).classList.add('act');
     window.scrollTo({top:0,behavior:'smooth'});
-    if (!renderedPanes[t.dataset.pane]) {
-      var p = t.dataset.pane;
-      if (p === 'home') rHome();
-      else if (p === 'metrics') rMetrics();
-      else if (p === 'team') rTeam();
-      else if (p === 'market') rMarket();
-      else if (p === 'playbook') rPlaybook();
-      else if (p === 'intel') rIntel();
-      else if (p === 'glossary') rGlossary();
-      else if (p === 'suivi') rSuivi();
-      renderedPanes[p] = true;
-    }
+    
 
     setTimeout(()=>{
       document.querySelectorAll('#p-'+t.dataset.pane+' .bar-row').forEach(b=>b.classList.add('animate'));
