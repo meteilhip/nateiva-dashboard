@@ -4793,7 +4793,114 @@ function rHome(){
         '🏁 Votre pipeline'
       ];
 
+  // ---------- LIVE PULSE (modern UX v11) ----------
+  var _today=new Date(); var _todayKey=_today.toISOString().slice(0,10);
+  var _todayFups=dashboard.followups.filter(function(f){
+    var ts=String(f.Timestamp||''); return ts.indexOf(_todayKey)===0 || ts.indexOf(_todayKey.replace(/-/g,'/'))===0;
+  });
+  var _todayCount=_todayFups.length;
+  var _activeExperts=new Set(_todayFups.map(function(f){return f.Expert;}).filter(Boolean)).size;
+  var _latestWin=null;
+  for (var i=dashboard.followups.length-1;i>=0;i--){
+    var f=dashboard.followups[i];
+    if (/conver|gagn|won|deal/i.test(String(f.Outcome||'')+String(f.NextAction||''))){ _latestWin=f; break; }
+  }
+  var _feedItems=dashboard.followups.slice().sort(function(a,b){
+    return String(b.Timestamp||'').localeCompare(String(a.Timestamp||''));
+  }).slice(0,6);
+  function _feedIcon(type){
+    type=String(type||'').toUpperCase();
+    if (type==='CALL') return {icon:'📞', cls:'call'};
+    if (type==='VISIT') return {icon:'🚶', cls:'visit'};
+    if (type==='WHATSAPP') return {icon:'💬', cls:'whatsapp'};
+    if (type==='SMS') return {icon:'✉️', cls:'whatsapp'};
+    if (type==='EMAIL') return {icon:'📧', cls:'visit'};
+    if (type==='LETTER') return {icon:'📨', cls:'visit'};
+    return {icon:'•', cls:''};
+  }
+  function _relTime(ts){
+    if (!ts) return '—';
+    var d=new Date(ts); if (isNaN(d.getTime())) return ts;
+    var diff=Math.floor((Date.now()-d.getTime())/60000);
+    if (diff<1) return 'à l\'instant';
+    if (diff<60) return 'il y a '+diff+' min';
+    if (diff<1440) return 'il y a '+Math.floor(diff/60)+'h';
+    return 'il y a '+Math.floor(diff/1440)+'j';
+  }
+  var _pulseStreak=dashboard.activeDays || 0;
+  var _conversionRate=uniqueSchools>0 ? Math.round((wonStage.count/uniqueSchools)*100) : 0;
+
   let h=`
+  <!-- LIVE PULSE STRIP (admin instant overview) -->
+  <div class="section" style="background:linear-gradient(135deg, rgba(220,38,38,.04), rgba(245,158,11,.04));border:1px solid var(--g100);padding:18px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="chip-modern live">PULSE LIVE</span>
+        <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--ink)">Vue d'ensemble équipe</span>
+      </div>
+      <span class="streak-flame"><span class="flame">🔥</span> <span class="count-up" data-target="${_pulseStreak}">0</span> jours actifs</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <div class="stat-modern lift">
+        <div class="stat-head">
+          <span class="stat-label">Activité du jour</span>
+          <span class="stat-icon" style="background:var(--red-soft);color:var(--red)">⚡</span>
+        </div>
+        <div class="stat-val"><span class="count-up" data-target="${_todayCount}">0</span></div>
+        <div class="stat-sub">${_activeExperts} expert${_activeExperts>1?'s':''} en action</div>
+      </div>
+      <div class="stat-modern lift">
+        <div class="stat-head">
+          <span class="stat-label">Écoles dans le pipeline</span>
+          <span class="stat-icon" style="background:var(--teal-soft);color:var(--teal)">🏫</span>
+        </div>
+        <div class="stat-val"><span class="count-up" data-target="${uniqueSchools}">0</span></div>
+        <div class="stat-sub">${hotStage.count||0} chaudes · ${wonStage.count||0} gagnées</div>
+      </div>
+      <div class="stat-modern lift">
+        <div class="stat-head">
+          <span class="stat-label">Taux conversion</span>
+          <span class="stat-icon" style="background:var(--green-soft);color:var(--green)">🎯</span>
+        </div>
+        <div class="stat-val"><span class="count-up" data-target="${_conversionRate}" data-suffix="%">0%</span></div>
+        <div class="stat-sub">${wonStage.count||0} converti${(wonStage.count||0)>1?'s':''} / ${uniqueSchools}</div>
+      </div>
+      <div class="stat-modern lift">
+        <div class="stat-head">
+          <span class="stat-label">Couverture appels</span>
+          <span class="stat-icon" style="background:var(--saffron-soft);color:var(--saffron-deep)">📞</span>
+        </div>
+        <div class="stat-val"><span class="count-up" data-target="${schoolCoverage}" data-suffix="%">0%</span></div>
+        <div class="stat-sub">${schoolsCalled} / ${uniqueSchools} écoles contactées</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE ACTIVITY FEED -->
+  ${_feedItems.length ? `
+  <div class="section" style="padding:18px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">📡 Flux d'activité équipe</span>
+        <span class="chip-modern live">TEMPS RÉEL</span>
+      </div>
+      <a href="#" data-jump="suivi" style="color:var(--red);font-weight:700;font-size:12px;text-decoration:none">Voir tout →</a>
+    </div>
+    <div class="feed">
+      ${_feedItems.map(function(f){
+        var fi=_feedIcon(f.FollowupType);
+        return '<div class="feed-item">'+
+          '<div class="feed-dot '+fi.cls+'">'+fi.icon+'</div>'+
+          '<div class="feed-content">'+
+            '<div class="feed-title">'+(f.Expert||'—')+' · '+(f.SchoolName||'—')+'</div>'+
+            '<div class="feed-meta"><b>'+(f.FollowupType||'').toUpperCase()+'</b> · '+(f.Outcome||f.NextAction||'aucune note')+' · '+_relTime(f.Timestamp)+'</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')}
+    </div>
+  </div>
+  ` : ''}
+
   <div class="page-intro" data-num="01">
     <h2>Nateiva <span class="it">Sale Analytic</span></h2>
     <div class="quick-links">${quickLinks}</div>
@@ -9201,15 +9308,37 @@ function rSuivi() {
     });
     h += '</div></div>';
   } else {
+    // — Achievement badges based on stats —
+    var _achs = [];
+    if (stats.totalEntries >= 1) _achs.push({i:'🚀', t:'Démarré', e:true});
+    if (stats.totalEntries >= 10) _achs.push({i:'⚡', t:'10 entrées', e:true});
+    if (stats.totalEntries >= 50) _achs.push({i:'💎', t:'50 entrées', e:true});
+    if (stats.hotDeals >= 3) _achs.push({i:'🔥', t:'Deal Hunter', e:true});
+    if (stats.converted >= 1) _achs.push({i:'🏆', t:'Premier deal', e:true});
+    if (stats.converted >= 5) _achs.push({i:'👑', t:'Closer', e:true});
+    if (stats.callConnected >= 20) _achs.push({i:'📞', t:'Maître appel', e:true});
+    if (myRank && myRank.rank === 1) _achs.push({i:'🥇', t:'#1 équipe', e:true});
+    if (myRank && myRank.rank === 2) _achs.push({i:'🥈', t:'#2 équipe', e:true});
+    if (myRank && myRank.rank === 3) _achs.push({i:'🥉', t:'#3 équipe', e:true});
+
+    if (_achs.length) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:14px;background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(220,38,38,.04));border-radius:14px;border:1px solid var(--g100)">';
+      h += '<span style="font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--g600);align-self:center;margin-right:6px">🎖️ Récompenses débloquées</span>';
+      _achs.forEach(function(a){
+        h += '<span class="achievement earned"><span class="ach-icon">'+a.i+'</span>'+a.t+'</span>';
+      });
+      h += '</div>';
+    }
+
     h += '<div class="suivi-kpis">';
-    h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val">' + stats.score + '</div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val">' + stats.totalEntries + '</div><div class="sk-lbl">Entrées terrain</div><div style="font-size:11px;color:var(--g400);margin-top:4px">' + stats.uniqueSchools + ' écoles uniques</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val">' + stats.hotDeals + '</div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val">' + stats.calls + '</div><div class="sk-lbl">Appels saisis</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val">' + stats.callConnected + '</div><div class="sk-lbl">Contacts établis</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">📵</div><div class="sk-val">' + (stats.callNoAnswer + stats.callUnreachable) + '</div><div class="sk-lbl">Sans réponse / erreur</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val">' + stats.converted + '</div><div class="sk-lbl">Convertis</div></div>';
-    h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val">' + fmt(stats.totalCost) + '</div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
+    h += '<div class="suivi-kpi score-card"><div class="sk-icon">🏆</div><div class="sk-val"><span class="count-up" data-target="' + stats.score + '">0</span></div><div class="sk-lbl">Score total' + (myRank ? ' · #' + myRank.rank : '') + '</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📊</div><div class="sk-val"><span class="count-up" data-target="' + stats.totalEntries + '">0</span></div><div class="sk-lbl">Entrées terrain</div><div style="font-size:11px;color:var(--g400);margin-top:4px">' + stats.uniqueSchools + ' écoles uniques</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🔥</div><div class="sk-val"><span class="count-up" data-target="' + stats.hotDeals + '">0</span></div><div class="sk-lbl">Deals chauds ≥60%</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📞</div><div class="sk-val"><span class="count-up" data-target="' + stats.calls + '">0</span></div><div class="sk-lbl">Appels saisis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">🤝</div><div class="sk-val"><span class="count-up" data-target="' + stats.callConnected + '">0</span></div><div class="sk-lbl">Contacts établis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">📵</div><div class="sk-val"><span class="count-up" data-target="' + (stats.callNoAnswer + stats.callUnreachable) + '">0</span></div><div class="sk-lbl">Sans réponse / erreur</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">✅</div><div class="sk-val"><span class="count-up" data-target="' + stats.converted + '">0</span></div><div class="sk-lbl">Convertis</div></div>';
+    h += '<div class="suivi-kpi"><div class="sk-icon">💰</div><div class="sk-val"><span class="count-up" data-target="' + (stats.totalCost||0) + '">0</span></div><div class="sk-lbl">Coûts terrain (FCFA)</div></div>';
     h += '</div>';
   }
 
