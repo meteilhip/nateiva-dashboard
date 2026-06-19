@@ -2667,14 +2667,39 @@ function canonicalPersonName(value){
 function samePerson(a,b){return canonicalPersonKey(a)===canonicalPersonKey(b)}
 function digitsOnly(value){return String(value||'').replace(/\D/g,'')}
 function categorizeCallStatus(item){
-  const text=[(item && item.Status)||'',(item && item.Outcome)||'']
-    .map(function(value){ return normalizeText(value); })
+  const statusText=normalizeText((item && item.Status) || '');
+  const outcomeText=normalizeText((item && item.Outcome) || '');
+  const noteText=normalizeText(getFollowupPlainNotes(item));
+  const nextActionText=normalizeText((item && item.NextAction) || '');
+  const fullText=[statusText,outcomeText,noteText,nextActionText]
     .filter(Boolean)
     .join(' ');
-  if(/contact etabli/.test(text) && /message laisse|autre personne/.test(text))return 'message';
-  if(/contact etabli|rdv fixe|interesse|demo faite|dossier transmis|converti|signe/.test(text))return 'connected';
-  if(/aucune reponse|ligne occupee|pas joignable/.test(text))return 'no_answer';
-  if(/injoignable|erreur/.test(text))return 'unreachable';
+  const intent=extractCallIntent(item);
+  const messageSignal=/message laisse|autre personne|secretaire|gardien|veilleur|standard|reception/.test(fullText);
+  const directConnectedSignal=/rdv fixe|interesse|demo faite|dossier transmis|converti|signe|meeting|decision/.test(fullText)
+    || (/contact etabli/.test(fullText) && !messageSignal);
+  const strongContactSignal=directConnectedSignal
+    || intent.signals.docs
+    || intent.signals.visit
+    || intent.signals.escalation
+    || intent.signals.interest
+    || intent.signals.rejection;
+  const callbackSignal=/rapp|relanc|repass|retour|plus tard|aout|juillet|septembre|rentree|conges|vacance/.test(fullText)
+    || intent.signals.callback
+    || !!nextActionText
+    || !!activeDayKey(item && item.NextDate)
+    || isYesFlag(item && item.CallSecondCall)
+    || isYesFlag(item && item.CallWhatsappDocs)
+    || isYesFlag(item && item.CallToSuperior)
+    || isYesFlag(item && item.CallVisit);
+  const unreachableSignal=/numero injoignable|injoignable|mauvais numero|numero faux|hors service|erreur/.test(fullText);
+  const noAnswerSignal=/aucune reponse|sans reponse|pas de reponse|ligne occupee|pas joignable|ne decroche|repondeur|pas pu avoir le contact|pas eu le contact/.test(fullText);
+  if(unreachableSignal)return 'unreachable';
+  if(noAnswerSignal && !strongContactSignal)return 'no_answer';
+  if(messageSignal && !directConnectedSignal && !intent.signals.visit && !intent.signals.escalation && !intent.signals.interest && !intent.signals.rejection)return 'message';
+  if(strongContactSignal || callbackSignal || (noteText && !noAnswerSignal))return 'connected';
+  if(messageSignal)return 'message';
+  if(noAnswerSignal)return 'no_answer';
   return 'other';
 }
 function zoneLabel(row){return row && row.v==='YAOUNDE' ? row.sy : row && row.sd}
@@ -3048,7 +3073,10 @@ function buildSchoolRecords(rawRows, followups){
 
   followups.forEach(function(item){
     const itemKey=item.SchoolKey || schoolKey(item.SchoolName);
-    if(item.Source==='calls-sheet' && itemKey && !map.has(itemKey))return;
+    const knownSchool=!!(itemKey && map.has(itemKey));
+    const explicitNewSchool=shouldCreateSchoolFromFollowup(item);
+    if(item.Source==='calls-sheet' && itemKey && !knownSchool)return;
+    if(itemKey && !knownSchool && !explicitNewSchool)return;
     const rec=ensure(item.SchoolName,itemKey);
     if(!rec)return;
     const meta=readFollowupMeta(item);
@@ -8239,23 +8267,32 @@ function showToast(msg, isError) {
 }
 
 // --- Expert stats from RAW + followups ---
-function computeExpertStats(expertName) {
-  var rawData = getWorkspaceRawForUser(expertName);
-  var fuData = getWorkspaceFollowupsForUser(expertName);
-  var daysOnField = getDaysOnField(expertName);
+function isOpenPipelineStage(stage) {
+  return stage === 'chaud' || stage === 'tiede' || stage === 'froid' || stage === 'nouveau';
+}
+
+function summarizeWorkspacePerformance(rawData, fuData, options) {
+  var settings = options || {};
   var uniqueRecords = buildSchoolRecords(rawData, fuData);
   var totalEntries = rawData.length;
-  var totalProspections = totalEntries;
+  var totalProspections = settings.totalProspections != null ? settings.totalProspections : totalEntries;
   var uniqueSchools = uniqueRecords.length;
-  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
+  var hotDeals = uniqueRecords.filter(function(r) { return r.stage === 'chaud'; }).length;
+  var converted = uniqueRecords.filter(function(r) { return r.stage === 'gagne'; }).length;
+  var inProgress = uniqueRecords.filter(function(r) { return isOpenPipelineStage(r.stage); }).length;
   var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
   var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
   var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
-  var converted = 0, inProgress = 0, relance = 0;
   var schoolsFollowed = new Set();
+  var relanceKeys = new Set();
   for (var i = 0; i < fuData.length; i++) {
     var f = fuData[i];
-    if (f.FollowupType === 'CALL') {
+    var followupType = String(f && f.FollowupType || '').toUpperCase();
+    var notesText = normalizeText(getFollowupPlainNotes(f));
+    var nextActionText = normalizeText(f && f.NextAction);
+    var intent = followupType === 'CALL' ? extractCallIntent(f) : null;
+    var schoolRef = schoolKey(f && f.SchoolName) || ('followup-' + String(f && f.ID || i));
+    if (followupType === 'CALL') {
       calls++;
       var callBucket = categorizeCallStatus(f);
       if (callBucket === 'connected') callConnected++;
@@ -8264,17 +8301,57 @@ function computeExpertStats(expertName) {
       else if (callBucket === 'unreachable') callUnreachable++;
       else callOther++;
     }
-    else if (f.FollowupType === 'WHATSAPP') whatsapp++;
-    else if (f.FollowupType === 'SMS') sms++;
-    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
-    if (f.Status === 'Converti') converted++;
-    else if (f.Status === 'En cours') inProgress++;
-    else if (f.Status === 'Relance') relance++;
-    schoolsFollowed.add(f.SchoolName);
+    else if (followupType === 'WHATSAPP') whatsapp++;
+    else if (followupType === 'SMS') sms++;
+    else if (followupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
+    if (f && f.SchoolName) schoolsFollowed.add(schoolKey(f.SchoolName));
+    if (
+      normalizeText(f && f.Status) === 'relance'
+      || /relanc|rapp|repass|retour|suivi|follow up/.test(nextActionText)
+      || !!activeDayKey(f && f.NextDate)
+      || (intent && intent.signals.callback)
+      || /relanc|rapp|repass|retour|suivi|follow up/.test(notesText)
+    ) {
+      relanceKeys.add(schoolRef);
+    }
   }
+  var relance = relanceKeys.size;
   var totalFollowups = calls + whatsapp + sms + visits;
   var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daysOnField, totalProspections: totalProspections, totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
+  return {
+    daysOnField: settings.daysOnField != null ? settings.daysOnField : 0,
+    totalProspections: totalProspections,
+    totalEntries: totalEntries,
+    uniqueSchools: uniqueSchools,
+    hotDeals: hotDeals,
+    avgRate: avgRate,
+    calls: calls,
+    whatsapp: whatsapp,
+    sms: sms,
+    visits: visits,
+    totalCost: totalCost,
+    converted: converted,
+    inProgress: inProgress,
+    relance: relance,
+    totalFollowups: totalFollowups,
+    schoolsFollowed: schoolsFollowed.size,
+    score: Math.max(0, score),
+    callConnected: callConnected,
+    callMessage: callMessage,
+    callNoAnswer: callNoAnswer,
+    callUnreachable: callUnreachable,
+    callOther: callOther
+  };
+}
+
+function computeExpertStats(expertName) {
+  var rawData = getWorkspaceRawForUser(expertName);
+  var fuData = getWorkspaceFollowupsForUser(expertName);
+  var daysOnField = getDaysOnField(expertName);
+  return summarizeWorkspacePerformance(rawData, fuData, {
+    daysOnField: daysOnField,
+    totalProspections: rawData.length
+  });
 }
 
 function computeVisibleWorkspaceStats() {
@@ -8289,68 +8366,18 @@ function computeVisibleWorkspaceStats() {
     var day = activeDayKey(f.Timestamp);
     if (day) daySet.add(day);
   });
-  var uniqueRecords = buildSchoolRecords(rawData, fuData);
-  var totalEntries = rawData.length;
-  var totalProspections = totalEntries;
-  var uniqueSchools = uniqueRecords.length;
-  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
-  var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
-  var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
-  var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
-  var converted = 0, inProgress = 0, relance = 0;
-  var schoolsFollowed = new Set();
-  fuData.forEach(function(f) {
-    if (f.FollowupType === 'CALL') {
-      calls++;
-      var callBucket = categorizeCallStatus(f);
-      if (callBucket === 'connected') callConnected++;
-      else if (callBucket === 'message') callMessage++;
-      else if (callBucket === 'no_answer') callNoAnswer++;
-      else if (callBucket === 'unreachable') callUnreachable++;
-      else callOther++;
-    } else if (f.FollowupType === 'WHATSAPP') whatsapp++;
-    else if (f.FollowupType === 'SMS') sms++;
-    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
-    if (f.Status === 'Converti') converted++;
-    else if (f.Status === 'En cours') inProgress++;
-    else if (f.Status === 'Relance') relance++;
-    schoolsFollowed.add(f.SchoolName);
+  return summarizeWorkspacePerformance(rawData, fuData, {
+    daysOnField: daySet.size,
+    totalProspections: rawData.length
   });
-  var totalFollowups = calls + whatsapp + sms + visits;
-  var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { daysOnField: daySet.size, totalProspections: totalProspections, totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, schoolsFollowed: schoolsFollowed.size, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
 function computeExpertStatsFromVisible(expertName) {
   var rawData = getVisibleRaw().filter(function(r) { return samePerson(r.e, expertName); });
   var fuData = getVisibleFollowups().filter(function(f) { return samePerson(f.Expert, expertName); });
-  var uniqueRecords = buildSchoolRecords(rawData, fuData);
-  var totalEntries = rawData.length;
-  var uniqueSchools = uniqueRecords.length;
-  var hotDeals = uniqueRecords.filter(function(r) { return r.rate >= 60; }).length;
-  var avgRate = uniqueRecords.length ? Math.round(uniqueRecords.reduce(function(s, r) { return s + (r.rate || 0); }, 0) / uniqueRecords.length) : 0;
-  var calls = 0, whatsapp = 0, sms = 0, visits = 0, totalCost = 0;
-  var callConnected = 0, callMessage = 0, callNoAnswer = 0, callUnreachable = 0, callOther = 0;
-  var converted = 0, inProgress = 0, relance = 0;
-  fuData.forEach(function(f) {
-    if (f.FollowupType === 'CALL') {
-      calls++;
-      var cb = categorizeCallStatus(f);
-      if (cb === 'connected') callConnected++;
-      else if (cb === 'message') callMessage++;
-      else if (cb === 'no_answer') callNoAnswer++;
-      else if (cb === 'unreachable') callUnreachable++;
-      else callOther++;
-    } else if (f.FollowupType === 'WHATSAPP') whatsapp++;
-    else if (f.FollowupType === 'SMS') sms++;
-    else if (f.FollowupType === 'VISIT') { visits++; totalCost += Number(f.Cost) || 0; }
-    if (f.Status === 'Converti') converted++;
-    else if (f.Status === 'En cours') inProgress++;
-    else if (f.Status === 'Relance') relance++;
+  return summarizeWorkspacePerformance(rawData, fuData, {
+    totalProspections: rawData.length
   });
-  var totalFollowups = calls + whatsapp + sms + visits;
-  var score = (converted * 40) + (hotDeals * 15) + (relance * 10) + (visits * 8) + (calls * 5) + (whatsapp * 3) + (sms * 2) + Math.round(avgRate / 5) - Math.floor(totalCost / 1000) * 2;
-  return { totalEntries: totalEntries, uniqueSchools: uniqueSchools, hotDeals: hotDeals, avgRate: avgRate, calls: calls, whatsapp: whatsapp, sms: sms, visits: visits, totalCost: totalCost, converted: converted, inProgress: inProgress, relance: relance, totalFollowups: totalFollowups, score: Math.max(0, score), callConnected: callConnected, callMessage: callMessage, callNoAnswer: callNoAnswer, callUnreachable: callUnreachable, callOther: callOther };
 }
 
 function drillDownExecKPI(metric, label) {
@@ -10256,7 +10283,11 @@ async function submitFollowup() {
     responseDate: document.getElementById('fuResponseDate') ? document.getElementById('fuResponseDate').value : '',
     daysToAnswer: document.getElementById('fuDaysToAnswer') ? document.getElementById('fuDaysToAnswer').value : '',
     followedUpBy: document.getElementById('fuFollowedUpBy') ? document.getElementById('fuFollowedUpBy').value.trim() : '',
-    letterContent: document.getElementById('fuLetterContent') ? document.getElementById('fuLetterContent').value.trim() : ''
+    letterContent: document.getElementById('fuLetterContent') ? document.getElementById('fuLetterContent').value.trim() : '',
+    entryOrigin: schoolSel === '__other__'
+      ? 'new-school'
+      : (cleanMetaValue(existingMeta && existingMeta.entryOrigin) || ''),
+    firstContactChannel: cleanMetaValue(existingMeta && existingMeta.firstContactChannel) || document.getElementById('fuType').value
   };
   var data = {
     action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
@@ -10344,6 +10375,10 @@ async function submitFollowup() {
     daysToAnswer: questionnaireMeta.daysToAnswer,
     FollowedUpBy: questionnaireMeta.followedUpBy,
     followedUpBy: questionnaireMeta.followedUpBy,
+    EntryOrigin: questionnaireMeta.entryOrigin,
+    entryOrigin: questionnaireMeta.entryOrigin,
+    FirstContactChannel: questionnaireMeta.firstContactChannel,
+    firstContactChannel: questionnaireMeta.firstContactChannel,
     LetterContent: questionnaireMeta.letterContent,
     letterContent: questionnaireMeta.letterContent
   };
