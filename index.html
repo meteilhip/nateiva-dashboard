@@ -2407,6 +2407,29 @@ button,select,input,textarea{outline:none}
 .lift{transition:all .3s cubic-bezier(.16,1,.3,1)}
 .lift:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
 
+/* — Revenue Tracker chart — */
+.rev-chart-wrap{background:var(--g50);border-radius:14px;padding:14px;border:1px solid var(--g100)}
+.rev-chart-legend{display:flex;gap:18px;justify-content:flex-end;margin-bottom:10px;font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.06em}
+.rev-chart-legend .rl{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.rev-chart-legend .rl-gagne{background:var(--green)}
+.rev-chart-legend .rl-chaud{background:var(--red)}
+.rev-chart-legend .rl-tiede{background:var(--saffron)}
+.rev-chart{display:flex;gap:10px;align-items:flex-end;height:160px;padding:0 4px}
+.rev-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:24px}
+.rev-bar-stack{flex:1;width:100%;max-width:42px;display:flex;flex-direction:column-reverse;justify-content:flex-start;gap:2px;align-items:stretch;position:relative}
+.rev-bar-stack > div{border-radius:4px 4px 0 0;transition:all .35s cubic-bezier(.16,1,.3,1);min-height:2px;animation:barRise .5s cubic-bezier(.16,1,.3,1) both}
+.rev-bar-stack .rb-gagne{background:linear-gradient(180deg,var(--green-bright),var(--green));box-shadow:0 -2px 6px rgba(5,150,105,.25)}
+.rev-bar-stack .rb-chaud{background:linear-gradient(180deg,var(--red-bright),var(--red))}
+.rev-bar-stack .rb-tiede{background:linear-gradient(180deg,var(--saffron-bright),var(--saffron))}
+.rev-bar-col:hover .rev-bar-stack > div{filter:brightness(1.1);transform:scaleX(1.05)}
+.rev-bar-label{font-size:10.5px;color:var(--g600);font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:-.02em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+@keyframes barRise{from{transform-origin:bottom;transform:scaleY(0);opacity:0}to{transform-origin:bottom;transform:scaleY(1);opacity:1}}
+@media(max-width:600px){
+  .rev-chart{height:120px;gap:5px}
+  .rev-bar-stack{max-width:28px}
+  .rev-bar-label{font-size:9px;max-width:36px}
+}
+
 /* ============================================
    MOBILE FIRST (≤900px → ≤480px)
    ============================================ */
@@ -4651,7 +4674,58 @@ function renderMiniChart(series){
 }
 
 const ST={city:'',expert:'',sec:'',cat:'',rate:0};
-const DASH_STATE={trackingMode:'week',selectedPeriodKey:''};
+const DASH_STATE={trackingMode:'week',selectedPeriodKey:'',revPeriod:'month',ambCategory:'all'};
+
+// Ambassador commission table by category × mode
+const AMBASSADOR_RATES = {
+  'primsec-offline':  { label: 'Primaire/Sec. · Offline (60K)',       base: 60000,  commission: 25000,  type:'flat' },
+  'primsec-online':   { label: 'Primaire/Sec. · Online (250K)',       base: 250000, commission: 80000,  type:'flat' },
+  'univ-offline':     { label: 'Université · Offline (550K)',         base: 550000, commission: 120000, type:'flat' },
+  'univ-online':      { label: 'Université · Online (2 500 / élève)', base: null,   commission: 0.15,   type:'pct'  }
+};
+function ambKeyForRecord(r){
+  var univ = /universit/i.test(String(r.type||''));
+  var online = /online/i.test(String(r.appMode||''));
+  return (univ?'univ-':'primsec-')+(online?'online':'offline');
+}
+function bucketKeyForDate(dt, period){
+  if (!dt) return '';
+  var d = new Date(dt); if (isNaN(d.getTime())) return '';
+  if (period === 'year')  return String(d.getFullYear());
+  if (period === 'month') return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  var first = new Date(d.getFullYear(),0,1);
+  var diffDays = Math.floor((d - first)/86400000);
+  var wk = Math.ceil((diffDays + first.getDay() + 1)/7);
+  return d.getFullYear()+'-S'+String(wk).padStart(2,'0');
+}
+function bucketLabel(key, period){
+  if (!key) return '—';
+  if (period === 'year') return key;
+  if (period === 'month'){ var p=key.split('-'); var months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']; return (months[parseInt(p[1])-1]||p[1])+' '+p[0].slice(2); }
+  return key.replace('-S',' S');
+}
+function buildRevenueBuckets(records, period){
+  var map = {};
+  records.forEach(function(r){
+    var k = bucketKeyForDate(r.lastTouch || r.closedAt, period);
+    if (!k) return;
+    if (!map[k]) map[k] = { key:k, gagne:0, gagneNet:0, ambEarned:0, chaud:0, tiede:0, ambPotentialHot:0, ambPotentialWarm:0, count:{gagne:0,chaud:0,tiede:0} };
+    var amt = r.amount||0;
+    if (r.stage === 'gagne')      { map[k].gagne += amt; map[k].gagneNet += (r.netAmount||0); map[k].ambEarned += (r.ambassadorAmount||0); map[k].count.gagne++; }
+    else if (r.stage === 'chaud'){ map[k].chaud += amt; map[k].ambPotentialHot += estimateAmbForPotential(r); map[k].count.chaud++; }
+    else if (r.stage === 'tiede'){ map[k].tiede += amt; map[k].ambPotentialWarm += estimateAmbForPotential(r); map[k].count.tiede++; }
+  });
+  return Object.keys(map).sort().map(function(k){return map[k];});
+}
+function estimateAmbForPotential(r){
+  var key = ambKeyForRecord(r);
+  var cfg = AMBASSADOR_RATES[key]; if (!cfg) return 0;
+  if (cfg.type === 'flat') return Math.round((cfg.commission||0) * ((r.rate||0)/100));
+  if (cfg.type === 'pct'){ var base = 2500 * (r.effectif||0); return Math.round(base * cfg.commission * ((r.rate||0)/100)); }
+  return 0;
+}
+function setRevPeriod(p){ if (DASH_STATE.revPeriod === p) return; DASH_STATE.revPeriod = p; var pane = document.querySelector('.pane.act'); if (pane && pane.id === 'p-home') renderAll(); }
+function setAmbCategory(c){ DASH_STATE.ambCategory = c; var pane = document.querySelector('.pane.act'); if (pane && pane.id === 'p-home') renderAll(); }
 function gF(){
   return getVisibleRaw().filter(r=>{
     if(ST.city && r.v!==ST.city)return false;
@@ -5027,6 +5101,115 @@ function rHome(){
       ${summaryTags.map(function(tag){ return '<span>' + tag + '</span>'; }).join('')}
     </div>
   </div>
+
+  <!-- 💰 REVENUE TRACKER (visible by everyone) -->
+  ${(function(){
+    var period = DASH_STATE.revPeriod || 'month';
+    var allRecords = dashboard.records;
+    var buckets = buildRevenueBuckets(allRecords, period);
+    // current period totals (last bucket = most recent), and all-time totals
+    var curr = buckets.length ? buckets[buckets.length-1] : {gagne:0,chaud:0,tiede:0,gagneNet:0,ambEarned:0,ambPotentialHot:0,ambPotentialWarm:0,count:{gagne:0,chaud:0,tiede:0}};
+    var allTime = buckets.reduce(function(a,b){
+      a.gagne+=b.gagne; a.gagneNet+=b.gagneNet; a.ambEarned+=b.ambEarned;
+      a.chaud+=b.chaud; a.tiede+=b.tiede;
+      a.ambPotentialHot+=b.ambPotentialHot; a.ambPotentialWarm+=b.ambPotentialWarm;
+      a.count.gagne+=b.count.gagne; a.count.chaud+=b.count.chaud; a.count.tiede+=b.count.tiede;
+      return a;
+    }, {gagne:0,gagneNet:0,ambEarned:0,chaud:0,tiede:0,ambPotentialHot:0,ambPotentialWarm:0,count:{gagne:0,chaud:0,tiede:0}});
+    // Build a small bar chart of last 8 buckets
+    var last8 = buckets.slice(-8);
+    var maxVal = Math.max(1, last8.reduce(function(m,b){return Math.max(m, b.gagne+b.chaud+b.tiede);}, 0));
+    function bar(b){
+      var gPct = (b.gagne/maxVal)*100;
+      var hPct = (b.chaud/maxVal)*100;
+      var wPct = (b.tiede/maxVal)*100;
+      return '<div class="rev-bar-col" title="'+bucketLabel(b.key,period)+' — Gagné '+moneyCompact(b.gagne)+' · Chaud '+moneyCompact(b.chaud)+' · Tiède '+moneyCompact(b.tiede)+'">'+
+        '<div class="rev-bar-stack">'+
+          (b.tiede>0?'<div class="rb-tiede" style="height:'+wPct+'%"></div>':'')+
+          (b.chaud>0?'<div class="rb-chaud" style="height:'+hPct+'%"></div>':'')+
+          (b.gagne>0?'<div class="rb-gagne" style="height:'+gPct+'%"></div>':'')+
+        '</div>'+
+        '<div class="rev-bar-label">'+bucketLabel(b.key,period)+'</div>'+
+      '</div>';
+    }
+    // Ambassador estimator
+    var ambCat = DASH_STATE.ambCategory || 'all';
+    var categoryOptions = '<option value="all">📊 Toutes catégories confondues</option>' +
+      Object.keys(AMBASSADOR_RATES).map(function(k){
+        return '<option value="'+k+'"'+(ambCat===k?' selected':'')+'>'+AMBASSADOR_RATES[k].label+'</option>';
+      }).join('');
+    var ambEarnedFiltered = 0, ambPotFiltered = 0, gagneCount = 0, chaudCount = 0, tiedeCount = 0;
+    allRecords.forEach(function(r){
+      var key = ambKeyForRecord(r);
+      if (ambCat !== 'all' && key !== ambCat) return;
+      if (r.stage === 'gagne') { ambEarnedFiltered += (r.ambassadorAmount||0); gagneCount++; }
+      else if (r.stage === 'chaud') { ambPotFiltered += estimateAmbForPotential(r); chaudCount++; }
+      else if (r.stage === 'tiede') { ambPotFiltered += estimateAmbForPotential(r); tiedeCount++; }
+    });
+    var catCfg = ambCat !== 'all' ? AMBASSADOR_RATES[ambCat] : null;
+    var commissionTxt = catCfg ? (catCfg.type === 'pct' ? Math.round(catCfg.commission*100)+'% du base (2 500 × élèves)' : moneyCompact(catCfg.commission)+' / école gagnée') : 'Variable selon catégorie';
+
+    return '<div class="section" style="padding:18px;margin-bottom:14px">'+
+      '<div class="sec-head" style="margin-bottom:14px">'+
+        '<h2>💰 Revenue Tracker <span class="it">par période</span></h2>'+
+        '<span class="anno">Gagné · Pipeline chaud · Pipeline tiède · estimation ambassadeur</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">'+
+        '<button type="button" class="suivi-tab-btn '+(period==='week'?'act':'')+'" onclick="setRevPeriod(\'week\')">📅 Semaine</button>'+
+        '<button type="button" class="suivi-tab-btn '+(period==='month'?'act':'')+'" onclick="setRevPeriod(\'month\')">🗓️ Mois</button>'+
+        '<button type="button" class="suivi-tab-btn '+(period==='year'?'act':'')+'" onclick="setRevPeriod(\'year\')">📆 Année</button>'+
+        '<span style="margin-left:auto;font-family:JetBrains Mono,monospace;font-size:11px;color:var(--g500);align-self:center">Période courante: <b style="color:var(--ink)">'+bucketLabel(curr.key,period)+'</b></span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px">'+
+        '<div class="stat-modern lift" style="border-top:3px solid var(--green)">'+
+          '<div class="stat-head"><span class="stat-label">🏆 Revenu gagné · '+bucketLabel(curr.key,period)+'</span><span class="stat-icon" style="background:var(--green-soft);color:var(--green)">✓</span></div>'+
+          '<div class="stat-val">'+moneyCompact(curr.gagne)+'</div>'+
+          '<div class="stat-sub">'+curr.count.gagne+' école'+(curr.count.gagne>1?'s':'')+' · Total cumulé: <b>'+moneyCompact(allTime.gagne)+'</b></div>'+
+        '</div>'+
+        '<div class="stat-modern lift" style="border-top:3px solid var(--red)">'+
+          '<div class="stat-head"><span class="stat-label">🔥 Pipeline chaud · '+bucketLabel(curr.key,period)+'</span><span class="stat-icon" style="background:var(--red-soft);color:var(--red)">→</span></div>'+
+          '<div class="stat-val">'+moneyCompact(curr.chaud)+'</div>'+
+          '<div class="stat-sub">'+curr.count.chaud+' école'+(curr.count.chaud>1?'s':'')+' ≥60% · Total cumulé: <b>'+moneyCompact(allTime.chaud)+'</b></div>'+
+        '</div>'+
+        '<div class="stat-modern lift" style="border-top:3px solid var(--saffron)">'+
+          '<div class="stat-head"><span class="stat-label">🟠 Pipeline tiède · '+bucketLabel(curr.key,period)+'</span><span class="stat-icon" style="background:var(--saffron-soft);color:var(--saffron-deep)">~</span></div>'+
+          '<div class="stat-val">'+moneyCompact(curr.tiede)+'</div>'+
+          '<div class="stat-sub">'+curr.count.tiede+' école'+(curr.count.tiede>1?'s':'')+' (40-59%) · Total cumulé: <b>'+moneyCompact(allTime.tiede)+'</b></div>'+
+        '</div>'+
+      '</div>'+
+      (last8.length ? '<div class="rev-chart-wrap"><div class="rev-chart-legend">'+
+        '<span><i class="rl rl-gagne"></i> Gagné</span>'+
+        '<span><i class="rl rl-chaud"></i> Chaud</span>'+
+        '<span><i class="rl rl-tiede"></i> Tiède</span>'+
+      '</div><div class="rev-chart">'+last8.map(bar).join('')+'</div></div>' : '')+
+      // Ambassador estimator
+      '<div style="margin-top:18px;padding:16px;background:linear-gradient(135deg,rgba(124,58,237,.05),rgba(220,38,38,.03));border-radius:14px;border:1px solid var(--g100)">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">'+
+          '<div style="display:flex;align-items:center;gap:10px"><span style="font-family:Fraunces,serif;font-size:17px;font-weight:700">🤝 Estimation paiement Ambassadeur</span>'+
+            '<span class="chip-modern" style="background:rgba(124,58,237,.1);color:var(--purple)">'+commissionTxt+'</span>'+
+          '</div>'+
+          '<select onchange="setAmbCategory(this.value)" style="padding:8px 12px;border-radius:10px;border:1.5px solid var(--g200);font-family:inherit;font-weight:600;font-size:13px;background:#fff;cursor:pointer">'+categoryOptions+'</select>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">'+
+          '<div class="stat-modern" style="border-top:3px solid var(--purple)">'+
+            '<div class="stat-head"><span class="stat-label">💸 Déjà gagné</span><span class="stat-icon" style="background:var(--purple-soft);color:var(--purple)">🏆</span></div>'+
+            '<div class="stat-val" style="color:var(--purple)">'+moneyCompact(ambEarnedFiltered)+'</div>'+
+            '<div class="stat-sub">'+gagneCount+' conversion'+(gagneCount>1?'s':'')+' close'+(gagneCount>1?'es':'')+'</div>'+
+          '</div>'+
+          '<div class="stat-modern" style="border-top:3px solid var(--red)">'+
+            '<div class="stat-head"><span class="stat-label">🎯 Potentiel chaud + tiède</span><span class="stat-icon" style="background:var(--red-soft);color:var(--red)">⚡</span></div>'+
+            '<div class="stat-val" style="color:var(--red)">'+moneyCompact(ambPotFiltered)+'</div>'+
+            '<div class="stat-sub">'+chaudCount+' chaud · '+tiedeCount+' tiède · pondéré par taux</div>'+
+          '</div>'+
+          '<div class="stat-modern" style="border-top:3px solid var(--green)">'+
+            '<div class="stat-head"><span class="stat-label">💎 Total projeté</span><span class="stat-icon" style="background:var(--green-soft);color:var(--green)">∑</span></div>'+
+            '<div class="stat-val" style="color:var(--green)">'+moneyCompact(ambEarnedFiltered + ambPotFiltered)+'</div>'+
+            '<div class="stat-sub">si tout le pipeline converti à son taux actuel</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  })()}
 
   <div class="section">
     <div class="sec-head">
