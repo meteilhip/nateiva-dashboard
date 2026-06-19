@@ -30,10 +30,13 @@ function defaultPermissionsForRole(userLike) {
 function normalizePermissions(userLike) {
   const defaults = defaultPermissionsForRole(userLike || {});
   const incoming = userLike && userLike.permissions ? userLike.permissions : {};
-  const isNoah = isNoahAccount(userLike);
+  const normalized = normalizeRole(userLike && userLike.role ? userLike.role : userLike);
+  const isPrivileged = normalized === "SuperAdmin" || normalized === "SubAdmin";
+  const dbScope = incoming.dataScope;
+  const allowedScope = isPrivileged && (dbScope === "all" || dbScope === "team") ? dbScope : defaults.dataScope;
   return {
-    dataScope: isNoah && incoming.dataScope === "all" ? "all" : defaults.dataScope,
-    manageUsers: defaults.manageUsers,
+    dataScope: dbScope === "all" && isPrivileged ? "all" : allowedScope,
+    manageUsers: incoming.manageUsers === true ? true : defaults.manageUsers,
     panes: Array.isArray(incoming.panes) && incoming.panes.length ? incoming.panes.filter((pane) => ALL_PANES.includes(pane)) : defaults.panes
   };
 }
