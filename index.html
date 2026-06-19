@@ -4417,21 +4417,7 @@ function renderCategoryHeatmap(records) {
     });
   });
 
-  // Build Guide Card
-  var guideHtml = '<div class="heatmap-guide" style="background: var(--paper); border: 1.5px solid var(--g200); border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow);">';
-  guideHtml += '  <h4 style="margin: 0 0 8px; color: var(--ink); display: flex; align-items: center; gap: 8px; font-size: 14px; font-family:\'Outfit\', system-ui, sans-serif;">';
-  guideHtml += '    <span>💡</span> Guide de lecture de la Heatmap';
-  guideHtml += '  </h4>';
-  guideHtml += '  <p style="margin: 0; font-size: 12.5px; color: var(--g700); line-height: 1.6; font-family:\'Outfit\', system-ui, sans-serif;">';
-  guideHtml += '    Cette heatmap croise le <b>standing (potentiel financier)</b> avec l\'<b>état d\'avancement (funnel)</b> et la <b>localisation (ville/quartier)</b> de nos écoles :';
-  guideHtml += '  </p>';
-  guideHtml += '  <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--g700); line-height: 1.65; font-family:\'Outfit\', system-ui, sans-serif;">';
-  guideHtml += '    <li><b>Couleur de ligne = Catégorie de standing :</b> Chaque ligne est associée à un code couleur spécifique (Violet pour Très Haute Standing, Bleu pour Haute, Vert pour Moyen, etc.).</li>';
-  guideHtml += '    <li><b>Opacité = Densité d\'écoles :</b> Plus la cellule est <b>foncée</b>, plus elle contient d\'écoles actives dans ce croisement.</li>';
-  guideHtml += '    <li><b>Zéros masqués (·) :</b> Les cellules vides avec un simple point gris (<b>·</b>) indiquent qu\'il n\'y a aucun prospect dans ce croisement, ce qui permet aux zones chaudes de sauter instantanément aux yeux.</li>';
-  guideHtml += '    <li><b>Focus Closing :</b> Pour optimiser l\'effort terrain et télé, ciblez les cellules <b>foncées</b> situées dans les colonnes <b>🏆 Gagné</b>, <b>🔥 Chaud</b> et <b>⚡ Tiède</b>.</li>';
-  guideHtml += '  </ul>';
-  guideHtml += '</div>';
+  // Guide moved to Glossaire — kept there to avoid duplication on Dashboard
 
   // Build KPIs
   var kpiHtml = '<div class="kpis">';
@@ -4593,7 +4579,6 @@ function renderCategoryHeatmap(records) {
 
   // Return the combined HTML
   return '<div class="city-heatmap" style="margin-bottom: 24px;">' +
-         guideHtml +
          kpiHtml +
          '  <div class="two">' +
          matrix1Html +
