@@ -8051,17 +8051,19 @@ function buildNewSchoolsFromFollowups() {
 // === PERF: memoization layer ===
 // Data-version counter — bump when raw rows or followups change to invalidate caches
 window.__dataVersion = window.__dataVersion || 1;
-function bumpDataVersion(){ window.__dataVersion++; _memo = { v: window.__dataVersion }; }
-var _memo = { v: window.__dataVersion };
+window.__memo = window.__memo || { v: window.__dataVersion };
+function bumpDataVersion(){ window.__dataVersion++; window.__memo = { v: window.__dataVersion }; }
 function _cacheGet(bucket, key){
-  if (_memo.v !== window.__dataVersion) _memo = { v: window.__dataVersion };
-  if (!_memo[bucket]) return undefined;
-  return _memo[bucket][key];
+  var m = window.__memo;
+  if (!m || m.v !== window.__dataVersion) { m = window.__memo = { v: window.__dataVersion }; }
+  if (!m[bucket]) return undefined;
+  return m[bucket][key];
 }
 function _cachePut(bucket, key, val){
-  if (_memo.v !== window.__dataVersion) _memo = { v: window.__dataVersion };
-  if (!_memo[bucket]) _memo[bucket] = {};
-  _memo[bucket][key] = val;
+  var m = window.__memo;
+  if (!m || m.v !== window.__dataVersion) { m = window.__memo = { v: window.__dataVersion }; }
+  if (!m[bucket]) m[bucket] = {};
+  m[bucket][key] = val;
   return val;
 }
 
