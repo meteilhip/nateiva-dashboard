@@ -7770,11 +7770,13 @@ function setApiToken(token) {
 function setServerUsers(users) {
   serverUsers = Array.isArray(users) ? users : [];
   localStorage.setItem('nateiva_server_users', JSON.stringify(serverUsers));
+  if (typeof bumpDataVersion === 'function') bumpDataVersion();
 }
 
 function setSyncedFollowups(followups) {
   suiviFollowups = dedupeFollowupRecords(Array.isArray(followups) ? followups : []);
   persistFollowupStore();
+  if (typeof bumpDataVersion === 'function') bumpDataVersion();
 }
 
 function persistEntryImpacts() {
@@ -8046,8 +8048,27 @@ function buildNewSchoolsFromFollowups() {
   return list;
 }
 
+// === PERF: memoization layer ===
+// Data-version counter — bump when raw rows or followups change to invalidate caches
+window.__dataVersion = window.__dataVersion || 1;
+function bumpDataVersion(){ window.__dataVersion++; _memo = { v: window.__dataVersion }; }
+var _memo = { v: window.__dataVersion };
+function _cacheGet(bucket, key){
+  if (_memo.v !== window.__dataVersion) _memo = { v: window.__dataVersion };
+  if (!_memo[bucket]) return undefined;
+  return _memo[bucket][key];
+}
+function _cachePut(bucket, key, val){
+  if (_memo.v !== window.__dataVersion) _memo = { v: window.__dataVersion };
+  if (!_memo[bucket]) _memo[bucket] = {};
+  _memo[bucket][key] = val;
+  return val;
+}
+
 function getAllRawRows() {
-  return getBaseRawRows().concat(buildNewSchoolsFromFollowups());
+  var hit = _cacheGet('allRaw', '_');
+  if (hit) return hit;
+  return _cachePut('allRaw', '_', getBaseRawRows().concat(buildNewSchoolsFromFollowups()));
 }
 
 function normalizeAssignedCity(city) {
@@ -8056,10 +8077,12 @@ function normalizeAssignedCity(city) {
 
 function getAssignedCityForExpert(expertName) {
   if (!expertName) return '';
+  var hit = _cacheGet('assignedCity', expertName);
+  if (hit !== undefined) return hit;
   var user = getAllUsers().find(function(item) {
     return samePerson(item.fullName || item.username, expertName);
   });
-  return normalizeAssignedCity(user && user.city ? user.city : '');
+  return _cachePut('assignedCity', expertName, normalizeAssignedCity(user && user.city ? user.city : ''));
 }
 
 function recordMatchesAssignedCity(expertName, city) {
@@ -8071,28 +8094,34 @@ function recordMatchesAssignedCity(expertName, city) {
 
 function getWorkspaceRawForUser(expertName) {
   if (!expertName) return [];
-  return getAllRawRows().filter(function(r) {
+  var hit = _cacheGet('wsRaw', expertName);
+  if (hit) return hit;
+  return _cachePut('wsRaw', expertName, getAllRawRows().filter(function(r) {
     return samePerson(r.e, expertName) && recordMatchesAssignedCity(expertName, r.v);
-  });
+  }));
 }
 
 function getKnownSchoolKeySet() {
+  var hit = _cacheGet('knownKeys', '_');
+  if (hit) return hit;
   var keys = new Set();
   getAllRawRows().forEach(function(row) {
     var key = schoolKey(row && row.n);
     if (key) keys.add(key);
   });
-  return keys;
+  return _cachePut('knownKeys', '_', keys);
 }
 
 function getOwnedSchoolKeySetForUser(expertName) {
+  if (!expertName) return new Set();
+  var hit = _cacheGet('ownedKeys', expertName);
+  if (hit) return hit;
   var keys = new Set();
-  if (!expertName) return keys;
   getWorkspaceRawForUser(expertName).forEach(function(row) {
     var key = schoolKey(row && row.n);
     if (key) keys.add(key);
   });
-  return keys;
+  return _cachePut('ownedKeys', expertName, keys);
 }
 
 function schoolBelongsToUserPortfolio(expertName, schoolName) {
@@ -8230,11 +8259,13 @@ function isImportedCallFollowup(item) {
 
 function getWorkspaceFollowupsForUser(expertName) {
   if (!expertName) return [];
-  return getAllFollowups().filter(function(f) {
+  var hit = _cacheGet('wsFup', expertName);
+  if (hit) return hit;
+  return _cachePut('wsFup', expertName, getAllFollowups().filter(function(f) {
     return samePerson(f.Expert, expertName)
       && recordMatchesAssignedCity(expertName, f.City)
       && schoolBelongsToUserPortfolio(expertName, f.SchoolName);
-  });
+  }));
 }
 
 function getVisibleFollowups() {
@@ -9161,6 +9192,7 @@ function dedupeFollowupRecords(records) {
 
 function persistFollowupStore() {
   localStorage.setItem('nateiva_followups', JSON.stringify(suiviFollowups));
+  if (typeof bumpDataVersion === 'function') bumpDataVersion();
 }
 
 function sanitizeFollowupStore() {
