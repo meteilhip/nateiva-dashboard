@@ -5075,6 +5075,8 @@ document.querySelectorAll('.nav-btn').forEach(t=>{
     t.classList.add('act');
     document.getElementById('p-'+t.dataset.pane).classList.add('act');
     if (typeof renderPaneIfDirty === 'function') renderPaneIfDirty(t.dataset.pane);
+    // Animate any count-up numbers in the newly visible pane
+    if (typeof runCountUps === 'function') runCountUps(document.getElementById('p-'+t.dataset.pane));
     window.scrollTo({top:0,behavior:'smooth'});
     setTimeout(()=>{
       document.querySelectorAll('#p-'+t.dataset.pane+' .bar-row').forEach(b=>b.classList.add('animate'));
@@ -7519,17 +7521,23 @@ function renderAll(){
     _renderAllNow();
   });
 }
+window.__bootTimings = window.__bootTimings || {};
 function _renderAllNow(){
+  var t0 = performance.now();
   refreshFilters();
   updateFilterSummary();
   const f=gF();
   const scope=getDashboardScope();
+  var t1 = performance.now();
   const uniqueCount=buildSchoolRecords(scope.rawRows,scope.followups).length;
+  var t2 = performance.now();
   var fc=document.getElementById('fCount'); if (fc) fc.textContent=f.length;
   var ft=document.getElementById('fTotal'); if (ft) ft.textContent='/ ' + f.length + ' entrées · ' + uniqueCount + ' écoles';
   // Mark all panes dirty, then render only the visible one
   Object.keys(_paneDirty).forEach(function(k){ _paneDirty[k]=true; });
-  renderPaneIfDirty(_getActivePaneKey());
+  var activeKey = _getActivePaneKey();
+  renderPaneIfDirty(activeKey);
+  var t3 = performance.now();
   applyNavigationAccess();
   updateHeaderAuth();
   setTimeout(()=>{
@@ -7537,6 +7545,10 @@ function _renderAllNow(){
   },100);
   setTimeout(animateCounters,200);
   if (typeof runCountUps === 'function') runCountUps();
+  var t4 = performance.now();
+  // Track timings for diagnosis (window.__bootTimings)
+  window.__bootTimings[activeKey] = window.__bootTimings[activeKey] || [];
+  window.__bootTimings[activeKey].push({filters:Math.round(t1-t0), buildRecords:Math.round(t2-t1), renderPane:Math.round(t3-t2), finalize:Math.round(t4-t3), total:Math.round(t4-t0)});
 }
 
 function animateCounters(){
@@ -11299,7 +11311,7 @@ setInterval(updateVercelToolbarVisibility, 60000);
     b.addEventListener('click', function(){
       var pane = b.dataset.pane;
       var topBtn = document.querySelector('.nav-btn[data-pane="'+pane+'"]');
-      if (topBtn) topBtn.click();
+      if (topBtn) topBtn.click(); // top click handler already triggers render + runCountUps
       syncBottomNav(pane);
       window.scrollTo({top:0, behavior:'smooth'});
     });
