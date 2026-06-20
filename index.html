@@ -2522,6 +2522,64 @@ button,select,input,textarea{outline:none}
 .ddg-row.total b{color:#fff;font-size:17px}
 .ddg-row.amb b{color:var(--saffron-bright)}
 
+/* — Mes Saisies modal — */
+.me-modal{max-width:880px;width:96%}
+.me-header h3{font-family:'Fraunces',serif;font-size:20px;margin:0}
+.me-subtitle{font-size:12px;color:var(--g500);font-family:'JetBrains Mono',monospace;margin-top:4px}
+.me-banner{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(13,148,136,.06));border:1px solid var(--saffron);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--g700);margin-bottom:14px;line-height:1.55}
+.me-banner b{color:var(--ink)}
+.me-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid var(--g100);padding-bottom:0}
+.me-tab{background:none;border:none;padding:10px 16px;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px;color:var(--g500);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s ease}
+.me-tab:hover{color:var(--ink)}
+.me-tab.act{color:var(--teal);border-bottom-color:var(--teal)}
+.me-tab-panel{display:none;animation:fadeInUp .35s cubic-bezier(.16,1,.3,1) both}
+.me-tab-panel.act{display:block}
+.me-empty{padding:32px;text-align:center;color:var(--g500);background:var(--g50);border-radius:12px}
+.me-row{background:var(--paper);border:1px solid var(--g200);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:all .2s ease}
+.me-row:hover{border-color:var(--teal);box-shadow:var(--shadow-sm)}
+.me-row.open{box-shadow:var(--shadow-lg);border-color:var(--teal)}
+.me-row-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer;gap:10px}
+.me-row-main{flex:1;min-width:0}
+.me-row-title{font-weight:700;font-size:13.5px;color:var(--ink);margin-bottom:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.me-row-sub{font-size:11.5px;color:var(--g500);font-family:'JetBrains Mono',monospace;letter-spacing:-.01em}
+.me-row-meta{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.me-tag{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--g100);color:var(--g700);font-family:'JetBrains Mono',monospace}
+.me-tag.note{background:var(--saffron-soft);color:var(--saffron-deep)}
+.me-chev{font-size:14px;color:var(--g400);transition:transform .25s ease;width:18px;text-align:center}
+.me-row.open .me-chev{transform:rotate(180deg);color:var(--teal)}
+.me-row-body{display:none;padding:0 14px 14px;border-top:1px dashed var(--g200);margin-top:0}
+.me-row.open .me-row-body{display:block;animation:fadeInUp .3s cubic-bezier(.16,1,.3,1) both}
+.me-field{font-size:12.5px;color:var(--g700);padding:8px 0;line-height:1.5}
+.me-field b{color:var(--ink)}
+.me-notes{margin-top:10px;background:var(--g50);border-radius:10px;padding:10px}
+.me-note-item{background:var(--paper);border-left:3px solid var(--teal);padding:8px 12px;border-radius:6px;margin-bottom:6px;font-size:12.5px;line-height:1.5}
+.me-note-item:last-child{margin-bottom:0}
+.me-note-meta{font-size:10.5px;color:var(--g500);font-family:'JetBrains Mono',monospace;margin-top:4px}
+.me-note-empty{font-size:11.5px;color:var(--g400);font-style:italic;text-align:center;padding:6px}
+.me-add-note{margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+.me-add-note textarea{flex:1;border:1.5px solid var(--g200);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:12.5px;resize:vertical;min-height:42px;transition:border-color .2s}
+.me-add-note textarea:focus{outline:none;border-color:var(--teal)}
+.me-add-note button{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;transition:all .2s ease}
+.me-add-note button:hover{background:var(--teal-deep);transform:translateY(-1px)}
+.me-edit-cta{margin-top:12px;background:linear-gradient(135deg,rgba(220,38,38,.06),rgba(245,158,11,.04));border:1px dashed var(--red);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.me-edit-cta span{font-size:11.5px;color:var(--g700);line-height:1.5;flex:1;min-width:220px}
+.me-edit-cta b{color:var(--ink)}
+.me-edit-cta button{background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .2s ease}
+.me-edit-cta button:hover{background:var(--red-deep);transform:translateY(-1px) scale(1.02)}
+.ms-cta{box-shadow:0 8px 24px rgba(13,148,136,.28) !important}
+.ms-cta:hover{box-shadow:0 14px 32px rgba(13,148,136,.4) !important}
+
+@media(max-width:600px){
+  .me-modal{width:100%;max-width:100%;max-height:94vh;border-radius:20px 20px 0 0;align-self:flex-end;margin-bottom:0}
+  .me-row-head{flex-wrap:wrap}
+  .me-row-meta{margin-left:auto}
+  .me-add-note{flex-direction:column}
+  .me-add-note button{width:100%}
+  .me-edit-cta{flex-direction:column;align-items:stretch}
+  .me-edit-cta button{width:100%}
+  .me-tab{flex:1;padding:10px 8px;font-size:12px}
+}
+
 @media(max-width:600px){
   .rev-period-card{padding:14px}
   .rev-period-name{font-size:17px}
@@ -9973,6 +10031,7 @@ function rSuivi() {
   h += '<div class="workspace-primary-actions">';
   h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l\'effet sur le funnel.</small></button>';
   h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle entrée</strong><small>Créez une fiche école, courrier ou email avec contact, zone, standing et suivi.</small></button>';
+  h += '<button class="workspace-cta ms-cta" onclick="showMyEntries()" style="background:linear-gradient(135deg,var(--teal),var(--teal-deep));border-color:var(--teal-deep)"><span class="eyebrow">📚 Lecture seule</span><strong>📚 Mes saisies</strong><small>Toutes les données que vous avez déjà saisies. Ajoutez des notes complémentaires. Pour modifier, ouvrez « Nouveau suivi ».</small></button>';
   h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
   h += '</div>';
   h += '<div class="workspace-action-note">';
@@ -10676,6 +10735,175 @@ function prefillFromSchool(name, contact, phone, city, sector) {
   prefillSchool();
   updateSchoolOwnershipNotice();
   activateSuiviPanel('add', { scroll: true });
+}
+
+// ===========================================================
+// MES SAISIES — read-only viewer with append-only annotations
+// ===========================================================
+function _myEntriesNoteKey(){ return 'nateiva_my_notes_'+(currentUser?currentUser.username:'anon'); }
+function getMyEntryNotes(entryId){
+  try { var all=JSON.parse(localStorage.getItem(_myEntriesNoteKey())||'{}'); return all[entryId]||[]; } catch(e){ return []; }
+}
+function appendMyEntryNote(entryId, text){
+  if (!text || !text.trim()) return false;
+  try {
+    var all=JSON.parse(localStorage.getItem(_myEntriesNoteKey())||'{}');
+    if (!all[entryId]) all[entryId]=[];
+    all[entryId].push({ ts:new Date().toISOString(), by:currentUser?currentUser.username:'', text:text.trim() });
+    localStorage.setItem(_myEntriesNoteKey(), JSON.stringify(all));
+    return true;
+  } catch(e){ return false; }
+}
+function _myEntriesFmtDate(ts){
+  if (!ts) return '—'; var d=new Date(ts); if (isNaN(d.getTime())) return ts;
+  return d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function _myEntriesStageBadge(stage){
+  var map={gagne:{c:'var(--green)',l:'Gagné'},chaud:{c:'var(--red)',l:'Chaud'},tiede:{c:'var(--saffron)',l:'Tiède'},froid:{c:'var(--g500)',l:'Froid'},nouveau:{c:'var(--teal)',l:'Nouveau'},perdu:{c:'var(--g800)',l:'Perdu'}};
+  var m=map[stage]||{c:'var(--g400)',l:'—'};
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:'+m.c+';color:#fff;font-size:10.5px;font-weight:700">'+m.l+'</span>';
+}
+function showMyEntries(){
+  if (!currentUser){ showToast('Veuillez vous connecter', true); return; }
+  var me = currentUser.fullName;
+  var myRaw = getWorkspaceRawForUser(me);
+  var myFu = getWorkspaceFollowupsForUser(me).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+  var allRecords = (typeof buildSchoolRecords === 'function') ? buildSchoolRecords(myRaw, myFu) : [];
+  var recByKey = {}; allRecords.forEach(function(r){ recByKey[r.key]=r; });
+  // Existing modal cleanup
+  var prev=document.getElementById('me-overlay'); if (prev) prev.remove();
+  // Build schools list
+  var schoolsHtml = allRecords.length ? allRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(function(r){
+    var notes = getMyEntryNotes('school:'+r.key);
+    return '<div class="me-row" data-entry="school:'+esc(r.key)+'">'+
+      '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
+        '<div class="me-row-main">'+
+          '<div class="me-row-title">🏫 '+esc(r.schoolName||'—')+' '+_myEntriesStageBadge(r.stage)+'</div>'+
+          '<div class="me-row-sub">'+esc(r.city||'—')+(r.zone?' · '+esc(r.zone):'')+(r.type?' · '+esc(r.type):'')+(r.appMode?' · '+esc(r.appMode):'')+' · '+(r.rate||0)+'% · '+(r.effectif?fmt(r.effectif)+' élèves':'effectif n/r')+'</div>'+
+          (r.contactName||r.phone?'<div class="me-row-sub">👤 '+esc(r.contactName||'?')+' · 📞 '+esc(r.phone||'?')+'</div>':'')+
+        '</div>'+
+        '<div class="me-row-meta">'+
+          '<div class="me-tag">'+r.rawCount+' fiche'+(r.rawCount>1?'s':'')+'</div>'+
+          '<div class="me-tag">'+r.followupCount+' suivi'+(r.followupCount>1?'s':'')+'</div>'+
+          (notes.length?'<div class="me-tag note">'+notes.length+' note'+(notes.length>1?'s':'')+'</div>':'')+
+          '<div class="me-chev">▾</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="me-row-body">'+
+        (r.notes?'<div class="me-field"><b>📝 Notes terrain:</b> '+esc(r.notes)+'</div>':'')+
+        (r.decisionReach?'<div class="me-field"><b>👔 Décideur:</b> '+esc(r.decisionReach)+'</div>':'')+
+        (r.currentSystem?'<div class="me-field"><b>💻 Système actuel:</b> '+esc(r.currentSystem)+'</div>':'')+
+        '<div class="me-field"><b>📅 Dernière touche:</b> '+_myEntriesFmtDate(r.lastTouch)+'</div>'+
+        '<div class="me-notes">'+
+          (notes.length?notes.map(function(n){return '<div class="me-note-item">💬 '+esc(n.text)+'<div class="me-note-meta">'+_myEntriesFmtDate(n.ts)+(n.by?' · '+esc(n.by):'')+'</div></div>';}).join(''):'<div class="me-note-empty">Aucune note complémentaire</div>')+
+        '</div>'+
+        '<div class="me-add-note">'+
+          '<textarea id="me-note-school:'+esc(r.key)+'" placeholder="Ajouter une note d\'explication (lecture seule pour la fiche d\'origine — cette note s\'ajoute en bas)…" rows="2"></textarea>'+
+          '<button onclick="submitMyEntryNote(\'school:'+esc(r.key).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">+ Ajouter note</button>'+
+        '</div>'+
+        '<div class="me-edit-cta"><span>⚠️ Pour <b>modifier</b> ces données, ouvrez « Nouveau suivi » — la sélection de l\'école pré-remplit automatiquement tout ce qui est déjà saisi.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(r.schoolName).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi pour cette école</button></div>'+
+      '</div>'+
+    '</div>';
+  }).join('') : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
+  // Build followups list
+  var fuHtml = myFu.length ? myFu.map(function(f){
+    var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
+    var notes = getMyEntryNotes(entryId);
+    var typeIcon = (f.FollowupType==='CALL'?'📞':f.FollowupType==='VISIT'?'🚶':f.FollowupType==='WHATSAPP'?'💬':f.FollowupType==='SMS'?'📱':f.FollowupType==='EMAIL'?'📧':f.FollowupType==='LETTER'?'📨':'📝');
+    return '<div class="me-row" data-entry="'+esc(entryId)+'">'+
+      '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
+        '<div class="me-row-main">'+
+          '<div class="me-row-title">'+typeIcon+' '+esc(f.FollowupType||'—')+' · '+esc(f.SchoolName||'—')+'</div>'+
+          '<div class="me-row-sub">'+_myEntriesFmtDate(f.Timestamp)+(f.Outcome?' · '+esc(f.Outcome):'')+(f.NextAction?' → '+esc(f.NextAction):'')+'</div>'+
+        '</div>'+
+        '<div class="me-row-meta">'+
+          (notes.length?'<div class="me-tag note">'+notes.length+' note'+(notes.length>1?'s':'')+'</div>':'')+
+          '<div class="me-chev">▾</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="me-row-body">'+
+        (f.Notes?'<div class="me-field"><b>📝 Notes:</b> '+esc(f.Notes)+'</div>':'')+
+        (f.NextDate?'<div class="me-field"><b>⏰ Prochaine action:</b> '+esc(f.NextDate)+'</div>':'')+
+        (f.Cost?'<div class="me-field"><b>💰 Coût:</b> '+fmt(f.Cost)+' FCFA</div>':'')+
+        '<div class="me-notes">'+
+          (notes.length?notes.map(function(n){return '<div class="me-note-item">💬 '+esc(n.text)+'<div class="me-note-meta">'+_myEntriesFmtDate(n.ts)+(n.by?' · '+esc(n.by):'')+'</div></div>';}).join(''):'<div class="me-note-empty">Aucune note complémentaire</div>')+
+        '</div>'+
+        '<div class="me-add-note">'+
+          '<textarea id="me-note-'+esc(entryId)+'" placeholder="Ajouter une note d\'explication (ne modifie pas la saisie d\'origine)…" rows="2"></textarea>'+
+          '<button onclick="submitMyEntryNote(\''+esc(entryId).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">+ Ajouter note</button>'+
+        '</div>'+
+        '<div class="me-edit-cta"><span>⚠️ Pour <b>modifier</b> ce suivi, ouvrez « Nouveau suivi » et sélectionnez l\'école — tout est pré-rempli.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(f.SchoolName||'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi</button></div>'+
+      '</div>'+
+    '</div>';
+  }).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
+
+  var html = '<div id="me-overlay" class="dd-overlay" onclick="if(event.target===this)closeMyEntries()">'+
+    '<div class="dd-modal me-modal">'+
+      '<div class="dd-header me-header">'+
+        '<div>'+
+          '<h3>📚 Mes saisies — Lecture seule</h3>'+
+          '<div class="me-subtitle">'+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+myFu.length+' suivi'+(myFu.length>1?'s':'')+' · ajoutez des notes ci-dessous, ou cliquez « Nouveau suivi » pour modifier</div>'+
+        '</div>'+
+        '<button class="dd-close" onclick="closeMyEntries()">×</button>'+
+      '</div>'+
+      '<div class="dd-body me-body">'+
+        '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
+        '<div class="me-tabs">'+
+          '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Mes écoles ('+allRecords.length+')</button>'+
+          '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+myFu.length+')</button>'+
+        '</div>'+
+        '<div id="me-tab-schools" class="me-tab-panel act">'+schoolsHtml+'</div>'+
+        '<div id="me-tab-fu" class="me-tab-panel">'+fuHtml+'</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.body.style.overflow='hidden';
+}
+function closeMyEntries(){ var o=document.getElementById('me-overlay'); if (o){ o.remove(); document.body.style.overflow=''; } }
+function setMyEntriesTab(btn, key){
+  document.querySelectorAll('.me-tab').forEach(function(b){b.classList.remove('act');});
+  btn.classList.add('act');
+  document.querySelectorAll('.me-tab-panel').forEach(function(p){p.classList.remove('act');});
+  document.getElementById('me-tab-'+key).classList.add('act');
+}
+function submitMyEntryNote(entryId){
+  var ta = document.getElementById('me-note-'+entryId);
+  if (!ta) return;
+  var text = ta.value.trim();
+  if (!text){ showToast('Note vide', true); return; }
+  if (appendMyEntryNote(entryId, text)){
+    if (typeof toast === 'function') toast('Note ajoutée ✓', 'success');
+    else showToast('Note ajoutée');
+    ta.value='';
+    // Re-render this row's notes section without closing the modal
+    var row = document.querySelector('.me-row[data-entry="'+CSS.escape(entryId)+'"]');
+    if (row){
+      var notes = getMyEntryNotes(entryId);
+      var notesEl = row.querySelector('.me-notes');
+      if (notesEl){
+        notesEl.innerHTML = notes.map(function(n){return '<div class="me-note-item">💬 '+esc(n.text)+'<div class="me-note-meta">'+_myEntriesFmtDate(n.ts)+(n.by?' · '+esc(n.by):'')+'</div></div>';}).join('');
+      }
+      var tag = row.querySelector('.me-tag.note');
+      if (!tag){
+        var meta = row.querySelector('.me-row-meta');
+        if (meta){ var t=document.createElement('div'); t.className='me-tag note'; t.textContent=notes.length+' note'+(notes.length>1?'s':''); meta.insertBefore(t, meta.firstChild); }
+      } else tag.textContent = notes.length+' note'+(notes.length>1?'s':'');
+    }
+  } else { showToast('Erreur sauvegarde note', true); }
+}
+function showFollowupFromSchool(schoolName){
+  showFollowupForm();
+  setTimeout(function(){
+    var sel = document.getElementById('fuSchool');
+    if (sel){
+      var matched = false;
+      Array.from(sel.options).forEach(function(o){ if (o.value && o.value.toLowerCase()===String(schoolName||'').toLowerCase().trim()) { sel.value=o.value; matched=true; } });
+      if (!matched){ sel.value='__other__'; var other=document.getElementById('fuSchoolOther'); if (other) other.value=schoolName; }
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+      if (typeof prefillSchool === 'function') prefillSchool();
+    }
+  }, 80);
 }
 
 function showFollowupForm() {
