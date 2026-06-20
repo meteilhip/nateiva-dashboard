@@ -1844,6 +1844,22 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 }
 .suivi-tab:hover{color:var(--ink)}
 .suivi-tab.act{background:var(--paper);color:var(--ink);box-shadow:var(--shadow-sm)}
+.suivi-tab.highlight{
+  background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(220,38,38,.08));
+  color:var(--saffron-deep);font-weight:800;
+  border:1.5px solid rgba(245,158,11,.35);
+  box-shadow:0 2px 8px rgba(245,158,11,.18);
+  position:relative;
+}
+.suivi-tab.highlight::after{
+  content:'';position:absolute;top:-4px;right:-4px;width:8px;height:8px;
+  border-radius:50%;background:var(--red);
+  box-shadow:0 0 0 0 rgba(220,38,38,.4);
+  animation:pulse-dot 1.8s ease infinite;
+}
+.suivi-tab.highlight:hover{background:linear-gradient(135deg,rgba(245,158,11,.2),rgba(220,38,38,.12));transform:translateY(-1px)}
+.suivi-tab.highlight.act{background:linear-gradient(135deg,var(--saffron),var(--red));color:#fff;border-color:transparent;box-shadow:var(--shadow-saffron)}
+.suivi-tab.highlight.act::after{background:#fff;box-shadow:0 0 0 0 rgba(255,255,255,.6)}
 .suivi-panel{display:none;animation:fadeUp .35s ease}
 .suivi-panel.act{display:block}
 
@@ -7737,7 +7753,7 @@ var VERIFIED_CALL_PATCHES = [
 var ENTRY_IMPACT_STORAGE_KEY = 'nateiva_entry_impacts';
 var FOLLOWUP_META_MARKER = '[NATEIVA_META]';
 var entryImpactByUser = safeStorageParse(ENTRY_IMPACT_STORAGE_KEY, {});
-var suiviPreferredTab = 'planner';
+var suiviPreferredTab = 'history';
 var followupEditId = '';
 var followupEditMode = 'create';
 var followupSubmitBusy = false;
@@ -10031,7 +10047,7 @@ function rSuivi() {
   h += '<div class="workspace-primary-actions">';
   h += '<button class="workspace-cta" onclick="showFollowupForm()"><span class="eyebrow">📞 Appel · WhatsApp · Visite</span><strong>+ Nouveau suivi</strong><small>Ajoutez ce qui a été dit, la date, la prochaine action et l\'effet sur le funnel.</small></button>';
   h += '<button class="workspace-cta alt" onclick="showNewSchoolForm()"><span class="eyebrow">🏫 Portefeuille terrain</span><strong>+ Nouvelle entrée</strong><small>Créez une fiche école, courrier ou email avec contact, zone, standing et suivi.</small></button>';
-  h += '<button class="workspace-cta ms-cta" onclick="showMyEntries()" style="background:linear-gradient(135deg,var(--teal),var(--teal-deep));border-color:var(--teal-deep)"><span class="eyebrow">📚 Lecture seule</span><strong>📚 Mes saisies</strong><small>Toutes les données que vous avez déjà saisies. Ajoutez des notes complémentaires. Pour modifier, ouvrez « Nouveau suivi ».</small></button>';
+  h += '<button class="workspace-cta ms-cta" onclick="showMyEntries()" style="background:linear-gradient(135deg,var(--teal),var(--teal-deep));border-color:var(--teal-deep)"><span class="eyebrow">📚 Lecture seule</span><strong>'+(isSuper?'📚 Saisies équipe':'📚 Mes saisies')+'</strong><small>'+(isSuper?'Toutes les saisies de tous les experts. Ajoutez des notes complémentaires. Pour modifier, ouvrez « Nouveau suivi ».':'Toutes les données que vous avez déjà saisies. Ajoutez des notes complémentaires. Pour modifier, ouvrez « Nouveau suivi ».')+'</small></button>';
   h += '<button class="workspace-cta" onclick="showInviteForm()" style="background:var(--red);border-color:var(--red)"><span class="eyebrow">👥 Gestion équipe</span><strong>+ Nouvel utilisateur</strong><small>Invitez un expert ou ambassadeur et attribuez-lui un rôle et une ville.</small></button>';
   h += '</div>';
   h += '<div class="workspace-action-note">';
@@ -10074,10 +10090,10 @@ function rSuivi() {
   h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'power\',\'Qualité Électricité\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
   h += '</div></div>';
 
-  // Sub-tabs
+  // Sub-tabs — Historique en premier, puis Rappels — les deux mis en avant
   h += '<div class="suivi-tabs">';
-  h += '<button class="suivi-tab" data-stab="planner">Rappels & 2 semaines</button>';
-  h += '<button class="suivi-tab" data-stab="history">Historique (' + myFollowups.length + ')</button>';
+  h += '<button class="suivi-tab highlight" data-stab="history">📜 Historique (' + myFollowups.length + ')</button>';
+  h += '<button class="suivi-tab highlight" data-stab="planner">⏰ Rappels & 2 semaines</button>';
   h += '<button class="suivi-tab" data-stab="ranking">Classement</button>';
   h += '<button class="suivi-tab" data-stab="costs">Coûts terrain</button>';
   if (canSeeLetterEmail(currentUser)) h += '<button class="suivi-tab" data-stab="courrier">📨 Courrier & Emails</button>';
@@ -10766,8 +10782,17 @@ function _myEntriesStageBadge(stage){
 function showMyEntries(){
   if (!currentUser){ showToast('Veuillez vous connecter', true); return; }
   var me = currentUser.fullName;
-  var myRaw = getWorkspaceRawForUser(me);
-  var myFu = getWorkspaceFollowupsForUser(me).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+  // Super-admin & coordo (canSeeAllData) see EVERYONE's saisies. Others see only their portfolio.
+  var seeAll = (typeof canSeeAllData === 'function') ? canSeeAllData(currentUser) : false;
+  var myRaw, myFu;
+  if (seeAll){
+    myRaw = (typeof getVisibleRaw === 'function') ? getVisibleRaw() : getAllRawRows();
+    myFu  = ((typeof getVisibleFollowups === 'function') ? getVisibleFollowups() : getAllFollowups())
+            .slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+  } else {
+    myRaw = getWorkspaceRawForUser(me);
+    myFu  = getWorkspaceFollowupsForUser(me).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+  }
   var allRecords = (typeof buildSchoolRecords === 'function') ? buildSchoolRecords(myRaw, myFu) : [];
   var recByKey = {}; allRecords.forEach(function(r){ recByKey[r.key]=r; });
   // Existing modal cleanup
@@ -10779,7 +10804,7 @@ function showMyEntries(){
       '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
           '<div class="me-row-title">🏫 '+esc(r.schoolName||'—')+' '+_myEntriesStageBadge(r.stage)+'</div>'+
-          '<div class="me-row-sub">'+esc(r.city||'—')+(r.zone?' · '+esc(r.zone):'')+(r.type?' · '+esc(r.type):'')+(r.appMode?' · '+esc(r.appMode):'')+' · '+(r.rate||0)+'% · '+(r.effectif?fmt(r.effectif)+' élèves':'effectif n/r')+'</div>'+
+          '<div class="me-row-sub">'+(seeAll&&r.expert?'<b style="color:var(--teal-deep)">👤 '+esc(r.expert)+'</b> · ':'')+esc(r.city||'—')+(r.zone?' · '+esc(r.zone):'')+(r.type?' · '+esc(r.type):'')+(r.appMode?' · '+esc(r.appMode):'')+' · '+(r.rate||0)+'% · '+(r.effectif?fmt(r.effectif)+' élèves':'effectif n/r')+'</div>'+
           (r.contactName||r.phone?'<div class="me-row-sub">👤 '+esc(r.contactName||'?')+' · 📞 '+esc(r.phone||'?')+'</div>':'')+
         '</div>'+
         '<div class="me-row-meta">'+
@@ -10814,7 +10839,7 @@ function showMyEntries(){
       '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
           '<div class="me-row-title">'+typeIcon+' '+esc(f.FollowupType||'—')+' · '+esc(f.SchoolName||'—')+'</div>'+
-          '<div class="me-row-sub">'+_myEntriesFmtDate(f.Timestamp)+(f.Outcome?' · '+esc(f.Outcome):'')+(f.NextAction?' → '+esc(f.NextAction):'')+'</div>'+
+          '<div class="me-row-sub">'+(seeAll&&f.Expert?'<b style="color:var(--teal-deep)">👤 '+esc(f.Expert)+'</b> · ':'')+_myEntriesFmtDate(f.Timestamp)+(f.Outcome?' · '+esc(f.Outcome):'')+(f.NextAction?' → '+esc(f.NextAction):'')+'</div>'+
         '</div>'+
         '<div class="me-row-meta">'+
           (notes.length?'<div class="me-tag note">'+notes.length+' note'+(notes.length>1?'s':'')+'</div>':'')+
@@ -10841,8 +10866,8 @@ function showMyEntries(){
     '<div class="dd-modal me-modal">'+
       '<div class="dd-header me-header">'+
         '<div>'+
-          '<h3>📚 Mes saisies — Lecture seule</h3>'+
-          '<div class="me-subtitle">'+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+myFu.length+' suivi'+(myFu.length>1?'s':'')+' · ajoutez des notes ci-dessous, ou cliquez « Nouveau suivi » pour modifier</div>'+
+          '<h3>📚 '+(seeAll?'Saisies — toute l\'équipe':'Mes saisies')+' <span style="font-size:11px;background:var(--g100);color:var(--g700);padding:3px 8px;border-radius:6px;font-weight:700;font-family:JetBrains Mono,monospace;letter-spacing:.04em;text-transform:uppercase">Lecture seule</span></h3>'+
+          '<div class="me-subtitle">'+(seeAll?'<b style="color:var(--teal-deep)">Vue admin · vous voyez les saisies de tous les experts</b> · ':'')+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+myFu.length+' suivi'+(myFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
         '</div>'+
         '<button class="dd-close" onclick="closeMyEntries()">×</button>'+
       '</div>'+
