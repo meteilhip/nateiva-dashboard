@@ -2585,6 +2585,59 @@ button,select,input,textarea{outline:none}
 .ms-cta{box-shadow:0 8px 24px rgba(13,148,136,.28) !important}
 .ms-cta:hover{box-shadow:0 14px 32px rgba(13,148,136,.4) !important}
 
+/* — Intelligence Terrain & Conversion — */
+.field-intel{background:linear-gradient(135deg,rgba(124,58,237,.04),rgba(13,148,136,.04));border-radius:16px;padding:18px;border:1px solid var(--g100)}
+.ai-badge{background:linear-gradient(135deg,var(--purple),var(--teal)) !important;color:#fff !important}
+.intel-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.intel-stat{background:var(--paper);border:1px solid var(--g100);border-radius:12px;padding:14px;transition:all .25s cubic-bezier(.16,1,.3,1);border-left:3px solid var(--purple)}
+.intel-stat:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-left-color:var(--teal)}
+.intel-stat .is-lbl{font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.intel-stat .is-val{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1}
+.intel-stat .is-sub{font-size:11px;color:var(--g500);margin-top:6px;font-family:'JetBrains Mono',monospace}
+.intel-rank-wrap{background:var(--paper);border-radius:12px;padding:14px;border:1px solid var(--g100)}
+.intel-rank-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+.intel-rank-head>span:first-child{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--ink)}
+.intel-rank-help{font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace}
+.intel-rank-list{display:flex;flex-direction:column;gap:8px}
+.intel-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--g50);border-radius:10px;cursor:pointer;transition:all .25s cubic-bezier(.16,1,.3,1);border:1px solid transparent}
+.intel-row:hover{background:var(--paper);border-color:var(--purple);transform:translateX(4px);box-shadow:var(--shadow)}
+.ir-rank{font-family:'Fraunces',serif;font-size:18px;font-weight:700;min-width:36px;text-align:center;color:var(--g700)}
+.ir-main{flex:1;min-width:0}
+.ir-name{font-weight:700;font-size:13.5px;color:var(--ink);margin-bottom:4px}
+.ir-meta{display:flex;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--g600)}
+.ir-meta span{background:var(--paper);padding:2px 7px;border-radius:6px;border:1px solid var(--g200)}
+.ir-meta .ir-avg{background:var(--saffron-soft);color:var(--saffron-deep);border-color:rgba(245,158,11,.25);font-weight:700}
+.ir-meta .ir-close{background:var(--green-soft);color:var(--green);border-color:rgba(5,150,105,.25);font-weight:700}
+.ir-bar{margin-top:8px;height:5px;background:var(--g200);border-radius:3px;overflow:hidden}
+.ir-bar-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--teal));border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both}
+.ir-score{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:var(--ink);min-width:50px;text-align:right}
+
+/* Field-intel drill modal cards */
+.fi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.fi-card{background:var(--g50);border-radius:10px;padding:12px;text-align:center;transition:all .25s ease;border:1px solid var(--g100)}
+.fi-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.fi-card.fi-hero{background:linear-gradient(135deg,var(--ink),var(--g800));color:#fff;border:none}
+.fi-card.fi-hero .fi-val{color:var(--saffron-bright)}
+.fi-card.fi-hero .fi-lbl{color:var(--g400)}
+.fi-card.fi-emph{background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(13,148,136,.06));border-color:var(--purple)}
+.fi-icon{font-size:22px;margin-bottom:6px}
+.fi-val{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--ink);line-height:1}
+.fi-lbl{font-size:11px;color:var(--g600);margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.fi-sub{font-size:10.5px;color:var(--g500);margin-top:3px}
+.fi-insight{background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(220,38,38,.04));border-left:4px solid var(--saffron);padding:14px 16px;border-radius:10px}
+.fi-insight-title{font-weight:800;color:var(--ink);font-size:13px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.fi-insight ul{margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:var(--g700)}
+.fi-insight li{margin-bottom:5px}
+.fi-insight b{color:var(--ink)}
+
+@media(max-width:600px){
+  .intel-stat .is-val{font-size:22px}
+  .ir-meta{font-size:9.5px}
+  .ir-meta span{padding:2px 6px}
+  .ir-score{font-size:15px}
+  .fi-val{font-size:20px}
+}
+
 @media(max-width:600px){
   .me-modal{width:100%;max-width:100%;max-height:94vh;border-radius:20px 20px 0 0;align-self:flex-end;margin-bottom:0}
   .me-row-head{flex-wrap:wrap}
@@ -7964,7 +8017,107 @@ function mergeUserRecord(user) {
 
 function getAllUsers() {
   var sourceUsers = Array.isArray(serverUsers) && serverUsers.length ? serverUsers : DEFAULT_USERS.concat(Array.isArray(invitedUsers) ? invitedUsers : []);
-  return sourceUsers.map(mergeUserRecord);
+  // Ivan removed — all his work reassigned to Kessi Taylor (see remapExpertForRaw/Followup)
+  return sourceUsers
+    .filter(function(u){ return !(u && (u.username==='ivan' || /^ivan$/i.test(String(u.fullName||'').trim()))); })
+    .map(mergeUserRecord);
+}
+
+// === Field & Conversion Intelligence ===
+// Per-expert: days on field, field visits count, total interactions, avg interactions before close
+function computeFieldIntelligence(){
+  var hit = (typeof _cacheGet === 'function') ? _cacheGet('fieldIntel','_') : undefined;
+  if (hit) return hit;
+  var allRaw = getAllRawRows();
+  var allFu = getAllFollowups();
+  // Index by expert
+  var byExpert = {};
+  function ensure(name){
+    var key = canonicalPersonKey(name);
+    if (!key) return null;
+    if (!byExpert[key]) byExpert[key] = {
+      expert: canonicalPersonName(name),
+      fieldDays: new Set(),       // distinct days with raw prospection (field) or VISIT followup
+      callDays:  new Set(),       // distinct days with CALL/WHATSAPP/SMS followup
+      visits: 0,                  // VISIT followups
+      rawEntries: 0,              // raw prospection entries (field)
+      calls: 0,
+      whatsapp: 0,
+      sms: 0,
+      emails: 0,
+      letters: 0,
+      schoolInteractions: {},     // schoolKey → count of touches
+      closedSchools: new Set(),   // school keys where converted
+      closedInteractions: 0       // sum of touches across closed schools
+    };
+    return byExpert[key];
+  }
+  allRaw.forEach(function(r){
+    var e = ensure(r.e); if (!e) return;
+    e.rawEntries++;
+    var d = activeDayKey(r.t); if (d) e.fieldDays.add(d);
+    var k = schoolKey(r.n); if (k){ e.schoolInteractions[k] = (e.schoolInteractions[k]||0) + 1; }
+  });
+  allFu.forEach(function(f){
+    var e = ensure(f.Expert); if (!e) return;
+    var d = activeDayKey(f.Timestamp);
+    var t = String(f.FollowupType||'').toUpperCase();
+    if (t === 'VISIT') { e.visits++; if (d) e.fieldDays.add(d); }
+    else if (t === 'CALL') { e.calls++; if (d) e.callDays.add(d); }
+    else if (t === 'WHATSAPP') { e.whatsapp++; if (d) e.callDays.add(d); }
+    else if (t === 'SMS') { e.sms++; if (d) e.callDays.add(d); }
+    else if (t === 'EMAIL') e.emails++;
+    else if (t === 'LETTER') e.letters++;
+    var k = schoolKey(f.SchoolName); if (k){ e.schoolInteractions[k] = (e.schoolInteractions[k]||0) + 1; }
+    if (k && /conver|gagn|won/i.test(String(f.Outcome||'')+String(f.NextAction||''))) e.closedSchools.add(k);
+  });
+  // Convert sets to numbers and compute averages
+  var rows = Object.keys(byExpert).map(function(k){
+    var e = byExpert[k];
+    var schoolCount = Object.keys(e.schoolInteractions).length;
+    var totalInteractions = Object.values(e.schoolInteractions).reduce(function(a,b){return a+b;},0);
+    e.closedSchools.forEach(function(sk){ e.closedInteractions += (e.schoolInteractions[sk]||0); });
+    var avgInteractionsAll = schoolCount ? +(totalInteractions/schoolCount).toFixed(1) : 0;
+    var avgInteractionsBeforeClose = e.closedSchools.size ? +(e.closedInteractions/e.closedSchools.size).toFixed(1) : 0;
+    return {
+      expert: e.expert,
+      fieldDays: e.fieldDays.size,
+      callDays: e.callDays.size,
+      visits: e.visits,
+      rawEntries: e.rawEntries,
+      calls: e.calls,
+      whatsapp: e.whatsapp,
+      sms: e.sms,
+      emails: e.emails,
+      letters: e.letters,
+      totalSchools: schoolCount,
+      totalInteractions: totalInteractions,
+      avgInteractionsAll: avgInteractionsAll,
+      closedSchools: e.closedSchools.size,
+      avgInteractionsBeforeClose: avgInteractionsBeforeClose,
+      // Efficiency score: more closes per fewer interactions = better. Add raw activity weight.
+      efficiency: schoolCount ? Math.round( (e.closedSchools.size / Math.max(avgInteractionsAll,1)) * 100 ) : 0,
+      activityScore: e.rawEntries * 3 + e.visits * 4 + e.calls * 2 + e.whatsapp + e.sms + e.emails * 2 + e.letters * 3
+    };
+  });
+  // Aggregates
+  var totals = {
+    fieldDays: rows.reduce(function(s,r){return s+r.fieldDays;},0),
+    callDays:  rows.reduce(function(s,r){return s+r.callDays;},0),
+    visits:    rows.reduce(function(s,r){return s+r.visits;},0),
+    rawEntries:rows.reduce(function(s,r){return s+r.rawEntries;},0),
+    interactions: rows.reduce(function(s,r){return s+r.totalInteractions;},0),
+    closedSchools: rows.reduce(function(s,r){return s+r.closedSchools;},0),
+    avgFieldDaysPerExpert: rows.length ? Math.round(rows.reduce(function(s,r){return s+r.fieldDays;},0)/rows.length) : 0,
+    avgInteractionsBeforeClose: (function(){
+      var totalClosed = rows.reduce(function(s,r){return s+r.closedSchools;},0);
+      var totalCloseInteractions = rows.reduce(function(s,r){return s+(r.avgInteractionsBeforeClose*r.closedSchools);},0);
+      return totalClosed ? +(totalCloseInteractions/totalClosed).toFixed(1) : 0;
+    })()
+  };
+  var result = { rows: rows, totals: totals };
+  if (typeof _cachePut === 'function') return _cachePut('fieldIntel','_', result);
+  return result;
 }
 
 function getUserByUsername(username) {
@@ -8034,9 +8187,39 @@ function applyNavigationAccess() {
 
 currentUser = currentUser && currentUser.username ? (getUserByUsername(currentUser.username) || mergeUserRecord(currentUser)) : null;
 
+// === Expert REMAP rules ===
+// 1) All of Ivan's work → Kessi Taylor (Ivan removed)
+// 2) Kendo Fabiola's calls/follow-ups in YAOUNDE → Kessi Taylor (Douala kept for Fabiola)
+function _isIvan(name){
+  return /\bivan\b/i.test(String(name||'').trim());
+}
+function _isFabiola(name){
+  return /fabiola|kendo/i.test(String(name||'').trim());
+}
+function remapExpertForRaw(row){
+  if (!row) return row;
+  if (_isIvan(row.e)) { row = Object.assign({}, row, {e:'Kessi Taylor', _remapped:'ivan→kessi'}); }
+  // Fabiola raw entries kept as-is (only call follow-ups are reassigned)
+  return row;
+}
+function remapExpertForFollowup(f){
+  if (!f) return f;
+  if (_isIvan(f.Expert)) { f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'ivan→kessi'}); }
+  else if (_isFabiola(f.Expert) && /yaound[ée]/i.test(String(f.City||''))) {
+    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'fabiola-yde→kessi'});
+  }
+  return f;
+}
+
 function getBaseRawRows() {
+  var hit = (typeof _cacheGet === 'function') ? _cacheGet('baseRaw','_') : undefined;
+  if (hit) return hit;
   var imported = LIVE_DATA && Array.isArray(LIVE_DATA.prospection) ? LIVE_DATA.prospection : null;
-  return imported && imported.length ? imported : RAW;
+  var src = imported && imported.length ? imported : RAW;
+  // Apply remap once, cache via memo layer (invalidated by bumpDataVersion)
+  var mapped = src.map(remapExpertForRaw);
+  if (typeof _cachePut === 'function') return _cachePut('baseRaw','_', mapped);
+  return mapped;
 }
 
 function shouldCreateSchoolFromFollowup(followup) {
@@ -8326,7 +8509,13 @@ function buildImportedSheetFollowups() {
 }
 
 function getAllFollowups() {
-  return (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
+  var hit = (typeof _cacheGet === 'function') ? _cacheGet('allFup','_') : undefined;
+  if (hit) return hit;
+  var merged = (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
+  // Apply remap (Ivan → Kessi everywhere, Fabiola Yaoundé calls → Kessi)
+  var mapped = merged.map(remapExpertForFollowup);
+  if (typeof _cachePut === 'function') return _cachePut('allFup','_', mapped);
+  return mapped;
 }
 
 function isImportedCallFollowup(item) {
@@ -10000,6 +10189,44 @@ function rSuivi() {
     h += '<div class="exec-card" onclick="drillDownExecKPI(\'followups\',\'Total suivis\')"><div class="ec-head"><div class="ec-icon">📋</div></div><div class="ec-val">' + agg.totalFollowups + '</div><div class="ec-lbl">Total suivis</div></div>';
     h += '</div></div>';
 
+    // Section 5: 🧠 Intelligence Terrain & Conversion (AI analytics)
+    var intel = computeFieldIntelligence();
+    var intelRows = intel.rows.slice().sort(function(a,b){return b.activityScore - a.activityScore;});
+    var maxActivity = Math.max(1, intelRows[0]?intelRows[0].activityScore:1);
+    h += '<div class="exec-section field-intel" style="animation-delay:.5s"><div class="exec-section-title">🧠 Intelligence Terrain & Conversion <span class="exec-badge ai-badge">AI · '+intelRows.length+' experts</span></div>';
+    h += '<div class="intel-summary">';
+    h += '<div class="intel-stat"><div class="is-lbl">🚶 Jours moyens sur le terrain</div><div class="is-val">'+intel.totals.avgFieldDaysPerExpert+'</div><div class="is-sub">par expert / période</div></div>';
+    h += '<div class="intel-stat"><div class="is-lbl">📞 Interactions totales</div><div class="is-val">'+fmt(intel.totals.interactions)+'</div><div class="is-sub">'+intel.totals.visits+' visites · '+intel.totals.rawEntries+' fiches terrain</div></div>';
+    h += '<div class="intel-stat"><div class="is-lbl">🎯 Avg. interactions avant closing</div><div class="is-val">'+intel.totals.avgInteractionsBeforeClose+'</div><div class="is-sub">moyenne pondérée équipe · '+intel.totals.closedSchools+' fermetures</div></div>';
+    h += '<div class="intel-stat"><div class="is-lbl">📅 Total jours terrain équipe</div><div class="is-val">'+intel.totals.fieldDays+'</div><div class="is-sub">'+intel.totals.callDays+' jours en téléprospection</div></div>';
+    h += '</div>';
+    // Ranking table
+    h += '<div class="intel-rank-wrap"><div class="intel-rank-head"><span>🏆 Classement activité & efficacité</span><span class="intel-rank-help">Score = activité × poids + bonus closing (cliquez pour le détail)</span></div>';
+    h += '<div class="intel-rank-list">';
+    intelRows.forEach(function(r, i){
+      var pct = Math.round((r.activityScore / maxActivity) * 100);
+      var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+      h += '<div class="intel-row" onclick="drillDownFieldIntel(\''+esc(r.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">';
+      h += '<div class="ir-rank">'+medal+'</div>';
+      h += '<div class="ir-main">';
+      h += '<div class="ir-name">'+esc(r.expert)+'</div>';
+      h += '<div class="ir-meta">'+
+        '<span title="Jours terrain (raw + visites)">🚶 '+r.fieldDays+'j</span>'+
+        '<span title="Jours téléprospection">📞 '+r.callDays+'j</span>'+
+        '<span title="Visites terrain">🏃 '+r.visits+'</span>'+
+        '<span title="Fiches terrain saisies">📋 '+r.rawEntries+'</span>'+
+        '<span title="Appels passés">📞 '+r.calls+'</span>'+
+        '<span title="Écoles touchées">🏫 '+r.totalSchools+'</span>'+
+        '<span title="Moyenne interactions avant close" class="ir-avg">⏱ '+r.avgInteractionsBeforeClose+' int/close</span>'+
+        '<span title="Conversions" class="ir-close">✅ '+r.closedSchools+'</span>'+
+      '</div>';
+      h += '<div class="ir-bar"><div class="ir-bar-fill" style="width:'+pct+'%"></div></div>';
+      h += '</div>';
+      h += '<div class="ir-score">'+r.activityScore+'</div>';
+      h += '</div>';
+    });
+    h += '</div></div></div>';
+
     // Expert Leaderboard mini
     h += '<div class="exec-breakdown"><h4>🏅 Classement rapide</h4><div class="exec-breakdown-grid">';
     suiviRankings.forEach(function(r) {
@@ -10890,6 +11117,44 @@ function showMyEntries(){
   document.body.style.overflow='hidden';
 }
 function closeMyEntries(){ var o=document.getElementById('me-overlay'); if (o){ o.remove(); document.body.style.overflow=''; } }
+
+// Drill-down: per-expert field intelligence detail
+function drillDownFieldIntel(expertName){
+  var intel = computeFieldIntelligence();
+  var row = intel.rows.find(function(r){return r.expert === expertName;});
+  if (!row) { showToast('Pas de données pour '+expertName, true); return; }
+  var rank = intel.rows.slice().sort(function(a,b){return b.activityScore - a.activityScore;}).findIndex(function(r){return r.expert===expertName;}) + 1;
+  var body = '<div class="fi-grid">';
+  body += '<div class="fi-card fi-hero"><div class="fi-icon">🏆</div><div class="fi-val">#'+rank+'</div><div class="fi-lbl">Rang équipe</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">🚶</div><div class="fi-val">'+row.fieldDays+'</div><div class="fi-lbl">Jours sur le terrain</div><div class="fi-sub">(distincts, raw + visites)</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">📞</div><div class="fi-val">'+row.callDays+'</div><div class="fi-lbl">Jours téléprospection</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">🏃</div><div class="fi-val">'+row.visits+'</div><div class="fi-lbl">Visites terrain</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">📋</div><div class="fi-val">'+row.rawEntries+'</div><div class="fi-lbl">Fiches terrain saisies</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">📞</div><div class="fi-val">'+row.calls+'</div><div class="fi-lbl">Appels passés</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">💬</div><div class="fi-val">'+row.whatsapp+'</div><div class="fi-lbl">WhatsApp</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">📱</div><div class="fi-val">'+row.sms+'</div><div class="fi-lbl">SMS</div></div>';
+  body += '<div class="fi-card"><div class="fi-icon">📧</div><div class="fi-val">'+(row.emails+row.letters)+'</div><div class="fi-lbl">Emails + Courriers</div></div>';
+  body += '<div class="fi-card fi-emph"><div class="fi-icon">🏫</div><div class="fi-val">'+row.totalSchools+'</div><div class="fi-lbl">Écoles touchées</div></div>';
+  body += '<div class="fi-card fi-emph"><div class="fi-icon">🔄</div><div class="fi-val">'+row.avgInteractionsAll+'</div><div class="fi-lbl">Avg interactions / école</div></div>';
+  body += '<div class="fi-card fi-emph"><div class="fi-icon">⏱</div><div class="fi-val">'+row.avgInteractionsBeforeClose+'</div><div class="fi-lbl">Avg interactions avant close</div></div>';
+  body += '<div class="fi-card fi-emph"><div class="fi-icon">✅</div><div class="fi-val">'+row.closedSchools+'</div><div class="fi-lbl">Conversions</div></div>';
+  body += '</div>';
+  body += '<div class="fi-insight">';
+  body += '<div class="fi-insight-title">🧠 Analyse AI</div>';
+  var insights = [];
+  if (row.avgInteractionsBeforeClose>0 && intel.totals.avgInteractionsBeforeClose>0){
+    var diff = row.avgInteractionsBeforeClose - intel.totals.avgInteractionsBeforeClose;
+    if (diff < -0.5) insights.push('🎯 <b>'+expertName+' close plus vite que la moyenne</b> : '+row.avgInteractionsBeforeClose+' interactions vs '+intel.totals.avgInteractionsBeforeClose+' pour l\'équipe.');
+    else if (diff > 0.5) insights.push('⚠️ <b>'+expertName+' a besoin de plus d\'interactions pour conclure</b> ('+row.avgInteractionsBeforeClose+' vs '+intel.totals.avgInteractionsBeforeClose+'). Cibler les écoles déjà tièdes/chaudes.');
+    else insights.push('✓ Ratio interactions/close conforme à la moyenne équipe ('+intel.totals.avgInteractionsBeforeClose+').');
+  }
+  if (row.fieldDays > intel.totals.avgFieldDaysPerExpert + 3) insights.push('💪 Présent sur le terrain plus que la moyenne ('+row.fieldDays+'j vs ~'+intel.totals.avgFieldDaysPerExpert+'j).');
+  else if (row.fieldDays < intel.totals.avgFieldDaysPerExpert - 3 && row.callDays > intel.totals.avgFieldDaysPerExpert) insights.push('📞 Profil <b>téléprospecteur</b> : très actif au téléphone, peu de terrain. Bon mix avec un visiteur.');
+  if (row.totalSchools > 0 && row.closedSchools === 0) insights.push('🚧 Aucune conversion encore — vérifier que les écoles chaudes (≥60%) sont travaillées en priorité.');
+  if (!insights.length) insights.push('📊 Données insuffisantes pour générer une analyse personnalisée.');
+  body += '<ul>'+insights.map(function(i){return '<li>'+i+'</li>';}).join('')+'</ul></div>';
+  showDrillDown('🧠 '+expertName+' — Intelligence Terrain', body);
+}
 function setMyEntriesTab(btn, key){
   document.querySelectorAll('.me-tab').forEach(function(b){b.classList.remove('act');});
   btn.classList.add('act');
