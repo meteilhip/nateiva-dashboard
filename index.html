@@ -2630,12 +2630,45 @@ button,select,input,textarea{outline:none}
 .fi-insight li{margin-bottom:5px}
 .fi-insight b{color:var(--ink)}
 
+/* — Top performers grid (Workspace) — */
+.top-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:12px}
+.top-card{
+  background:var(--paper);border:1px solid var(--g100);border-top:4px solid var(--saffron);
+  border-radius:14px;padding:16px;cursor:pointer;
+  transition:all .35s cubic-bezier(.16,1,.3,1);display:flex;gap:14px;align-items:flex-start;
+  position:relative;overflow:hidden;
+  animation:cardPop .45s cubic-bezier(.16,1,.3,1) both;
+}
+.top-card::before{
+  content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at center,rgba(245,158,11,.12),transparent 60%);
+  opacity:0;transition:opacity .4s ease;pointer-events:none;
+}
+.top-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:var(--shadow-lg)}
+.top-card:hover::before{opacity:1}
+.top-card.top-empty{opacity:.7;cursor:default}
+.top-card.top-empty:hover{transform:none;box-shadow:var(--shadow-sm)}
+.tc-icon{flex-shrink:0;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--saffron-soft);color:var(--saffron-deep)}
+.tc-body{flex:1;min-width:0;position:relative;z-index:1}
+.tc-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
+.tc-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
+.tc-name{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.1;margin-bottom:8px}
+.tc-stats{display:flex;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--g700)}
+.tc-stats span{background:var(--g100);padding:3px 8px;border-radius:6px}
+.tc-stats .tc-score{background:var(--ink);color:var(--saffron-bright);margin-left:auto}
+.tc-empty{font-size:12px;color:var(--g500);font-style:italic;padding:8px 0}
+.top-note{font-size:12px;color:var(--g600);text-align:center;padding:10px 0;background:var(--g50);border-radius:8px}
+.top-note a{cursor:pointer}
+
 @media(max-width:600px){
   .intel-stat .is-val{font-size:22px}
   .ir-meta{font-size:9.5px}
   .ir-meta span{padding:2px 6px}
   .ir-score{font-size:15px}
   .fi-val{font-size:20px}
+  .top-card{padding:14px;gap:10px}
+  .tc-icon{width:40px;height:40px;font-size:20px}
+  .tc-name{font-size:17px}
 }
 
 @media(max-width:600px){
@@ -5637,7 +5670,40 @@ function rHome(){
       ${renderRevenueCard('🟠 Pipeline tiède',dashboard.warmRevenue,'Valeur pondérée des écoles tièdes (40-59%) à travailler.','',warmAmb,warmNet,'onclick="drillDownRevenue(\'warm\')"')}
 
     </div>
-  </div>`;
+  </div>` + (function(){
+    // 🏆 Classement Activité & Efficacité (moved from Workspace to Dashboard)
+    if (typeof computeFieldIntelligence !== 'function') return '';
+    var intel = computeFieldIntelligence();
+    var intelRows = intel.rows.slice().sort(function(a,b){return b.activityScore - a.activityScore;});
+    if (!intelRows.length) return '';
+    var maxActivity = Math.max(1, intelRows[0].activityScore);
+    var rankHtml = '<div class="section field-intel" style="margin-top:14px"><div class="sec-head"><h2>🏆 Classement <span class="it">Activité & Efficacité</span></h2><span class="anno">AI · '+intelRows.length+' experts · score = activité × poids + bonus closing</span></div>';
+    rankHtml += '<div class="intel-summary" style="margin-bottom:14px"><div class="intel-stat"><div class="is-lbl">🚶 Jours moyens terrain</div><div class="is-val">'+intel.totals.avgFieldDaysPerExpert+'</div><div class="is-sub">par expert</div></div><div class="intel-stat"><div class="is-lbl">📞 Interactions totales</div><div class="is-val">'+fmt(intel.totals.interactions)+'</div><div class="is-sub">'+intel.totals.visits+' visites</div></div><div class="intel-stat"><div class="is-lbl">⏱ Avg interactions avant close</div><div class="is-val">'+intel.totals.avgInteractionsBeforeClose+'</div><div class="is-sub">moyenne équipe pondérée</div></div><div class="intel-stat"><div class="is-lbl">📅 Total jours terrain</div><div class="is-val">'+intel.totals.fieldDays+'</div><div class="is-sub">'+intel.totals.callDays+' jours téléprospection</div></div></div>';
+    rankHtml += '<div class="intel-rank-list">';
+    intelRows.forEach(function(r,i){
+      var pct = Math.round((r.activityScore / maxActivity) * 100);
+      var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+      rankHtml += '<div class="intel-row" onclick="drillDownFieldIntel(\''+esc(r.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">'+
+        '<div class="ir-rank">'+medal+'</div>'+
+        '<div class="ir-main"><div class="ir-name">'+esc(r.expert)+'</div>'+
+          '<div class="ir-meta">'+
+            '<span title="Jours terrain">🚶 '+r.fieldDays+'j</span>'+
+            '<span title="Jours téléprospection">📞 '+r.callDays+'j</span>'+
+            '<span title="Visites terrain">🏃 '+r.visits+'</span>'+
+            '<span title="Fiches terrain saisies">📋 '+r.rawEntries+'</span>'+
+            '<span title="Appels passés">📞 '+r.calls+'</span>'+
+            '<span title="Écoles touchées">🏫 '+r.totalSchools+'</span>'+
+            '<span title="Moyenne interactions avant close" class="ir-avg">⏱ '+r.avgInteractionsBeforeClose+' int/close</span>'+
+            '<span title="Conversions" class="ir-close">✅ '+r.closedSchools+'</span>'+
+          '</div>'+
+          '<div class="ir-bar"><div class="ir-bar-fill" style="width:'+pct+'%"></div></div>'+
+        '</div>'+
+        '<div class="ir-score">'+r.activityScore+'</div>'+
+      '</div>';
+    });
+    rankHtml += '</div></div>';
+    return rankHtml;
+  })();
   })() : ''}
 
   <div class="section">
@@ -10189,43 +10255,48 @@ function rSuivi() {
     h += '<div class="exec-card" onclick="drillDownExecKPI(\'followups\',\'Total suivis\')"><div class="ec-head"><div class="ec-icon">📋</div></div><div class="ec-val">' + agg.totalFollowups + '</div><div class="ec-lbl">Total suivis</div></div>';
     h += '</div></div>';
 
-    // Section 5: 🧠 Intelligence Terrain & Conversion (AI analytics)
+    // Section 5: 🏅 Top Performers — Expert · Sub-Admin · Ambassador
     var intel = computeFieldIntelligence();
-    var intelRows = intel.rows.slice().sort(function(a,b){return b.activityScore - a.activityScore;});
-    var maxActivity = Math.max(1, intelRows[0]?intelRows[0].activityScore:1);
-    h += '<div class="exec-section field-intel" style="animation-delay:.5s"><div class="exec-section-title">🧠 Intelligence Terrain & Conversion <span class="exec-badge ai-badge">AI · '+intelRows.length+' experts</span></div>';
-    h += '<div class="intel-summary">';
-    h += '<div class="intel-stat"><div class="is-lbl">🚶 Jours moyens sur le terrain</div><div class="is-val">'+intel.totals.avgFieldDaysPerExpert+'</div><div class="is-sub">par expert / période</div></div>';
-    h += '<div class="intel-stat"><div class="is-lbl">📞 Interactions totales</div><div class="is-val">'+fmt(intel.totals.interactions)+'</div><div class="is-sub">'+intel.totals.visits+' visites · '+intel.totals.rawEntries+' fiches terrain</div></div>';
-    h += '<div class="intel-stat"><div class="is-lbl">🎯 Avg. interactions avant closing</div><div class="is-val">'+intel.totals.avgInteractionsBeforeClose+'</div><div class="is-sub">moyenne pondérée équipe · '+intel.totals.closedSchools+' fermetures</div></div>';
-    h += '<div class="intel-stat"><div class="is-lbl">📅 Total jours terrain équipe</div><div class="is-val">'+intel.totals.fieldDays+'</div><div class="is-sub">'+intel.totals.callDays+' jours en téléprospection</div></div>';
-    h += '</div>';
-    // Ranking table
-    h += '<div class="intel-rank-wrap"><div class="intel-rank-head"><span>🏆 Classement activité & efficacité</span><span class="intel-rank-help">Score = activité × poids + bonus closing (cliquez pour le détail)</span></div>';
-    h += '<div class="intel-rank-list">';
-    intelRows.forEach(function(r, i){
-      var pct = Math.round((r.activityScore / maxActivity) * 100);
-      var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
-      h += '<div class="intel-row" onclick="drillDownFieldIntel(\''+esc(r.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">';
-      h += '<div class="ir-rank">'+medal+'</div>';
-      h += '<div class="ir-main">';
-      h += '<div class="ir-name">'+esc(r.expert)+'</div>';
-      h += '<div class="ir-meta">'+
-        '<span title="Jours terrain (raw + visites)">🚶 '+r.fieldDays+'j</span>'+
-        '<span title="Jours téléprospection">📞 '+r.callDays+'j</span>'+
-        '<span title="Visites terrain">🏃 '+r.visits+'</span>'+
-        '<span title="Fiches terrain saisies">📋 '+r.rawEntries+'</span>'+
-        '<span title="Appels passés">📞 '+r.calls+'</span>'+
-        '<span title="Écoles touchées">🏫 '+r.totalSchools+'</span>'+
-        '<span title="Moyenne interactions avant close" class="ir-avg">⏱ '+r.avgInteractionsBeforeClose+' int/close</span>'+
-        '<span title="Conversions" class="ir-close">✅ '+r.closedSchools+'</span>'+
+    var allUsersList = (typeof getAllUsers === 'function') ? getAllUsers() : [];
+    function _roleOf(name){
+      var u = allUsersList.find(function(x){return samePerson(x.fullName||x.username, name);});
+      if (!u) return 'Expert';
+      if (typeof isSuperAdmin === 'function' && isSuperAdmin(u)) return 'SuperAdmin';
+      if (typeof isAmbassador === 'function' && isAmbassador(u)) return 'Ambassador';
+      if (typeof isSubAdmin === 'function' && isSubAdmin(u)) return 'SubAdmin';
+      if (typeof isExpert === 'function' && isExpert(u)) return 'Expert';
+      return 'Expert';
+    }
+    function _topOf(roles){
+      // Return highest activityScore among intel rows whose role matches
+      var pool = intel.rows.filter(function(r){return roles.indexOf(_roleOf(r.expert))!==-1;});
+      pool.sort(function(a,b){return b.activityScore - a.activityScore;});
+      return pool[0] || null;
+    }
+    var topExpert    = _topOf(['Expert']);
+    var topSubAdmin  = _topOf(['SubAdmin','SuperAdmin']);
+    var topAmbassador= _topOf(['Ambassador']);
+
+    function _topCard(title, icon, color, p, fallback){
+      if (!p) return '<div class="top-card top-empty"><div class="tc-icon">'+icon+'</div><div class="tc-title">'+title+'</div><div class="tc-empty">'+fallback+'</div></div>';
+      return '<div class="top-card" style="border-top-color:'+color+'" onclick="drillDownFieldIntel(\''+esc(p.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">'+
+        '<div class="tc-icon" style="background:'+color+'33;color:'+color+'">'+icon+'</div>'+
+        '<div class="tc-body">'+
+          '<div class="tc-label">'+title+'</div>'+
+          '<div class="tc-name">'+esc(p.expert)+'</div>'+
+          '<div class="tc-stats"><span>🏃 '+p.visits+'</span><span>📞 '+p.calls+'</span><span>🏫 '+p.totalSchools+'</span><span>✅ '+p.closedSchools+'</span><span class="tc-score">'+p.activityScore+' pts</span></div>'+
+        '</div>'+
       '</div>';
-      h += '<div class="ir-bar"><div class="ir-bar-fill" style="width:'+pct+'%"></div></div>';
-      h += '</div>';
-      h += '<div class="ir-score">'+r.activityScore+'</div>';
-      h += '</div>';
-    });
-    h += '</div></div></div>';
+    }
+
+    h += '<div class="exec-section" style="animation-delay:.5s"><div class="exec-section-title">🏅 Top performers <span class="exec-badge ai-badge">leaders globaux</span></div>';
+    h += '<div class="top-grid">';
+    h += _topCard('🥇 Top Expert',     '🥇', 'var(--saffron)', topExpert,    'Aucun expert noté');
+    h += _topCard('🏛 Top Sub-Admin',  '🏛', 'var(--purple)',  topSubAdmin,  'Aucun sub-admin noté');
+    h += _topCard('🤝 Top Ambassadeur','🤝', 'var(--teal)',    topAmbassador,'Aucun ambassadeur actif');
+    h += '</div>';
+    h += '<div class="top-note">Cliquez une carte pour le détail · Le classement complet est dans le <a href="#" data-jump="home" style="color:var(--red);font-weight:700;text-decoration:underline">Dashboard</a> sous « Revenus en FCFA ».</div>';
+    h += '</div>';
 
     // Expert Leaderboard mini
     h += '<div class="exec-breakdown"><h4>🏅 Classement rapide</h4><div class="exec-breakdown-grid">';
