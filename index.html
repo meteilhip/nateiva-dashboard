@@ -1520,35 +1520,69 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .suivi-kpi.clickable:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--saffron)}
 .suivi-kpi.clickable:active{transform:translateY(0) scale(.98)}
 
-.exec-section{margin-bottom:32px;animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both}
-.exec-section-title{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--ink);margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.exec-section-title .exec-badge{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--saffron-soft);color:var(--saffron-deep);padding:3px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.exec-section{margin-bottom:32px;animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both;background:linear-gradient(180deg,transparent,rgba(245,158,11,.02));border-radius:18px;padding:20px;border:1px solid var(--g100)}
+.exec-section-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:18px;display:flex;align-items:center;gap:10px;letter-spacing:-.02em}
+.exec-section-title .exec-badge{font-family:'JetBrains Mono',monospace;font-size:10px;background:linear-gradient(135deg,var(--saffron),var(--red));color:#fff;padding:4px 11px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;box-shadow:0 2px 8px rgba(245,158,11,.25)}
 
 .exec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
 @media(max-width:900px){.exec-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:500px){.exec-grid{grid-template-columns:1fr}}
 
-.exec-card{background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:20px;position:relative;overflow:hidden;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
-.exec-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
-.exec-card:active{transform:translateY(0) scale(.97)}
-.exec-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--g200);transition:background .3s}
-.exec-card:hover::before{background:var(--saffron)}
-.exec-card .ec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.exec-card .ec-icon{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--g50)}
-.exec-card .ec-trend{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px}
-.exec-card .ec-trend.up{background:var(--green-soft);color:var(--green)}
-.exec-card .ec-trend.down{background:var(--red-soft);color:var(--red)}
-.exec-card .ec-trend.flat{background:var(--g100);color:var(--g500)}
-.exec-card .ec-val{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.03em}
-.exec-card .ec-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g500);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-top:6px}
-.exec-card .ec-sub{font-size:12px;color:var(--g400);margin-top:8px;line-height:1.4}
+.exec-card{
+  background:var(--paper);border:1px solid var(--g100);border-radius:18px;
+  padding:18px 18px 20px;position:relative;overflow:hidden;cursor:pointer;
+  transition:all .35s cubic-bezier(.16,1,.3,1);
+  animation:cardPop .5s cubic-bezier(.16,1,.3,1) both;
+  box-shadow:var(--shadow-sm);
+}
+.exec-card:hover{transform:translateY(-5px) scale(1.015);box-shadow:0 18px 40px rgba(0,0,0,.1);border-color:transparent}
+.exec-card:active{transform:translateY(-1px) scale(.98);transition-duration:.12s}
+.exec-card::before{
+  content:'';position:absolute;inset:0;border-radius:18px;padding:1.5px;
+  background:linear-gradient(135deg,var(--saffron),var(--red),var(--purple));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:0;transition:opacity .35s ease;pointer-events:none;
+}
+.exec-card:hover::before{opacity:1}
+.exec-card::after{
+  content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at center,rgba(245,158,11,.08),transparent 60%);
+  opacity:0;transform:rotate(0deg);transition:opacity .5s ease;pointer-events:none;
+}
+.exec-card:hover::after{opacity:1}
+.exec-card .ec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;position:relative;z-index:1}
+.exec-card .ec-icon{
+  font-size:22px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  border-radius:12px;background:linear-gradient(135deg,var(--g50),var(--g100));
+  transition:all .35s cubic-bezier(.16,1,.3,1);
+  box-shadow:inset 0 0 0 1px var(--g200);
+}
+.exec-card:hover .ec-icon{transform:scale(1.1) rotate(-4deg);background:linear-gradient(135deg,var(--saffron-soft),var(--red-soft));box-shadow:inset 0 0 0 1px var(--saffron),0 4px 12px rgba(245,158,11,.2)}
+.exec-card .ec-trend{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:20px;letter-spacing:-.02em}
+.exec-card .ec-trend.up{background:linear-gradient(135deg,var(--green-soft),rgba(5,150,105,.18));color:var(--green);border:1px solid rgba(5,150,105,.2)}
+.exec-card .ec-trend.down{background:linear-gradient(135deg,var(--red-soft),rgba(220,38,38,.18));color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.exec-card .ec-trend.flat{background:var(--g100);color:var(--g500);border:1px solid var(--g200)}
+.exec-card .ec-val{font-family:'Fraunces',serif;font-size:34px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.035em;position:relative;z-index:1;font-variant-numeric:tabular-nums}
+.exec-card:hover .ec-val{background:linear-gradient(135deg,var(--ink),var(--red));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.exec-card .ec-lbl{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--g500);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-top:8px;position:relative;z-index:1}
+.exec-card .ec-sub{font-size:11.5px;color:var(--g500);margin-top:6px;line-height:1.45;position:relative;z-index:1}
 
-.exec-card.hero-card{background:linear-gradient(135deg,var(--ink),var(--g700));color:var(--paper);border-color:transparent;grid-column:span 2}
-.exec-card.hero-card .ec-val{color:var(--saffron-bright);font-size:42px}
+.exec-card.hero-card{
+  background:linear-gradient(135deg,var(--ink),var(--g800));color:var(--paper);
+  border-color:transparent;grid-column:span 2;
+  box-shadow:0 12px 32px rgba(0,0,0,.18);
+  position:relative;
+}
+.exec-card.hero-card::after{background:radial-gradient(ellipse at top right,rgba(245,158,11,.25),transparent 60%);opacity:1}
+.exec-card.hero-card::before{display:none}
+.exec-card.hero-card:hover{transform:translateY(-5px) scale(1.01);box-shadow:0 24px 50px rgba(0,0,0,.28)}
+.exec-card.hero-card .ec-val{color:var(--saffron-bright);font-size:48px;-webkit-text-fill-color:var(--saffron-bright);background:none}
+.exec-card.hero-card:hover .ec-val{-webkit-text-fill-color:#fff}
 .exec-card.hero-card .ec-lbl{color:var(--g300)}
 .exec-card.hero-card .ec-sub{color:var(--g400)}
-.exec-card.hero-card .ec-icon{background:rgba(255,255,255,.1)}
-.exec-card.hero-card::before{background:var(--saffron)}
+.exec-card.hero-card .ec-icon{background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);color:var(--saffron-bright)}
+.exec-card.hero-card:hover .ec-icon{background:rgba(245,158,11,.18);box-shadow:inset 0 0 0 1px var(--saffron),0 4px 16px rgba(245,158,11,.35)}
 
 .exec-breakdown{background:var(--paper);border:1.5px solid var(--g200);border-radius:16px;padding:24px;margin-bottom:24px;animation:surfaceIn .5s cubic-bezier(.16,1,.3,1) both}
 .exec-breakdown h4{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin-bottom:16px}
@@ -1561,10 +1595,21 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .exec-expert-row .eer-meta{font-size:11px;color:var(--g500)}
 .exec-expert-row .eer-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:var(--ink);flex-shrink:0}
 
-.exec-insight{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));margin-bottom:12px;border:1px solid rgba(245,158,11,.15);animation:surfaceIn .4s ease both}
-.exec-insight .ei-icon{font-size:20px;flex-shrink:0;margin-top:2px}
-.exec-insight .ei-text{font-size:13px;line-height:1.5;color:var(--g700)}
-.exec-insight .ei-text strong{color:var(--ink)}
+.exec-insight{
+  display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-radius:14px;
+  background:linear-gradient(135deg,var(--saffron-soft) 0%,rgba(220,38,38,.04) 60%,var(--bg-warm) 100%);
+  margin-bottom:16px;border:1px solid rgba(245,158,11,.2);
+  animation:surfaceIn .45s cubic-bezier(.16,1,.3,1) both;
+  box-shadow:0 2px 12px rgba(245,158,11,.08);
+  position:relative;overflow:hidden;
+}
+.exec-insight::before{
+  content:'';position:absolute;top:0;left:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--saffron),var(--red));border-radius:4px 0 0 4px;
+}
+.exec-insight .ei-icon{font-size:22px;flex-shrink:0;margin-top:2px;animation:breathe 3s ease infinite}
+.exec-insight .ei-text{font-size:13.5px;line-height:1.6;color:var(--g700);padding-left:6px}
+.exec-insight .ei-text strong{color:var(--ink);font-weight:800}
 
 .form-card{
   background:var(--paper);border:1.5px solid var(--g200);border-radius:18px;
@@ -5448,6 +5493,9 @@ function rHome(){
       </div>
     </div>
   </div>
+
+  <!-- 🏅 TOP PERFORMERS (just below Vue d'ensemble Pulse Live) -->
+  ${(typeof buildTopPerformersStrip === 'function') ? buildTopPerformersStrip('Cliquez une carte pour le détail · Classement complet plus bas sous « Revenus en FCFA ».') : ''}
 
   <!-- LIVE ACTIVITY FEED -->
   ${_feedItems.length ? `
@@ -10201,6 +10249,11 @@ function rSuivi() {
   h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
   h += '</div></div>';
 
+  // 🏅 Top performers strip — right below the account owner header
+  if (isSuper) {
+    h += buildTopPerformersStrip('Le classement complet est dans le <a href="#" data-jump="home" style="color:var(--red);font-weight:700;text-decoration:underline">Dashboard</a> sous « Revenus en FCFA ».');
+  }
+
   // KPIs — SuperAdmin gets 360 executive view, others get personal view
   if (isSuper) {
     var agg = computeVisibleWorkspaceStats();
@@ -10255,48 +10308,7 @@ function rSuivi() {
     h += '<div class="exec-card" onclick="drillDownExecKPI(\'followups\',\'Total suivis\')"><div class="ec-head"><div class="ec-icon">📋</div></div><div class="ec-val">' + agg.totalFollowups + '</div><div class="ec-lbl">Total suivis</div></div>';
     h += '</div></div>';
 
-    // Section 5: 🏅 Top Performers — Expert · Sub-Admin · Ambassador
-    var intel = computeFieldIntelligence();
-    var allUsersList = (typeof getAllUsers === 'function') ? getAllUsers() : [];
-    function _roleOf(name){
-      var u = allUsersList.find(function(x){return samePerson(x.fullName||x.username, name);});
-      if (!u) return 'Expert';
-      if (typeof isSuperAdmin === 'function' && isSuperAdmin(u)) return 'SuperAdmin';
-      if (typeof isAmbassador === 'function' && isAmbassador(u)) return 'Ambassador';
-      if (typeof isSubAdmin === 'function' && isSubAdmin(u)) return 'SubAdmin';
-      if (typeof isExpert === 'function' && isExpert(u)) return 'Expert';
-      return 'Expert';
-    }
-    function _topOf(roles){
-      // Return highest activityScore among intel rows whose role matches
-      var pool = intel.rows.filter(function(r){return roles.indexOf(_roleOf(r.expert))!==-1;});
-      pool.sort(function(a,b){return b.activityScore - a.activityScore;});
-      return pool[0] || null;
-    }
-    var topExpert    = _topOf(['Expert']);
-    var topSubAdmin  = _topOf(['SubAdmin','SuperAdmin']);
-    var topAmbassador= _topOf(['Ambassador']);
-
-    function _topCard(title, icon, color, p, fallback){
-      if (!p) return '<div class="top-card top-empty"><div class="tc-icon">'+icon+'</div><div class="tc-title">'+title+'</div><div class="tc-empty">'+fallback+'</div></div>';
-      return '<div class="top-card" style="border-top-color:'+color+'" onclick="drillDownFieldIntel(\''+esc(p.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">'+
-        '<div class="tc-icon" style="background:'+color+'33;color:'+color+'">'+icon+'</div>'+
-        '<div class="tc-body">'+
-          '<div class="tc-label">'+title+'</div>'+
-          '<div class="tc-name">'+esc(p.expert)+'</div>'+
-          '<div class="tc-stats"><span>🏃 '+p.visits+'</span><span>📞 '+p.calls+'</span><span>🏫 '+p.totalSchools+'</span><span>✅ '+p.closedSchools+'</span><span class="tc-score">'+p.activityScore+' pts</span></div>'+
-        '</div>'+
-      '</div>';
-    }
-
-    h += '<div class="exec-section" style="animation-delay:.5s"><div class="exec-section-title">🏅 Top performers <span class="exec-badge ai-badge">leaders globaux</span></div>';
-    h += '<div class="top-grid">';
-    h += _topCard('🥇 Top Expert',     '🥇', 'var(--saffron)', topExpert,    'Aucun expert noté');
-    h += _topCard('🏛 Top Sub-Admin',  '🏛', 'var(--purple)',  topSubAdmin,  'Aucun sub-admin noté');
-    h += _topCard('🤝 Top Ambassadeur','🤝', 'var(--teal)',    topAmbassador,'Aucun ambassadeur actif');
-    h += '</div>';
-    h += '<div class="top-note">Cliquez une carte pour le détail · Le classement complet est dans le <a href="#" data-jump="home" style="color:var(--red);font-weight:700;text-decoration:underline">Dashboard</a> sous « Revenus en FCFA ».</div>';
-    h += '</div>';
+    // Top Performers strip now rendered at the top of Workspace, see buildTopPerformersStrip() call above
 
     // Expert Leaderboard mini
     h += '<div class="exec-breakdown"><h4>🏅 Classement rapide</h4><div class="exec-breakdown-grid">';
@@ -11188,6 +11200,52 @@ function showMyEntries(){
   document.body.style.overflow='hidden';
 }
 function closeMyEntries(){ var o=document.getElementById('me-overlay'); if (o){ o.remove(); document.body.style.overflow=''; } }
+
+// 🏅 Top performers strip — reusable in Workspace and Dashboard
+function buildTopPerformersStrip(noteHref){
+  if (typeof computeFieldIntelligence !== 'function') return '';
+  var intel = computeFieldIntelligence();
+  if (!intel || !intel.rows || !intel.rows.length) return '';
+  var allUsersList = (typeof getAllUsers === 'function') ? getAllUsers() : [];
+  function _roleOf(name){
+    var u = allUsersList.find(function(x){return samePerson(x.fullName||x.username, name);});
+    if (!u) return 'Expert';
+    if (typeof isSuperAdmin === 'function' && isSuperAdmin(u)) return 'SuperAdmin';
+    if (typeof isAmbassador === 'function' && isAmbassador(u)) return 'Ambassador';
+    if (typeof isSubAdmin === 'function' && isSubAdmin(u)) return 'SubAdmin';
+    if (typeof isExpert === 'function' && isExpert(u)) return 'Expert';
+    return 'Expert';
+  }
+  function _topOf(roles){
+    var pool = intel.rows.filter(function(r){return roles.indexOf(_roleOf(r.expert))!==-1;});
+    pool.sort(function(a,b){return b.activityScore - a.activityScore;});
+    return pool[0] || null;
+  }
+  var topExpert     = _topOf(['Expert']);
+  var topSubAdmin   = _topOf(['SubAdmin','SuperAdmin']);
+  var topAmbassador = _topOf(['Ambassador']);
+  function _card(title, icon, color, p, fallback){
+    if (!p) return '<div class="top-card top-empty"><div class="tc-icon">'+icon+'</div><div class="tc-body"><div class="tc-label">'+title+'</div><div class="tc-empty">'+fallback+'</div></div></div>';
+    return '<div class="top-card" style="border-top-color:'+color+'" onclick="drillDownFieldIntel(\''+esc(p.expert).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">'+
+      '<div class="tc-icon" style="background:'+color+'33;color:'+color+'">'+icon+'</div>'+
+      '<div class="tc-body">'+
+        '<div class="tc-label">'+title+'</div>'+
+        '<div class="tc-name">'+esc(p.expert)+'</div>'+
+        '<div class="tc-stats"><span>🏃 '+p.visits+'</span><span>📞 '+p.calls+'</span><span>🏫 '+p.totalSchools+'</span><span>✅ '+p.closedSchools+'</span><span class="tc-score">'+p.activityScore+' pts</span></div>'+
+      '</div>'+
+    '</div>';
+  }
+  var noteHtml = noteHref ? '<div class="top-note">Cliquez une carte pour le détail · '+noteHref+'</div>' : '';
+  return '<div class="section top-strip" style="padding:18px;margin-bottom:14px">'+
+    '<div class="sec-head" style="margin-bottom:14px"><h2>🏅 Top <span class="it">Performers</span></h2><span class="anno">Leaders globaux · activité × poids + bonus closing</span></div>'+
+    '<div class="top-grid">'+
+      _card('🥇 Top Expert',     '🥇', 'var(--saffron)', topExpert,    'Aucun expert noté')+
+      _card('🏛 Top Sub-Admin',  '🏛', 'var(--purple)',  topSubAdmin,  'Aucun sub-admin noté')+
+      _card('🤝 Top Ambassadeur','🤝', 'var(--teal)',    topAmbassador,'Aucun ambassadeur actif')+
+    '</div>'+
+    noteHtml+
+  '</div>';
+}
 
 // Drill-down: per-expert field intelligence detail
 function drillDownFieldIntel(expertName){
