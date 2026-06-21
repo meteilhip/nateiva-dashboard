@@ -9907,9 +9907,11 @@ function rSuivi() {
   var cityOptions = allowedCities.map(function(city) {
     return '<option value="' + esc(city) + '">' + esc(getCityLabel(city)) + '</option>';
   }).join('');
-  var workspaceRaw = getWorkspaceRawForUser(me);
-  var workspaceFollowups = getWorkspaceFollowupsForUser(me);
-  var stats = computeExpertStats(me);
+  // 360 view for super-admin & coordo (canSeeAllData) — they see every expert's data
+  // everywhere in Workspace (Historique, Rappels, Coûts, Planner). Others see their portfolio.
+  var workspaceRaw = isSuper ? getVisibleRaw() : getWorkspaceRawForUser(me);
+  var workspaceFollowups = isSuper ? getVisibleFollowups() : getWorkspaceFollowupsForUser(me);
+  var stats = isSuper ? computeVisibleWorkspaceStats() : computeExpertStats(me);
   var myRank = suiviRankings.find(function(r) { return samePerson(r.expert, me); });
   var myFollowups = workspaceFollowups.sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
   var rankingRows = isSuper ? suiviRankings : suiviRankings.filter(function(r) { return samePerson(r.expert, me); });
@@ -10273,7 +10275,8 @@ function rSuivi() {
     h += '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">';
     planner.overdue.slice(0, 5).forEach(function(item) {
       var f = item.followup;
-      h += '<div class="planner-card overdue"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance en attente') + '</span>' + renderPlannerActions(f) + '</div>';
+      var expBadge = isSuper && f.Expert ? '<span style="display:inline-block;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;background:var(--teal-soft);color:var(--teal-deep);padding:2px 7px;border-radius:6px;margin-bottom:4px">👤 '+esc(f.Expert)+'</span>' : '';
+      h += '<div class="planner-card overdue">' + expBadge + '<strong>' + esc(f.SchoolName) + '</strong><span>' + esc(item.reminder.label + ' · ' + item.reminder.displayDate) + '</span><span>' + esc(f.NextAction || f.Outcome || 'Relance en attente') + '</span>' + renderPlannerActions(f) + '</div>';
     });
     h += '</div>';
   }
@@ -10309,7 +10312,8 @@ function rSuivi() {
       h += '<div class="planner-month"><div class="planner-month-title">' + esc(month.label) + '</div>';
       month.items.forEach(function(item) {
         var f = item.followup;
-        h += '<div class="planner-entry"><div class="planner-entry-main"><strong>' + esc(f.SchoolName) + '</strong><span>' + esc(f.NextAction || f.Outcome || 'Relance à préparer') + '</span></div><div class="planner-entry-side"><span>' + esc(item.reminder.displayDate) + '</span>' + renderPlannerActions(f) + '</div></div>';
+        var expBadge = isSuper && f.Expert ? '<span style="display:inline-block;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;background:var(--teal-soft);color:var(--teal-deep);padding:2px 7px;border-radius:6px;margin-right:6px">👤 '+esc(f.Expert)+'</span>' : '';
+        h += '<div class="planner-entry"><div class="planner-entry-main"><strong>' + expBadge + esc(f.SchoolName) + '</strong><span>' + esc(f.NextAction || f.Outcome || 'Relance à préparer') + '</span></div><div class="planner-entry-side"><span>' + esc(item.reminder.displayDate) + '</span>' + renderPlannerActions(f) + '</div></div>';
       });
       h += '</div>';
     });
@@ -10342,7 +10346,7 @@ function rSuivi() {
     var canDelete = canDeleteFollowups(currentUser) && !f.Imported && f.Source !== 'calls-sheet' && f.ID;
     h += '<div class="fu-item type-' + esc(f.FollowupType || 'CALL') + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
-    if (isSuper) h += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--g500)">' + esc(f.Expert) + '</span>';
+    if (isSuper) h += '<span style="display:inline-flex;align-items:center;gap:4px;font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:700;background:var(--teal-soft);color:var(--teal-deep);padding:3px 9px;border-radius:8px;border:1px solid rgba(13,148,136,.2)">👤 ' + esc(f.Expert) + '</span>';
     h += '<span class="fu-type ' + esc(f.FollowupType || 'CALL') + '">' + esc(fuTypeIcon(f.FollowupType)) + '</span>';
     h += '<span class="impact-pill steady">' + esc(stageMeta.label) + '</span>';
     if (canDelete) h += '<button class="delete-entry-btn" onclick="deleteFollowupEntry(\'' + esc(String(f.ID || '')).replace(/'/g, "\\'") + '\')">Supprimer</button>';
