@@ -8459,10 +8459,9 @@ function getAssignedCityForExpert(expertName) {
 }
 
 function recordMatchesAssignedCity(expertName, city) {
-  var assignedCity = getAssignedCityForExpert(expertName);
-  var recordCity = normalizeAssignedCity(city);
-  if (!assignedCity || assignedCity === 'ALL' || !recordCity) return true;
-  return recordCity === assignedCity;
+  // Open prospection — any expert can work any city; we never drop a record
+  // because its city differs from the user's assigned city.
+  return true;
 }
 
 function getWorkspaceRawForUser(expertName) {
@@ -10204,9 +10203,8 @@ function rSuivi() {
   var isSuper = canSeeAllData(currentUser);
   var canAdminUsers = canManageUsers(currentUser);
   var roleLabel = roleBadgeLabel(currentUser);
-  var allowedCities = (!isSuper && currentUser.city && currentUser.city !== 'ALL')
-    ? [String(currentUser.city).trim().toUpperCase()]
-    : CAMEROON_CITIES.map(function(c) { return c.value; });
+  // Every user can pick any city when saisying — no restriction by assigned city
+  var allowedCities = CAMEROON_CITIES.map(function(c) { return c.value; });
   var cityOptions = allowedCities.map(function(city) {
     return '<option value="' + esc(city) + '">' + esc(getCityLabel(city)) + '</option>';
   }).join('');
