@@ -8387,6 +8387,15 @@ function _is2026(value){
   // Accept ISO timestamps, MM/DD/YYYY, DD/MM/YYYY etc. — just check for '2026' anywhere
   return /2026/.test(String(value||''));
 }
+// Single source of truth for re-attribution at save time.
+// Returns the effective expert name that should be persisted given the originator + city + timestamp.
+function resolveSubmitExpertName(expertName, city, timestamp){
+  if (!expertName) return expertName;
+  var ts = timestamp || new Date().toISOString();
+  if (_isIvan(expertName) && _is2026(ts)) return 'Kessi Taylor';
+  if (_isFabiola(expertName) && /yaound[ée]/i.test(String(city||'')) && _is2026(ts)) return 'Kessi Taylor';
+  return expertName;
+}
 function remapExpertForRaw(row){
   if (!row) return row;
   // Ivan removed for 2026 only — his 2026 prospections reassigned to Kessi Taylor.
@@ -11543,10 +11552,15 @@ async function submitFollowup() {
       : (cleanMetaValue(existingMeta && existingMeta.entryOrigin) || ''),
     firstContactChannel: cleanMetaValue(existingMeta && existingMeta.firstContactChannel) || document.getElementById('fuType').value
   };
+  var _effectiveCityFu = document.getElementById('fuCity').value;
+  var _effectiveTsFu = editableExisting ? (editableExisting.Timestamp || entryTimestamp) : entryTimestamp;
+  var _effectiveExpertFu = (typeof resolveSubmitExpertName === 'function')
+    ? resolveSubmitExpertName(currentUser.fullName, _effectiveCityFu, _effectiveTsFu)
+    : currentUser.fullName;
   var data = {
-    action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: currentUser.fullName, schoolName: schoolName,
+    action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: _effectiveExpertFu, schoolName: schoolName,
     id: editableExisting ? editableExisting.ID : '',
-    timestamp: editableExisting ? (editableExisting.Timestamp || entryTimestamp) : entryTimestamp,
+    timestamp: _effectiveTsFu,
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
@@ -11785,10 +11799,14 @@ async function submitNewSchoolDirect() {
     letterContent: (document.getElementById('nsLetterContent') || {}).value || ''
   };
   
+  var _effectiveCityNs = document.getElementById('nsCity').value;
+  var _effectiveExpertNs = (typeof resolveSubmitExpertName === 'function')
+    ? resolveSubmitExpertName(currentUser.fullName, _effectiveCityNs, entryTimestamp)
+    : currentUser.fullName;
   var data = {
     action: 'addFollowup',
     timestamp: entryTimestamp,
-    expert: currentUser.fullName,
+    expert: _effectiveExpertNs,
     schoolName: schoolName,
     contactName: document.getElementById('nsContactName').value.trim(),
     contactPhone: document.getElementById('nsContactPhone').value.trim(),
