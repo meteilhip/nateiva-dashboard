@@ -2675,6 +2675,79 @@ button,select,input,textarea{outline:none}
 .fi-insight li{margin-bottom:5px}
 .fi-insight b{color:var(--ink)}
 
+/* — Urgent follow-ups hero banner — */
+.urgent-hero{
+  display:flex;align-items:center;gap:18px;padding:18px 22px;
+  border-radius:16px;cursor:pointer;
+  margin-bottom:16px;position:relative;overflow:hidden;
+  transition:all .35s cubic-bezier(.16,1,.3,1);
+  animation:cardPop .45s cubic-bezier(.16,1,.3,1) both;
+  border:1.5px solid transparent;
+}
+.urgent-hero::before{
+  content:'';position:absolute;inset:0;opacity:.06;pointer-events:none;
+}
+.urgent-hero.danger{
+  background:linear-gradient(135deg,rgba(220,38,38,.08),rgba(245,158,11,.05));
+  border-color:var(--red);
+  box-shadow:0 6px 20px rgba(220,38,38,.18);
+}
+.urgent-hero.danger .uh-icon{animation:pulse-dot 1.4s ease infinite;color:var(--red)}
+.urgent-hero.warn{
+  background:linear-gradient(135deg,var(--saffron-soft),rgba(245,158,11,.04));
+  border-color:var(--saffron);
+  box-shadow:0 4px 16px rgba(245,158,11,.18);
+}
+.urgent-hero.warn .uh-icon{color:var(--saffron-deep)}
+.urgent-hero.ok{
+  background:linear-gradient(135deg,var(--green-soft),rgba(5,150,105,.04));
+  border-color:var(--green);
+  box-shadow:0 4px 14px rgba(5,150,105,.15);
+}
+.urgent-hero.ok .uh-icon{color:var(--green)}
+.urgent-hero:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.12)}
+.urgent-hero:active{transform:translateY(-1px) scale(.995)}
+.uh-icon{
+  flex-shrink:0;font-size:36px;width:62px;height:62px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.55);backdrop-filter:blur(8px);
+  border-radius:16px;
+}
+.uh-body{flex:1;min-width:0}
+.uh-title{
+  font-family:'Fraunces',serif;font-size:18px;font-weight:700;
+  color:var(--ink);letter-spacing:-.02em;line-height:1.2;margin-bottom:4px;
+}
+.urgent-hero.danger .uh-title{color:var(--red-deep)}
+.uh-sub{font-size:12.5px;color:var(--g600);line-height:1.45;margin-bottom:10px}
+.uh-pills{display:flex;flex-wrap:wrap;gap:6px}
+.uh-pill{
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;
+  padding:4px 10px;border-radius:100px;letter-spacing:-.02em;
+  border:1px solid transparent;
+}
+.uh-pill.uh-overdue{background:rgba(220,38,38,.12);color:var(--red);border-color:rgba(220,38,38,.2)}
+.uh-pill.uh-urgent {background:rgba(245,158,11,.14);color:var(--saffron-deep);border-color:rgba(245,158,11,.25)}
+.uh-pill.uh-two    {background:rgba(13,148,136,.12);color:var(--teal-deep);border-color:rgba(13,148,136,.2)}
+.uh-pill.uh-total  {background:var(--g100);color:var(--g700);border-color:var(--g200)}
+.uh-cta{
+  flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:10px 18px;border-radius:12px;
+  background:var(--ink);color:#fff;
+  transition:all .25s ease;
+}
+.urgent-hero:hover .uh-cta{background:var(--red);transform:scale(1.05)}
+.uh-cta-label{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.uh-cta-arrow{font-size:20px;font-weight:300;transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.urgent-hero:hover .uh-cta-arrow{transform:translateX(4px)}
+
+@media(max-width:600px){
+  .urgent-hero{flex-direction:column;align-items:stretch;text-align:left;padding:14px 16px}
+  .uh-icon{width:48px;height:48px;font-size:28px}
+  .uh-title{font-size:15.5px}
+  .uh-cta{width:100%;flex-direction:row;justify-content:center;gap:10px}
+}
+
 /* — Top performers grid (Workspace) — */
 .top-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:12px}
 .top-card{
@@ -8310,17 +8383,25 @@ function _isIvan(name){
 function _isFabiola(name){
   return /fabiola|kendo/i.test(String(name||'').trim());
 }
+function _is2026(value){
+  // Accept ISO timestamps, MM/DD/YYYY, DD/MM/YYYY etc. — just check for '2026' anywhere
+  return /2026/.test(String(value||''));
+}
 function remapExpertForRaw(row){
   if (!row) return row;
-  if (_isIvan(row.e)) { row = Object.assign({}, row, {e:'Kessi Taylor', _remapped:'ivan→kessi'}); }
+  // Ivan removed for 2026 only — his 2026 prospections reassigned to Kessi Taylor.
+  // Pre-2026 data keeps Ivan's name for historical accuracy.
+  if (_isIvan(row.e) && _is2026(row.t)) { row = Object.assign({}, row, {e:'Kessi Taylor', _remapped:'ivan-2026→kessi'}); }
   // Fabiola raw entries kept as-is (only call follow-ups are reassigned)
   return row;
 }
 function remapExpertForFollowup(f){
   if (!f) return f;
-  if (_isIvan(f.Expert)) { f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'ivan→kessi'}); }
-  else if (_isFabiola(f.Expert) && /yaound[ée]/i.test(String(f.City||''))) {
-    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'fabiola-yde→kessi'});
+  var ts = f.Timestamp || f.timestamp || '';
+  if (_isIvan(f.Expert) && _is2026(ts)) {
+    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'ivan-2026→kessi'});
+  } else if (_isFabiola(f.Expert) && /yaound[ée]/i.test(String(f.City||'')) && _is2026(ts)) {
+    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'fabiola-yde-2026→kessi'});
   }
   return f;
 }
@@ -10247,6 +10328,42 @@ function rSuivi() {
   h += '<div class="days-badge" style="margin-left:14px"><span class="days-num">' + stats.daysOnField + '</span> jours sur le terrain</div>';
   h += '</div></div>';
 
+  // 🚨 URGENT FOLLOW-UPS HERO — first thing the user sees so they can act now
+  (function(){
+    var planner = buildPlannerModel(myFollowups);
+    var overdue = planner.overdue.length;
+    var urgent = planner.urgent.length;
+    var twoWeek = (planner.days||[]).reduce(function(s,d){return s + (d.items?d.items.length:0);},0);
+    var nextRelance = (planner.overdue.concat(planner.urgent))[0];
+    var totalAction = overdue + urgent;
+    var level = overdue > 0 ? 'danger' : urgent > 0 ? 'warn' : 'ok';
+    var icon = level==='danger'?'🚨':level==='warn'?'⏰':'✅';
+    var headline = level==='danger'
+        ? overdue+' relance'+(overdue>1?'s':'')+' EN RETARD à traiter immédiatement'
+        : level==='warn' ? urgent+' relance'+(urgent>1?'s':'')+' urgente'+(urgent>1?'s':'')+' cette semaine'
+        : 'Aucune relance en retard. Bon travail !';
+    var sub = totalAction > 0
+        ? twoWeek+' suivi'+(twoWeek>1?'s':'')+' programmé'+(twoWeek>1?'s':'')+' dans les 2 prochaines semaines · ' + (nextRelance?'Prochain : '+esc(nextRelance.followup.SchoolName||'—'):'')
+        : twoWeek+' suivi'+(twoWeek>1?'s':'')+' planifié'+(twoWeek>1?'s':'')+' dans les 2 prochaines semaines';
+    h += '<div class="urgent-hero '+level+'" onclick="activateSuiviPanel(\'planner\',{scroll:true})" role="button" tabindex="0" title="Cliquez pour voir tous vos rappels">'+
+      '<div class="uh-icon">'+icon+'</div>'+
+      '<div class="uh-body">'+
+        '<div class="uh-title">'+headline+'</div>'+
+        '<div class="uh-sub">'+sub+'</div>'+
+        '<div class="uh-pills">'+
+          '<span class="uh-pill uh-overdue">⏳ '+overdue+' en retard</span>'+
+          '<span class="uh-pill uh-urgent">📍 '+urgent+' urgentes</span>'+
+          '<span class="uh-pill uh-two">📅 '+twoWeek+' sur 2 sem.</span>'+
+          '<span class="uh-pill uh-total">📊 '+myFollowups.length+' suivis total</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="uh-cta">'+
+        '<span class="uh-cta-label">Voir Mes Suivis</span>'+
+        '<span class="uh-cta-arrow">→</span>'+
+      '</div>'+
+    '</div>';
+  })();
+
   // 🏅 Top performers strip — right below the account owner header
   if (isSuper) {
     h += buildTopPerformersStrip('Le classement complet est dans le <a href="#" data-jump="home" style="color:var(--red);font-weight:700;text-decoration:underline">Dashboard</a> sous « Revenus en FCFA ».');
@@ -11159,7 +11276,7 @@ function showMyEntries(){
         '</div>'+
       '</div>'+
       '<div class="me-row-body">'+
-        (f.Notes?'<div class="me-field"><b>📝 Notes:</b> '+esc(f.Notes)+'</div>':'')+
+        ((function(){var clean=(typeof getFollowupPlainNotes==='function')?getFollowupPlainNotes(f):(f.Notes||'');return clean?'<div class="me-field"><b>📝 Notes:</b> '+esc(clean)+'</div>':'';})())+
         (f.NextDate?'<div class="me-field"><b>⏰ Prochaine action:</b> '+esc(f.NextDate)+'</div>':'')+
         (f.Cost?'<div class="me-field"><b>💰 Coût:</b> '+fmt(f.Cost)+' FCFA</div>':'')+
         '<div class="me-notes">'+
