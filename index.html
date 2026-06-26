@@ -11455,8 +11455,8 @@ function showMyEntries(){
       '</div>'+
     '</div>';
   }).join('') : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
-  // Build followups list
-  var fuHtml = myFu.length ? myFu.map(function(f){
+  // Build followup rows — reused by both Mes Suivis and Courriers/Emails tabs
+  function _renderFuRow(f){
     var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
     var notes = getMyEntryNotes(entryId);
     var typeIcon = (f.FollowupType==='CALL'?'📞':f.FollowupType==='VISIT'?'🚶':f.FollowupType==='WHATSAPP'?'💬':f.FollowupType==='SMS'?'📱':f.FollowupType==='EMAIL'?'📧':f.FollowupType==='LETTER'?'📨':'📝');
@@ -11485,14 +11485,20 @@ function showMyEntries(){
         '<div class="me-edit-cta"><span>⚠️ Pour <b>modifier</b> ce suivi, ouvrez « Nouveau suivi » et sélectionnez l\'école — tout est pré-rempli.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(f.SchoolName||'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi</button></div>'+
       '</div>'+
     '</div>';
-  }).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
+  }
+  // Split into two pools: standard suivis (CALL/VISIT/WhatsApp/SMS/creation) vs Courriers (EMAIL/LETTER)
+  function _isMailType(f){ var t=String(f.FollowupType||'').toUpperCase(); return t==='EMAIL'||t==='LETTER'; }
+  var standardFu = myFu.filter(function(f){ return !_isMailType(f); });
+  var mailFu     = myFu.filter(_isMailType);
+  var fuHtml   = standardFu.length ? standardFu.map(_renderFuRow).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
+  var mailHtml = mailFu.length     ? mailFu.map(_renderFuRow).join('')     : '<div class="me-empty">Aucun courrier ni email enregistré pour le moment.</div>';
 
   var html = '<div id="me-overlay" class="dd-overlay" onclick="if(event.target===this)closeMyEntries()">'+
     '<div class="dd-modal me-modal">'+
       '<div class="dd-header me-header">'+
         '<div>'+
           '<h3>📚 '+(seeAll?'Saisies — toute l\'équipe':'Mes saisies')+' <span style="font-size:11px;background:var(--g100);color:var(--g700);padding:3px 8px;border-radius:6px;font-weight:700;font-family:JetBrains Mono,monospace;letter-spacing:.04em;text-transform:uppercase">Lecture seule</span></h3>'+
-          '<div class="me-subtitle">'+(seeAll?'<b style="color:var(--teal-deep)">Vue admin · vous voyez les saisies de tous les experts</b> · ':'')+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+myFu.length+' suivi'+(myFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
+          '<div class="me-subtitle">'+(seeAll?'<b style="color:var(--teal-deep)">Vue admin · vous voyez les saisies de tous les experts</b> · ':'')+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+standardFu.length+' suivi'+(standardFu.length>1?'s':'')+' · '+mailFu.length+' courrier'+(mailFu.length>1?'s':'')+'/email'+(mailFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
         '</div>'+
         '<button class="dd-close" onclick="closeMyEntries()">×</button>'+
       '</div>'+
@@ -11500,10 +11506,12 @@ function showMyEntries(){
         '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
         '<div class="me-tabs">'+
           '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Mes écoles ('+allRecords.length+')</button>'+
-          '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+myFu.length+')</button>'+
+          '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+standardFu.length+')</button>'+
+          '<button class="me-tab" onclick="setMyEntriesTab(this,\'mail\')">📨 Courriers & Emails ('+mailFu.length+')</button>'+
         '</div>'+
         '<div id="me-tab-schools" class="me-tab-panel act">'+schoolsHtml+'</div>'+
         '<div id="me-tab-fu" class="me-tab-panel">'+fuHtml+'</div>'+
+        '<div id="me-tab-mail" class="me-tab-panel">'+mailHtml+'</div>'+
       '</div>'+
     '</div>'+
   '</div>';
