@@ -3601,11 +3601,12 @@ function buildSchoolRecords(rawRows, followups){
     if(!rec.closeContact)rec.closeContact=rec.contactName;
     if(!rec.closedBy)rec.closedBy=rec.expert;
     if(!rec.closeStatus && rec.won)rec.closeStatus='Deal clos dans les suivis';
+    var _PL = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.PIPELINE) || {hot:60,warm:40,cold:1};
     if(rec.won)rec.stage='gagne';
     else if(rec.lost)rec.stage='perdu';
     else if(rec.rate==null)rec.stage='nouveau';
-    else if(rec.rate>=60)rec.stage='chaud';
-    else if(rec.rate>=40)rec.stage='tiede';
+    else if(rec.rate>=_PL.hot)rec.stage='chaud';
+    else if(rec.rate>=_PL.warm)rec.stage='tiede';
     else rec.stage='froid';
     var rev=computeSchoolRevenue(rec);
     rec.amount=rev.total;
@@ -3627,23 +3628,25 @@ function computeSchoolRevenue(rec){
   var mode=normalizeText(rec.appMode||'');
   var isUniversity=/universit/i.test(type);
   var isOnline=/online/i.test(mode);
+  var P  = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.PRICING) || {primSec:{offline:60000,online:250000},univ:{offline:550000,onlinePerStudent:2500}};
+  var AC = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.AMBASSADOR_COMMISSION) || {primSec:{offline:25000,online:80000},univ:{offline:120000,onlinePct:0.15}};
   var baseAmount,ambassadorAmount;
   if(isUniversity){
     if(isOnline){
       var students=rec.effectif||0;
-      baseAmount=2500*students;
-      ambassadorAmount=Math.round(baseAmount*0.15);
+      baseAmount=P.univ.onlinePerStudent*students;
+      ambassadorAmount=Math.round(baseAmount*AC.univ.onlinePct);
     }else{
-      baseAmount=550000;
-      ambassadorAmount=120000;
+      baseAmount=P.univ.offline;
+      ambassadorAmount=AC.univ.offline;
     }
   }else{
     if(isOnline){
-      baseAmount=250000;
-      ambassadorAmount=80000;
+      baseAmount=P.primSec.online;
+      ambassadorAmount=AC.primSec.online;
     }else{
-      baseAmount=60000;
-      ambassadorAmount=25000;
+      baseAmount=P.primSec.offline;
+      ambassadorAmount=AC.primSec.offline;
     }
   }
   if(rec.stage==='gagne'){
@@ -5224,13 +5227,18 @@ function renderMiniChart(series){
 const ST={city:'',expert:'',sec:'',cat:'',rate:0};
 const DASH_STATE={trackingMode:'week',selectedPeriodKey:'',revPeriod:'month',ambCategory:'all'};
 
-// Ambassador commission table by category × mode
-const AMBASSADOR_RATES = {
-  'primsec-offline':  { label: 'Primaire/Sec. · Offline (60K)',       base: 60000,  commission: 25000,  type:'flat' },
-  'primsec-online':   { label: 'Primaire/Sec. · Online (250K)',       base: 250000, commission: 80000,  type:'flat' },
-  'univ-offline':     { label: 'Université · Offline (550K)',         base: 550000, commission: 120000, type:'flat' },
-  'univ-online':      { label: 'Université · Online (2 500 / élève)', base: null,   commission: 0.15,   type:'pct'  }
-};
+// Ambassador commission table — derived from NATEIVA_CONFIG so prices live in one place
+const AMBASSADOR_RATES = (function(){
+  var P  = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.PRICING) || {primSec:{offline:60000,online:250000},univ:{offline:550000,onlinePerStudent:2500}};
+  var AC = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.AMBASSADOR_COMMISSION) || {primSec:{offline:25000,online:80000},univ:{offline:120000,onlinePct:0.15}};
+  function fmtK(n){ return n>=1000 ? (n/1000)+'K' : String(n); }
+  return {
+    'primsec-offline': { label: 'Primaire/Sec. · Offline ('+fmtK(P.primSec.offline)+')', base: P.primSec.offline, commission: AC.primSec.offline, type:'flat' },
+    'primsec-online':  { label: 'Primaire/Sec. · Online ('+fmtK(P.primSec.online)+')',   base: P.primSec.online,  commission: AC.primSec.online,  type:'flat' },
+    'univ-offline':    { label: 'Université · Offline ('+fmtK(P.univ.offline)+')',       base: P.univ.offline,    commission: AC.univ.offline,    type:'flat' },
+    'univ-online':     { label: 'Université · Online ('+P.univ.onlinePerStudent+' / élève)', base: null,        commission: AC.univ.onlinePct,  type:'pct'  }
+  };
+})();
 function ambKeyForRecord(r){
   var univ = /universit/i.test(String(r.type||''));
   var online = /online/i.test(String(r.appMode||''));
@@ -5673,10 +5681,11 @@ function rHome(){
   <!-- 💰 REVENUE TRACKER (visible by everyone) — 3 periods stacked -->
   ${(function(){
     var allRecords = dashboard.records;
+    var _W = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.REV_WINDOWS) || {week:12, month:12, year:5};
     var PERIODS = [
-      { key:'week',  label:'Week over Week',   icon:'📅', window:12, hint:'12 dernières semaines' },
-      { key:'month', label:'Month over Month', icon:'🗓️', window:12, hint:'12 derniers mois'      },
-      { key:'year',  label:'Year over Year',   icon:'📆', window:5,  hint:'5 dernières années'    }
+      { key:'week',  label:'Week over Week',   icon:'📅', window:_W.week,  hint:_W.week+' dernières semaines' },
+      { key:'month', label:'Month over Month', icon:'🗓️', window:_W.month, hint:_W.month+' derniers mois'      },
+      { key:'year',  label:'Year over Year',   icon:'📆', window:_W.year,  hint:_W.year+' dernières années'    }
     ];
     function renderPeriodPanel(P){
       var buckets = buildRevenueBuckets(allRecords, P.key, P.window);
@@ -8015,8 +8024,88 @@ function safeStorageParse(key, fallbackValue) {
     return fallbackValue;
   }
 }
-var APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
-var NATEIVA_SALE_ANALYTIC_API_URL = 'https://nateiva-sale-analytic-api.57.129.133.115.sslip.io';
+// ============================================
+// 🧭 NATEIVA_CONFIG — Single source of truth for business values.
+// Override any value before scripts load by setting window.NATEIVA_CONFIG_OVERRIDES.
+// ============================================
+window.NATEIVA_CONFIG = Object.assign({
+  // — URLs / endpoints —
+  APPS_SCRIPT_URL: 'YOUR_APPS_SCRIPT_URL_HERE',
+  API_URL: 'https://nateiva-sale-analytic-api.57.129.133.115.sslip.io',
+
+  // — Storage keys —
+  STORAGE: {
+    user: 'nateiva_user',
+    token: 'nateiva_sale_analytic_token',
+    deviceId: 'nateiva_sale_analytic_device_id',
+    followups: 'nateiva_followups',
+    serverUsers: 'nateiva_server_users',
+    invitedUsers: 'nateiva_invited_users',
+    userOverrides: 'nateiva_user_overrides',
+    entryImpacts: 'nateiva_entry_impacts',
+    notesPrefix: 'nateiva_my_notes_',
+    firstLoginPrefix: 'nateiva_first_login_'
+  },
+
+  // — Pricing (base amount in FCFA, per school per year) —
+  PRICING: {
+    primSec: { offline: 60000,  online: 250000 },
+    univ:    { offline: 550000, onlinePerStudent: 2500 }
+  },
+
+  // — Ambassador commission (flat in FCFA or pct of base) —
+  AMBASSADOR_COMMISSION: {
+    primSec: { offline: 25000,  online: 80000 },
+    univ:    { offline: 120000, onlinePct: 0.15 }
+  },
+
+  // — Pipeline rate thresholds (% conversion) —
+  PIPELINE: {
+    hot: 60,    // ≥60 = chaud
+    warm: 40,   // 40-59 = tiède
+    cold: 1     // 1-39 = froid (0 or null = nouveau)
+  },
+
+  // — Score weights (Workspace / Rankings) —
+  SCORE_WEIGHTS: {
+    converted: 40,
+    hotDeal: 15,
+    relance: 10,
+    visit: 8,
+    call: 5,
+    whatsapp: 3,
+    sms: 2,
+    costPenaltyPer1000: 2
+  },
+
+  // — Field-intel activity score weights —
+  ACTIVITY_WEIGHTS: {
+    rawEntry: 3,
+    visit: 4,
+    call: 2,
+    whatsapp: 1,
+    sms: 1,
+    email: 2,
+    letter: 3
+  },
+
+  // — Revenue Tracker window sizes (last N periods) —
+  REV_WINDOWS: { week: 12, month: 12, year: 5 },
+
+  // — Expert remap rules (year-scoped) —
+  EXPERT_REMAP: {
+    activeYear: 2026,
+    rules: [
+      { match: { name: 'ivan' },                                 target: 'Kessi Taylor' },
+      { match: { name: 'fabiola|kendo', city: /yaound[ée]/i },   target: 'Kessi Taylor' }
+    ]
+  }
+}, (window.NATEIVA_CONFIG_OVERRIDES || {}));
+
+// Back-compat shims (existing code uses these flat globals)
+var APPS_SCRIPT_URL = window.NATEIVA_CONFIG.APPS_SCRIPT_URL;
+var NATEIVA_SALE_ANALYTIC_API_URL = window.NATEIVA_CONFIG.API_URL;
+var NCFG = window.NATEIVA_CONFIG;
 var currentUser = safeStorageParse('nateiva_user', null);
 var suiviFollowups = safeStorageParse('nateiva_followups', []);
 var nateivaApiToken = localStorage.getItem('nateiva_sale_analytic_token') || '';
@@ -8441,45 +8530,57 @@ function applyNavigationAccess() {
 
 currentUser = currentUser && currentUser.username ? (getUserByUsername(currentUser.username) || mergeUserRecord(currentUser)) : null;
 
-// === Expert REMAP rules ===
-// 1) All of Ivan's work → Kessi Taylor (Ivan removed)
-// 2) Kendo Fabiola's calls/follow-ups in YAOUNDE → Kessi Taylor (Douala kept for Fabiola)
-function _isIvan(name){
-  return /\bivan\b/i.test(String(name||'').trim());
+// === Expert REMAP rules — sourced from NATEIVA_CONFIG.EXPERT_REMAP ===
+function _matchesRemapName(name, pattern){
+  if (!pattern) return true;
+  try { return new RegExp(pattern, 'i').test(String(name||'').trim()); } catch(e){ return false; }
 }
-function _isFabiola(name){
-  return /fabiola|kendo/i.test(String(name||'').trim());
+function _matchesRemapCity(city, pattern){
+  if (!pattern) return true;
+  if (pattern instanceof RegExp) return pattern.test(String(city||''));
+  try { return new RegExp(pattern, 'i').test(String(city||'')); } catch(e){ return false; }
 }
-function _is2026(value){
-  // Accept ISO timestamps, MM/DD/YYYY, DD/MM/YYYY etc. — just check for '2026' anywhere
-  return /2026/.test(String(value||''));
+// Back-compat helpers (referenced by other code paths)
+function _isIvan(name){ return /\bivan\b/i.test(String(name||'').trim()); }
+function _isFabiola(name){ return /fabiola|kendo/i.test(String(name||'').trim()); }
+function _isActiveRemapYear(value){
+  var year = ((window.NATEIVA_CONFIG||{}).EXPERT_REMAP||{}).activeYear || 2026;
+  return new RegExp('\\b'+year+'\\b').test(String(value||''));
+}
+function _findRemapRule(expertName, city){
+  var cfg = ((window.NATEIVA_CONFIG||{}).EXPERT_REMAP||{});
+  var rules = cfg.rules || [];
+  for (var i=0;i<rules.length;i++){
+    var r = rules[i];
+    if (_matchesRemapName(expertName, r.match && r.match.name) &&
+        _matchesRemapCity(city, r.match && r.match.city)) {
+      return r;
+    }
+  }
+  return null;
 }
 // Single source of truth for re-attribution at save time.
-// Returns the effective expert name that should be persisted given the originator + city + timestamp.
 function resolveSubmitExpertName(expertName, city, timestamp){
   if (!expertName) return expertName;
   var ts = timestamp || new Date().toISOString();
-  if (_isIvan(expertName) && _is2026(ts)) return 'Kessi Taylor';
-  if (_isFabiola(expertName) && /yaound[ée]/i.test(String(city||'')) && _is2026(ts)) return 'Kessi Taylor';
-  return expertName;
+  if (!_isActiveRemapYear(ts)) return expertName;
+  var rule = _findRemapRule(expertName, city);
+  return rule ? rule.target : expertName;
 }
 function remapExpertForRaw(row){
   if (!row) return row;
-  // Ivan removed for 2026 only — his 2026 prospections reassigned to Kessi Taylor.
-  // Pre-2026 data keeps Ivan's name for historical accuracy.
-  if (_isIvan(row.e) && _is2026(row.t)) { row = Object.assign({}, row, {e:'Kessi Taylor', _remapped:'ivan-2026→kessi'}); }
-  // Fabiola raw entries kept as-is (only call follow-ups are reassigned)
-  return row;
+  if (!_isActiveRemapYear(row.t)) return row;
+  var rule = _findRemapRule(row.e, row.v);
+  if (!rule) return row;
+  return Object.assign({}, row, {e: rule.target, _remapped: 'config'});
 }
 function remapExpertForFollowup(f){
   if (!f) return f;
   var ts = f.Timestamp || f.timestamp || '';
-  if (_isIvan(f.Expert) && _is2026(ts)) {
-    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'ivan-2026→kessi'});
-  } else if (_isFabiola(f.Expert) && /yaound[ée]/i.test(String(f.City||'')) && _is2026(ts)) {
-    f = Object.assign({}, f, {Expert:'Kessi Taylor', _remapped:'fabiola-yde-2026→kessi'});
-  }
-  return f;
+  if (!_isActiveRemapYear(ts)) return f;
+  var rule = _findRemapRule(f.Expert, f.City);
+  if (!rule) return f;
+  return Object.assign({}, f, {Expert: rule.target, _remapped: 'config'});
 }
 
 function getBaseRawRows() {
@@ -11277,7 +11378,10 @@ function prefillFromSchool(name, contact, phone, city, sector) {
 // ===========================================================
 // MES SAISIES — read-only viewer with append-only annotations
 // ===========================================================
-function _myEntriesNoteKey(){ return 'nateiva_my_notes_'+(currentUser?currentUser.username:'anon'); }
+function _myEntriesNoteKey(){
+  var prefix = (((window.NATEIVA_CONFIG||{}).STORAGE||{}).notesPrefix) || 'nateiva_my_notes_';
+  return prefix+(currentUser?currentUser.username:'anon');
+}
 function getMyEntryNotes(entryId){
   try { var all=JSON.parse(localStorage.getItem(_myEntriesNoteKey())||'{}'); return all[entryId]||[]; } catch(e){ return []; }
 }
