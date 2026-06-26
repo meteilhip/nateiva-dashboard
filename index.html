@@ -3540,7 +3540,7 @@ function buildSchoolRecords(rawRows, followups){
     if(meta.institutionLevel)rec.type=meta.institutionLevel||rec.type;
     if(meta.quartier)rec.quartier=rec.quartier||meta.quartier;
     if(meta.productType)rec.productType=rec.productType||meta.productType;
-    if(meta.appMode)rec.appMode=rec.appMode||meta.appMode;
+    if(meta.appMode)rec.appMode=rec.appMode||normalizeAppMode(meta.appMode);
     if(meta.currentSystem)rec.currentSystem=rec.currentSystem||meta.currentSystem;
     if(meta.decisionReach)rec.decisionReach=rec.decisionReach||meta.decisionReach;
     if(meta.decisionMaker)rec.decisionMaker=rec.decisionMaker||meta.decisionMaker;
@@ -3571,7 +3571,7 @@ function buildSchoolRecords(rawRows, followups){
       if(item.Location)rec.location=item.Location;
       if(meta.quartier)rec.quartier=meta.quartier;
       if(meta.productType)rec.productType=meta.productType;
-      if(meta.appMode)rec.appMode=meta.appMode;
+      if(meta.appMode)rec.appMode=normalizeAppMode(meta.appMode);
       if(meta.currentSystem)rec.currentSystem=meta.currentSystem;
       if(meta.decisionReach)rec.decisionReach=meta.decisionReach;
       if(meta.decisionMaker)rec.decisionMaker=meta.decisionMaker;
@@ -3623,9 +3623,16 @@ function buildSchoolRecords(rawRows, followups){
   });
 }
 
+// Normalize legacy app-mode values: Hybride / Mobile only → Online
+function normalizeAppMode(raw){
+  var v = String(raw || '').trim();
+  if (!v) return '';
+  if (/hybrid|mobile/i.test(v)) return 'Online';
+  return v;
+}
 function computeSchoolRevenue(rec){
   var type=normalizeText(rec.type||'');
-  var mode=normalizeText(rec.appMode||'');
+  var mode=normalizeText(normalizeAppMode(rec.appMode||''));
   var isUniversity=/universit/i.test(type);
   var isOnline=/online/i.test(mode);
   var P  = (window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.PRICING) || {primSec:{offline:60000,online:250000},univ:{offline:550000,onlinePerStudent:2500}};
@@ -10067,7 +10074,7 @@ function populateFollowupFormFromRecord(entry, mode) {
   if (document.getElementById('fuContactRole')) document.getElementById('fuContactRole').value = entry.ContactRole || '';
   if (document.getElementById('fuCurrentSystem')) document.getElementById('fuCurrentSystem').value = meta.currentSystem || entry.CurrentSystem || '';
   if (document.getElementById('fuProductType')) setFollowupSelectValue('fuProductType', meta.productType || entry.ProductType || '');
-  if (document.getElementById('fuAppMode')) setFollowupSelectValue('fuAppMode', meta.appMode || entry.AppMode || '');
+  if (document.getElementById('fuAppMode')) setFollowupSelectValue('fuAppMode', normalizeAppMode(meta.appMode || entry.AppMode || ''));
   if (document.getElementById('fuInternetQuality')) setFollowupSelectValue('fuInternetQuality', meta.internetQuality || entry.InternetQuality || '');
   if (document.getElementById('fuPowerQuality')) setFollowupSelectValue('fuPowerQuality', meta.powerQuality || entry.PowerQuality || '');
   if (document.getElementById('fuCampusCount')) document.getElementById('fuCampusCount').value = meta.campusCount || entry.CampusCount || '';
@@ -10742,7 +10749,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="fuContactRole" placeholder="Ex: Principal, Directeur"></div>';
   h += '<div class="form-field"><label>Système actuel / concurrent</label><input type="text" id="fuCurrentSystem" placeholder="Ex: Excel, papier, LOGESCO..."></div>';
   h += '<div class="form-field"><label>Type de produit discuté</label><select id="fuProductType"><option value="">-- À préciser --</option><option value="Nateiva School">Nateiva School</option><option value="Nateiva Learn">Nateiva Learn</option><option value="Marketplace">Marketplace</option><option value="Conference">Conference</option><option value="Build">Build</option><option value="Ambassadeur">Ambassadeur</option><option value="Pack complet">Pack complet</option></select></div>';
-  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="fuAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option><option value="Hybride">Hybride</option><option value="Mobile only">Mobile only</option></select></div>';
+  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="fuAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option></select></div>';
   h += '<div class="form-field"><label>Qualité internet</label><select id="fuInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
   h += '<div class="form-field"><label>Qualité électricité</label><select id="fuPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
   h += '<div class="form-field"><label>Nombre de campus</label><input type="number" id="fuCampusCount" placeholder="Ex: 1" min="1"></div>';
@@ -10835,7 +10842,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Rôle du contact</label><input type="text" id="nsContactRole" placeholder="Ex: Proviseur, Censeur"></div>';
   h += '<div class="form-field"><label>Système actuel / concurrent</label><input type="text" id="nsCurrentSystem" placeholder="Ex: papier, Excel, LOGESCO"></div>';
   h += '<div class="form-field"><label>Type de produit discuté</label><select id="nsProductType"><option value="">-- À préciser --</option><option value="Nateiva School">Nateiva School</option><option value="Nateiva Learn">Nateiva Learn</option><option value="Marketplace">Marketplace</option><option value="Conference">Conference</option><option value="Build">Build</option><option value="Ambassadeur">Ambassadeur</option><option value="Pack complet">Pack complet</option></select></div>';
-  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="nsAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option><option value="Hybride">Hybride</option><option value="Mobile only">Mobile only</option></select></div>';
+  h += '<div class="form-field"><label>Version NATEIVA discutée</label><select id="nsAppMode"><option value="">-- À préciser --</option><option value="Offline">Offline</option><option value="Online">Online</option></select></div>';
   h += '<div class="form-field"><label>Qualité internet</label><select id="nsInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
   h += '<div class="form-field"><label>Qualité électricité</label><select id="nsPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
   h += '<div class="form-field"><label>Nombre de campus</label><input type="number" id="nsCampusCount" placeholder="Ex: 1" min="1"></div>';
@@ -11269,9 +11276,10 @@ function prefillSchool() {
   var sel = document.getElementById('fuSchool');
   var cw = document.getElementById('fuSchoolCustomWrap');
   var nw = document.getElementById('newSchoolInfoWrap');
-  var expertName = currentUser ? currentUser.fullName : '';
-  var workspaceRaw = expertName ? getWorkspaceRawForUser(expertName) : getVisibleRaw();
-  var workspaceFollowups = expertName ? getWorkspaceFollowupsForUser(expertName) : getVisibleFollowups();
+  // Look across ALL data (not just current user's portfolio) so any field
+  // anyone has already saisied for this school pre-fills the form.
+  var workspaceRaw = getAllRawRows();
+  var workspaceFollowups = getAllFollowups();
   function setValue(id, value) {
     var el = document.getElementById(id);
     if (el) el.value = value == null ? '' : String(value);
@@ -11327,7 +11335,7 @@ function prefillSchool() {
     setValue('fuContactRole', (school && school.rp) || (record && record.contactRole) || '');
     setValue('fuCurrentSystem', (record && record.currentSystem) || '');
     setValue('fuProductType', (record && record.productType) || '');
-    setValue('fuAppMode', (record && record.appMode) || '');
+    setValue('fuAppMode', normalizeAppMode((record && record.appMode) || ''));
     setValue('fuDecisionReach', (record && record.decisionReach) || '');
     setValue('fuDecisionMaker', (record && record.decisionMaker) || '');
     setValue('fuInternetQuality', (record && record.internetQuality) || '');
@@ -11337,6 +11345,15 @@ function prefillSchool() {
     setValue('fuPreferredChannel', (record && record.preferredChannel) || '');
     setValue('fuBudgetTiming', (record && record.budgetTiming) || '');
     setValue('fuCampusCount', (record && record.campusCount) || '');
+    // Signal the user that the form was pre-filled — they only need to edit what changed
+    var prefilledCount = [
+      school && school.rn, school && (school.pw||school.pn), record && record.contactName,
+      record && record.appMode, record && record.productType, record && record.decisionReach,
+      record && record.currentSystem, record && record.location
+    ].filter(Boolean).length;
+    if (prefilledCount > 0 && typeof toast === 'function') {
+      toast('✓ Fiche pré-remplie ('+prefilledCount+' champs) — éditez seulement ce qui a changé', 'success');
+    }
   }
   updateSchoolOwnershipNotice();
 }
@@ -11709,7 +11726,7 @@ async function submitFollowup() {
     institutionLevel: document.getElementById('fuSchoolType').value,
     quartier: document.getElementById('fuQuartier').value.trim(),
     productType: document.getElementById('fuProductType').value,
-    appMode: document.getElementById('fuAppMode').value,
+    appMode: normalizeAppMode(document.getElementById('fuAppMode').value),
     currentSystem: document.getElementById('fuCurrentSystem').value.trim(),
     decisionReach: document.getElementById('fuDecisionReach').value,
     decisionMaker: document.getElementById('fuDecisionMaker').value.trim(),
@@ -11959,7 +11976,7 @@ async function submitNewSchoolDirect() {
     institutionLevel: document.getElementById('nsSchoolType').value,
     quartier: document.getElementById('nsQuartier').value.trim(),
     productType: document.getElementById('nsProductType').value,
-    appMode: document.getElementById('nsAppMode').value,
+    appMode: normalizeAppMode(document.getElementById('nsAppMode').value),
     currentSystem: document.getElementById('nsCurrentSystem').value.trim(),
     decisionReach: document.getElementById('nsDecisionReach').value,
     decisionMaker: document.getElementById('nsDecisionMaker').value.trim(),
