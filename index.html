@@ -2720,6 +2720,24 @@ button,select,input,textarea{outline:none}
 }
 .urgent-hero.danger .uh-title{color:var(--red-deep)}
 .uh-scope{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--g500);background:var(--g100);padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;vertical-align:middle}
+
+/* — Ambassador notes inside pipeline drill-down — */
+.amb-notes-block{margin:18px 0 8px;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(245,158,11,.04));border:1px solid rgba(124,58,237,.18);border-radius:12px;padding:14px}
+.amb-notes-title{font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.amb-notes-title .amb-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;background:var(--purple);color:#fff;padding:3px 9px;border-radius:100px;letter-spacing:.04em}
+.amb-notes-list{display:flex;flex-direction:column;gap:8px}
+.amb-note{background:var(--paper);border:1px solid var(--g200);border-left:3px solid var(--purple);border-radius:10px;padding:10px 12px;transition:all .2s ease}
+.amb-note:hover{border-color:var(--purple);box-shadow:var(--shadow-sm);transform:translateX(2px)}
+.amb-note-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
+.amb-note-icon{font-size:18px;flex-shrink:0}
+.amb-note-meta-main{flex:1;min-width:0}
+.amb-note-school{font-weight:700;font-size:13px;color:var(--ink)}
+.amb-note-by{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--purple);font-weight:700;margin-top:2px}
+.amb-note-body{font-size:12.5px;line-height:1.5;color:var(--g700);padding-left:28px}
+.amb-note-empty{font-size:11.5px;color:var(--g400);font-style:italic;padding-left:28px}
+.amb-note-next{font-size:11.5px;color:var(--saffron-deep);margin-top:6px;padding-left:28px;background:var(--saffron-soft);padding:4px 8px;border-radius:6px;display:inline-block;margin-left:28px}
+.amb-notes-empty{margin:14px 0 4px;padding:12px;background:var(--g50);border-radius:10px;font-size:12.5px;color:var(--g500);text-align:center;font-style:italic}
+.amb-notes-more{padding:8px;text-align:center;font-size:11.5px;color:var(--g500);font-family:'JetBrains Mono',monospace}
 .uh-sub{font-size:12.5px;color:var(--g600);line-height:1.45;margin-bottom:10px}
 .uh-pills{display:flex;flex-wrap:wrap;gap:6px}
 .uh-pill{
@@ -3240,6 +3258,7 @@ function resolveToneColor(tone){
     saffron:'var(--saffron)',
     teal:'var(--teal)',
     green:'var(--green)',
+    purple:'var(--purple)',
     dark:'var(--ink)',
     gray:'var(--g400)'
   }[tone] || tone || 'var(--g300)';
@@ -3253,34 +3272,45 @@ function primaryMatch(signalMap, orderedKeys, fallbackKey){
 
 const CALL_INTENT_RULES=[
   {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',tone:'red-deep',patterns:[/pas interesse/,/non interesse/,/refus/,/deja un logiciel/,/pas encore pret/]},
+  {key:'pricing',label:'💰 Objection prix / budget',short:'Prix / budget',tone:'red',patterns:[/trop cher/,/prix/,/cout/,/coute/,/cher/,/budget/,/rabais/,/reduction/,/cheaper/,/moins cher/,/payer/,/argent/,/scolarite/,/frais/,/economique/]},
   {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',tone:'saffron',patterns:[/rdv/,/rendez/,/visite/,/passer/,/deposer/]},
   {key:'escalation',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',tone:'dark',patterns:[/fondateur/,/fondatrice/,/hierarch/,/superieur/,/boss/,/conseil/]},
   {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',tone:'teal',patterns:[/doc/,/whatsapp/,/brochure/,/proposition/,/envoy/,/support/]},
-  {key:'callback',label:'🔁 Relance / 2e appel',short:'Relance',tone:'red',patterns:[/rapp/,/recontacter/,/revenir/,/plus tard/,/juin/,/conges/,/vacance/,/examen/]},
-  {key:'interest',label:'✨ Intérêt / découverte',short:'Intérêt',tone:'green',patterns:[/interess/,/prendre connaissance/,/etudier l offre/,/prise de rendez/,/voudrait/,/pour la suite/,/acheminer/]}
+  {key:'callback',label:'🔁 Relance / 2e appel',short:'Relance',tone:'red',patterns:[/rapp/,/recontacter/,/revenir/,/plus tard/,/juin/,/conges/,/vacance/]},
+  {key:'exam_period',label:'📚 Période d\'examen',short:'Examens',tone:'saffron',patterns:[/examen/,/evaluation/,/epreuve/,/preparatif/,/trimestre/,/fin d annee/,/fin de scolarit/]},
+  {key:'interest',label:'✨ Intérêt / découverte',short:'Intérêt',tone:'green',patterns:[/interess/,/prendre connaissance/,/etudier l offre/,/prise de rendez/,/voudrait/,/pour la suite/,/acheminer/]},
+  {key:'infrastructure',label:'⚡ Connexion / électricité',short:'Infra',tone:'gray',patterns:[/internet/,/connexion/,/wifi/,/reseau/,/electricite/,/coupure/,/courant/,/serveur/]},
+  {key:'ambassador',label:'🤝 Intérêt ambassadeur',short:'Ambassadeur',tone:'purple',patterns:[/ambassad/,/commission/,/parrain/,/referer/,/recomman/,/40%/]},
+  {key:'competitor_named',label:'⚔️ Concurrent nommé',short:'Concurrent',tone:'red-deep',patterns:[/logesco/,/simpala/,/edupage/,/educnet/,/scolinfo/,/sygesc/]},
+  {key:'tech_resistance',label:'🚧 Résistance tech',short:'Tech',tone:'gray',patterns:[/pas a l aise/,/ne maitrise/,/ne connait/,/pas adapt/,/trop complexe/,/pas pret pour/]}
 ];
 const CALL_INTENT_ORDER=CALL_INTENT_RULES.map(function(rule){ return rule.key; });
 
 const PROSPECTION_THEME_RULES=[
   {key:'competition',label:'⚔️ Prix / concurrent / refus',short:'Prix / refus',tone:'red-deep',patterns:[/deja un logiciel/,/pas capable de payer/,/pas encore pret/,/pas interesse/,/refus/]},
+  {key:'pricing',label:'💰 Objection prix / budget',short:'Prix / budget',tone:'red',patterns:[/trop cher/,/prix/,/cout/,/coute/,/cher/,/budget/,/rabais/,/reduction/,/moins cher/,/payer/,/scolarite/,/economique/]},
   {key:'blocked',label:'🚪 Accès bloqué / fermé',short:'Accès bloqué',tone:'gray',patterns:[/pas recu/,/pas trouve/,/personne n etait disponible/,/n etait pas la/,/ferme/,/fermee/,/portails ferme/,/directeur n etait pas la/]},
   {key:'documents',label:'📄 Dossier / documents',short:'Documents',tone:'teal',patterns:[/doc/,/whatsapp/,/brochure/,/proposition/,/photocop/,/envoy/,/support/]},
   {key:'callback',label:'🔁 Repasser / relancer',short:'Relance',tone:'red',patterns:[/rdv/,/rendez/,/repass/,/rapp/,/relanc/,/passer/,/demain/,/lundi/,/aout/]},
   {key:'hierarchie',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',tone:'dark',patterns:[/fondateur/,/fondatrice/,/hierarch/,/superieur/,/boss/,/conseil/,/administration/]},
-  {key:'interest',label:'✨ Intérêt chaud',short:'Intérêt',tone:'green',patterns:[/interess/,/aime/,/promet/,/forte chance/,/signe/,/voudrait/,/acheminer/]}
+  {key:'interest',label:'✨ Intérêt chaud',short:'Intérêt',tone:'green',patterns:[/interess/,/aime/,/promet/,/forte chance/,/signe/,/voudrait/,/acheminer/]},
+  {key:'exam_period',label:'📚 Période d\'examen',short:'Examens',tone:'saffron',patterns:[/examen/,/evaluation/,/epreuve/,/preparatif/,/trimestre/,/fin d annee/]},
+  {key:'infrastructure',label:'⚡ Connexion / électricité',short:'Infra',tone:'gray',patterns:[/internet/,/connexion/,/wifi/,/reseau/,/electricite/,/coupure/,/courant/]},
+  {key:'ambassador',label:'🤝 Intérêt ambassadeur',short:'Ambassadeur',tone:'purple',patterns:[/ambassad/,/commission/,/parrain/,/referer/,/recomman/,/40%/]},
+  {key:'multi_campus',label:'🏫 Multi-sites / annexes',short:'Multi-sites',tone:'teal',patterns:[/plusieurs site/,/plusieurs etablis/,/annexe/,/filiale/,/campus/,/succursale/]},
+  {key:'language',label:'🌐 Bilingue / langue',short:'Bilingue',tone:'teal',patterns:[/bilingue/,/anglais/,/anglophone/,/english/,/francophone/,/francais et anglais/]},
+  {key:'funding',label:'💸 Sponsor / financement',short:'Sponsor',tone:'purple',patterns:[/sponsor/,/mecene/,/donateur/,/ong/,/bourse/,/fondation/,/financement/,/financ/]},
+  {key:'tech_resistance',label:'🚧 Résistance tech',short:'Tech',tone:'gray',patterns:[/pas a l aise/,/ne maitrise/,/ne connait/,/pas adapt/,/trop complexe/]},
+  {key:'competitor_named',label:'⚔️ Concurrent nommé',short:'Concurrent',tone:'red-deep',patterns:[/logesco/,/simpala/,/edupage/,/educnet/,/scolinfo/,/sygesc/]}
 ];
 const PROSPECTION_THEME_ORDER=PROSPECTION_THEME_RULES.map(function(rule){ return rule.key; });
 
 function extractCallIntent(item){
   const text=normalizeText(getFollowupPlainNotes(item));
-  const signals={
-    rejection:hasAnyPattern(text,CALL_INTENT_RULES[0].patterns),
-    visit:hasAnyPattern(text,CALL_INTENT_RULES[1].patterns),
-    escalation:hasAnyPattern(text,CALL_INTENT_RULES[2].patterns),
-    docs:hasAnyPattern(text,CALL_INTENT_RULES[3].patterns),
-    callback:hasAnyPattern(text,CALL_INTENT_RULES[4].patterns),
-    interest:hasAnyPattern(text,CALL_INTENT_RULES[5].patterns)
-  };
+  const signals={};
+  CALL_INTENT_RULES.forEach(function(rule){
+    signals[rule.key]=hasAnyPattern(text,rule.patterns);
+  });
   const hasNote=!!text;
   signals.qualify=hasNote && !CALL_INTENT_ORDER.some(function(key){ return signals[key]; });
   return {
@@ -3292,14 +3322,12 @@ function extractCallIntent(item){
 
 function extractProspectionTheme(row){
   const text=normalizeText([(row && row.co)||'',(row && row.re)||''].join(' '));
-  const signals={
-    competition:hasAnyPattern(text,PROSPECTION_THEME_RULES[0].patterns),
-    blocked:hasAnyPattern(text,PROSPECTION_THEME_RULES[1].patterns),
-    documents:hasAnyPattern(text,PROSPECTION_THEME_RULES[2].patterns),
-    callback:hasAnyPattern(text,PROSPECTION_THEME_RULES[3].patterns),
-    hierarchie:hasAnyPattern(text,PROSPECTION_THEME_RULES[4].patterns),
-    interest:hasAnyPattern(text,PROSPECTION_THEME_RULES[5].patterns) || (typeof (row && row.r)==='number' && row.r>=60)
-  };
+  const signals={};
+  PROSPECTION_THEME_RULES.forEach(function(rule){
+    signals[rule.key]=hasAnyPattern(text,rule.patterns);
+  });
+  // Boost 'interest' signal when rate is ≥60%
+  if (typeof (row && row.r)==='number' && row.r>=60) signals.interest=true;
   signals.qualify=!PROSPECTION_THEME_ORDER.some(function(key){ return signals[key]; });
   return {
     signals:signals,
@@ -3878,8 +3906,10 @@ function buildCallAnalytics(followups, experts){
   const calls=followups.filter(function(item){ return item.FollowupType==='CALL'; });
   const summary={total:calls.length,connected:0,message:0,noAnswer:0,unreachable:0,other:0};
   const sourceFlags={secondCall:0,whatsappDocs:0,toSuperior:0,visit:0,ratingFilled:0,summaryFilled:0,summaryBlank:0,contactFilled:0,phoneFilled:0};
-  const noteSignalTotals={docs:0,callback:0,visit:0,escalation:0,interest:0,rejection:0,qualify:0};
-  const notePrimaryTotals={rejection:0,visit:0,escalation:0,docs:0,callback:0,interest:0,qualify:0};
+  // Dynamic — covers every CALL_INTENT_RULES key + 'qualify'
+  const noteSignalTotals={qualify:0};
+  const notePrimaryTotals={qualify:0};
+  CALL_INTENT_ORDER.forEach(function(k){ noteSignalTotals[k]=0; notePrimaryTotals[k]=0; });
   const byExpert=new Map();
   (experts||[]).filter(Boolean).forEach(function(expert){
     const name=canonicalPersonName(expert);
@@ -3937,15 +3967,12 @@ function buildCallAnalytics(followups, experts){
     {label:'⛔ Injoignable',short:'Injoignable',value:summary.unreachable,color:resolveToneColor('dark'),detail:'erreur / numéro KO'},
     {label:'❔ Statut vide / autre',short:'Autre',value:summary.other,color:resolveToneColor('gray'),detail:'statut non saisi'}
   ].filter(function(segment){ return segment.value>0; });
-  const primaryIntentSegments=[
-    {key:'docs',label:'📄 Docs / WhatsApp',short:'Docs',value:notePrimaryTotals.docs,color:resolveToneColor('teal'),detail:'résumé orienté envoi docs'},
-    {key:'visit',label:'📍 RDV / visite',short:'RDV / visite',value:notePrimaryTotals.visit,color:resolveToneColor('saffron'),detail:'résumé orienté rencontre'},
-    {key:'callback',label:'🔁 Relance / rappel',short:'Relance',value:notePrimaryTotals.callback,color:resolveToneColor('red'),detail:'résumé orienté reprise'},
-    {key:'escalation',label:'🏛️ Hiérarchie / fondateur',short:'Hiérarchie',value:notePrimaryTotals.escalation,color:resolveToneColor('dark'),detail:'résumé orienté décideur final'},
-    {key:'interest',label:'✨ Intérêt explicite',short:'Intérêt',value:notePrimaryTotals.interest,color:resolveToneColor('green'),detail:'résumé orienté intérêt'},
-    {key:'rejection',label:'⛔ Rejet / concurrent',short:'Rejet',value:notePrimaryTotals.rejection,color:resolveToneColor('red-deep'),detail:'résumé orienté blocage dur'},
-    {key:'qualify',label:'📝 Note à clarifier',short:'À clarifier',value:notePrimaryTotals.qualify,color:resolveToneColor('gray'),detail:'résumé rempli mais flou'}
-  ].filter(function(segment){ return segment.value>0; });
+  // Build segments dynamically from CALL_INTENT_RULES + the synthetic 'qualify' bucket
+  const primaryIntentSegments=CALL_INTENT_RULES.map(function(rule){
+    return {key:rule.key,label:rule.label,short:rule.short,value:notePrimaryTotals[rule.key]||0,color:resolveToneColor(rule.tone),detail:'résumé orienté '+rule.short.toLowerCase()};
+  }).concat([{key:'qualify',label:'📝 Note à clarifier',short:'À clarifier',value:notePrimaryTotals.qualify||0,color:resolveToneColor('gray'),detail:'résumé rempli mais flou'}])
+    .filter(function(segment){ return segment.value>0; })
+    .sort(function(a,b){ return b.value - a.value; });
   const topExpert=expertsTable[0] || null;
   const insights=[
     `${sourceFlags.summaryFilled} appels ont un résumé saisi et ${sourceFlags.summaryBlank} n'ont aucune note.`,
@@ -3975,8 +4002,10 @@ function buildCallAnalytics(followups, experts){
 }
 
 function buildProspectionAnalytics(rawRows, pipeline){
-  const overlap={competition:0,blocked:0,documents:0,callback:0,hierarchie:0,interest:0,qualify:0};
-  const primary={competition:0,blocked:0,documents:0,callback:0,hierarchie:0,interest:0,qualify:0};
+  // Dynamic overlap/primary — every rule key + synthetic 'qualify' bucket
+  const overlap={qualify:0};
+  const primary={qualify:0};
+  PROSPECTION_THEME_ORDER.forEach(function(k){ overlap[k]=0; primary[k]=0; });
   rawRows.forEach(function(row){
     const theme=extractProspectionTheme(row);
     PROSPECTION_THEME_ORDER.forEach(function(key){
@@ -3994,15 +4023,12 @@ function buildProspectionAnalytics(rawRows, pipeline){
       detail:stage.range
     };
   }).filter(function(segment){ return segment.value>0; });
-  const primaryThemeSegments=[
-    {key:'hierarchie',label:'🏛️ Fondateur / hiérarchie',short:'Hiérarchie',value:primary.hierarchie,color:resolveToneColor('dark'),detail:'prochaine décision hors expert'},
-    {key:'documents',label:'📄 Dossier / documents',short:'Documents',value:primary.documents,color:resolveToneColor('teal'),detail:'supports à déposer/envoyer'},
-    {key:'callback',label:'🔁 Repasser / relancer',short:'Relance',value:primary.callback,color:resolveToneColor('red'),detail:'retour terrain planifié'},
-    {key:'interest',label:'✨ Intérêt déjà chaud',short:'Intérêt',value:primary.interest,color:resolveToneColor('green'),detail:'bonne traction visible'},
-    {key:'blocked',label:'🚪 Accès bloqué / fermé',short:'Accès bloqué',value:primary.blocked,color:resolveToneColor('gray'),detail:'absence du décideur / porte close'},
-    {key:'competition',label:'⚔️ Prix / concurrent / refus',short:'Prix / refus',value:primary.competition,color:resolveToneColor('red-deep'),detail:'objection dure'},
-    {key:'qualify',label:'📝 À qualifier',short:'À qualifier',value:primary.qualify,color:resolveToneColor('saffron'),detail:'note trop faible pour lecture fine'}
-  ].filter(function(segment){ return segment.value>0; });
+  // Build segments dynamically from PROSPECTION_THEME_RULES + 'qualify'
+  const primaryThemeSegments=PROSPECTION_THEME_RULES.map(function(rule){
+    return {key:rule.key,label:rule.label,short:rule.short,value:primary[rule.key]||0,color:resolveToneColor(rule.tone),detail:'thème '+rule.short.toLowerCase()};
+  }).concat([{key:'qualify',label:'📝 À qualifier',short:'À qualifier',value:primary.qualify||0,color:resolveToneColor('saffron'),detail:'note trop faible pour lecture fine'}])
+    .filter(function(segment){ return segment.value>0; })
+    .sort(function(a,b){ return b.value - a.value; });
   return {
     overlap:overlap,
     primary:primary,
@@ -4243,6 +4269,46 @@ function drillDownStage(stageKey){
   var schools=stage.schools||[];
   var html='<div class="dd-stat-row"><span class="dd-stat-label">Nombre d\'écoles</span><span class="dd-stat-value">'+schools.length+'</span></div>';
   html+='<div class="dd-stat-row"><span class="dd-stat-label">Valeur pipeline</span><span class="dd-stat-value">'+moneyFCFA(stage.amount)+'</span></div>';
+
+  // 🤝 AMBASSADOR NOTES — surface what ambassadors have written about the schools in this stage
+  (function(){
+    var ambNames = (typeof getAmbassadorNames === 'function') ? getAmbassadorNames() : [];
+    if (!ambNames.length) return;
+    var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+    var schoolKeys = {};
+    schools.forEach(function(r){ var k=schoolKey(r.schoolName); if (k) schoolKeys[k]=r.schoolName; });
+    var ambFu = allFu.filter(function(f){
+      if (!f || !f.Expert) return false;
+      if (!ambNames.some(function(n){return samePerson(n, f.Expert);})) return false;
+      var k = schoolKey(f.SchoolName);
+      return k && schoolKeys[k];
+    }).sort(function(a,b){return new Date(b.Timestamp) - new Date(a.Timestamp);});
+    if (!ambFu.length){
+      html += '<div class="amb-notes-empty">🤝 Aucune note d\'ambassadeur sur les écoles de cette étape.</div>';
+      return;
+    }
+    html += '<div class="amb-notes-block">'+
+      '<h4 class="amb-notes-title">🤝 Notes des ambassadeurs <span class="amb-count">'+ambFu.length+' note'+(ambFu.length>1?'s':'')+' · '+Object.keys(ambFu.reduce(function(o,f){o[canonicalPersonKey(f.Expert)]=1;return o;},{})).length+' ambassadeur'+(ambFu.length>1?'s':'')+'</span></h4>'+
+      '<div class="amb-notes-list">';
+    ambFu.slice(0,15).forEach(function(f){
+      var cleanNote = (typeof getFollowupPlainNotes === 'function') ? getFollowupPlainNotes(f) : (f.Notes || '');
+      var when = f.Timestamp ? new Date(f.Timestamp).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+      var typeIcon = f.FollowupType==='CALL'?'📞':f.FollowupType==='VISIT'?'🚶':f.FollowupType==='WHATSAPP'?'💬':f.FollowupType==='SMS'?'📱':f.FollowupType==='EMAIL'?'📧':'📝';
+      html += '<div class="amb-note">'+
+        '<div class="amb-note-head">'+
+          '<span class="amb-note-icon">'+typeIcon+'</span>'+
+          '<div class="amb-note-meta-main">'+
+            '<div class="amb-note-school">'+esc(f.SchoolName||'—')+'</div>'+
+            '<div class="amb-note-by">🤝 '+esc(f.Expert||'')+' · '+when+(f.Outcome?' · '+esc(f.Outcome):'')+'</div>'+
+          '</div>'+
+        '</div>'+
+        (cleanNote ? '<div class="amb-note-body">'+esc(cleanNote)+'</div>' : '<div class="amb-note-empty">(pas de note rédigée)</div>')+
+        (f.NextAction ? '<div class="amb-note-next">⏰ '+esc(f.NextAction)+(f.NextDate?' · '+esc(f.NextDate):'')+'</div>' : '')+
+      '</div>';
+    });
+    if (ambFu.length > 15) html += '<div class="amb-notes-more">… et '+(ambFu.length-15)+' autres notes d\'ambassadeurs</div>';
+    html += '</div></div>';
+  })();
   if(stageKey==='gagne'){
     var totalAmb=schools.reduce(function(s,r){return s+(r.ambassadorAmount||0);},0);
     var totalNet=schools.reduce(function(s,r){return s+(r.netAmount||0);},0);
