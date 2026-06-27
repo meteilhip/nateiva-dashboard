@@ -2738,6 +2738,67 @@ button,select,input,textarea{outline:none}
 .amb-note-next{font-size:11.5px;color:var(--saffron-deep);margin-top:6px;padding-left:28px;background:var(--saffron-soft);padding:4px 8px;border-radius:6px;display:inline-block;margin-left:28px}
 .amb-notes-empty{margin:14px 0 4px;padding:12px;background:var(--g50);border-radius:10px;font-size:12.5px;color:var(--g500);text-align:center;font-style:italic}
 .amb-notes-more{padding:8px;text-align:center;font-size:11.5px;color:var(--g500);font-family:'JetBrains Mono',monospace}
+
+/* — Décideur vs Non-décideur section — */
+.dec-split{padding:18px;background:linear-gradient(180deg,rgba(13,148,136,.03),transparent);border:1px solid var(--g100);border-radius:18px}
+.dec-topcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 16px}
+.dec-card{display:flex;gap:14px;padding:14px;border-radius:14px;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);border:1px solid var(--g100);background:var(--paper);animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
+.dec-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.dec-card.dec-yes{border-left:5px solid var(--green);background:linear-gradient(135deg,var(--green-soft),var(--paper))}
+.dec-card.dec-no{border-left:5px solid var(--red);background:linear-gradient(135deg,var(--red-soft),var(--paper))}
+.dec-card .dec-icon{font-size:32px;flex-shrink:0;width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:var(--paper);border-radius:14px;box-shadow:var(--shadow-sm)}
+.dec-card .dec-body{flex:1;min-width:0}
+.dec-card .dec-lbl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
+.dec-card .dec-val{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1}
+.dec-card .dec-val .dec-of{font-size:14px;color:var(--g500);font-weight:600}
+.dec-card .dec-sub{font-size:11.5px;color:var(--g600);margin-top:6px}
+.dec-insight{padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));border:1px solid rgba(245,158,11,.18);grid-column:1/-1}
+.dec-insight-title{font-weight:800;color:var(--ink);font-size:12px;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase}
+.dec-insight-body{font-size:13px;line-height:1.55;color:var(--g700)}
+.dec-insight-body b{color:var(--ink)}
+.dec-chart{background:var(--paper);border:1px solid var(--g100);border-radius:14px;padding:14px}
+.dec-chart-legend{display:flex;gap:18px;justify-content:flex-end;margin-bottom:12px;font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.06em}
+.dec-chart-legend .dl{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.dec-chart-legend .dl-yes{background:var(--green)}
+.dec-chart-legend .dl-no{background:var(--red)}
+.dec-chart-bars{display:flex;flex-direction:column;gap:8px}
+.dec-bar-row{display:flex;align-items:center;gap:12px}
+.dec-bar-label{flex:0 0 100px;font-weight:700;font-size:12px}
+.dec-bar-track{flex:1;display:flex;gap:0;height:28px;background:var(--g50);border-radius:8px;overflow:hidden;border:1px solid var(--g100)}
+.dec-bar{display:flex;align-items:center;justify-content:center;height:100%;transition:width .55s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both;min-width:24px}
+.dec-bar.dec-bar-yes{background:linear-gradient(135deg,var(--green-bright),var(--green))}
+.dec-bar.dec-bar-no{background:linear-gradient(135deg,var(--red-bright),var(--red))}
+.dec-bar-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff}
+.dec-bar-pct{flex:0 0 50px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--ink)}
+@media(max-width:600px){
+  .dec-bar-label{flex:0 0 70px;font-size:11px}
+  .dec-bar-pct{flex:0 0 38px;font-size:11px}
+  .dec-card .dec-val{font-size:22px}
+  .dec-card .dec-icon{width:44px;height:44px;font-size:24px}
+}
+
+/* — Ambassador drill-down modal — */
+.adr-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.adr-sum-card{background:var(--g50);border-radius:10px;padding:12px;border:1px solid var(--g100);text-align:center}
+.adr-sum-card.adr-sum-hero{background:linear-gradient(135deg,var(--ink),var(--g800));color:#fff;border:none}
+.adr-sum-card.adr-sum-hero .adr-sum-val{color:var(--saffron-bright)}
+.adr-sum-card.adr-sum-hero .adr-sum-lbl{color:var(--g300)}
+.adr-sum-lbl{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
+.adr-sum-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:var(--ink);line-height:1}
+.adr-sum-val-small{font-size:12px;color:var(--g700);font-weight:700;line-height:1.3}
+.amb-drill-list{display:flex;flex-direction:column;gap:10px}
+.amb-drill-row{background:var(--paper);border:1px solid var(--g200);border-left:4px solid var(--purple);border-radius:10px;padding:12px 14px;transition:all .2s ease;animation:cardPop .35s cubic-bezier(.16,1,.3,1) both}
+.amb-drill-row:hover{box-shadow:var(--shadow-sm);transform:translateX(2px);border-left-color:var(--ink)}
+.adr-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.adr-school{font-weight:700;font-size:14px;color:var(--ink);flex:1;min-width:0}
+.adr-amount{font-family:'Fraunces',serif;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.adr-meta{display:flex;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--g600);margin-bottom:8px}
+.adr-meta span{background:var(--g100);padding:2px 7px;border-radius:6px}
+.adr-meta .adr-stage{font-weight:700;border:1px solid currentColor;background:transparent !important}
+.adr-meta .adr-cat{background:var(--purple-soft);color:var(--purple);font-weight:700;border:1px solid rgba(124,58,237,.2)}
+.adr-note{font-size:12.5px;line-height:1.5;color:var(--g700);background:var(--g50);padding:8px 10px;border-radius:8px}
+.adr-note b{color:var(--ink)}
+.adr-note-empty{color:var(--g400);font-style:italic}
 .uh-sub{font-size:12.5px;color:var(--g600);line-height:1.45;margin-bottom:10px}
 .uh-pills{display:flex;flex-wrap:wrap;gap:6px}
 .uh-pill{
@@ -4592,6 +4653,103 @@ function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
 }
 function closeDdRev(){ var o=document.getElementById('ddrev-overlay'); if(o){o.remove(); document.body.style.overflow='';} }
 
+// Drill-down: Décideur vs Non-décideur — list schools
+function drillDownDecider(mode){
+  if (!_ddDashboard) return;
+  var allRecs = _ddDashboard.records || [];
+  var filter = mode === 'yes' ? hasDecideurReached : function(r){return !hasDecideurReached(r);};
+  var schools = allRecs.filter(filter).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
+  var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
+  var title = (mode === 'yes' ? '👔 Décideur joint' : '🚪 Décideur PAS joint') + ' — ' + schools.length + ' école' + (schools.length>1?'s':'');
+  var body = '<div class="dd-stat-row"><span class="dd-stat-label">Revenu pondéré total</span><span class="dd-stat-value">'+moneyCompact(totalRev)+'</span></div>';
+  body += '<h4 style="margin:14px 0 8px;font-size:14px">Liste des écoles (triées par revenu)</h4><div class="dd-school-list">';
+  schools.slice(0,80).forEach(function(r){
+    var stageLabel = r.stage==='gagne'?'🏆 Gagné':r.stage==='chaud'?'🔥 Chaud':r.stage==='tiede'?'🟠 Tiède':r.stage==='froid'?'🔵 Froid':r.stage==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
+    body += '<div class="dd-school-item" style="flex-direction:column;align-items:stretch;gap:4px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="dd-school-name">'+esc(r.schoolName||'—')+'</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;color:var(--ink)">'+moneyCompact(r.amount||0)+'</span></div>'+
+      '<div class="dd-school-meta"><span>'+stageLabel+'</span><span>📍 '+esc(r.city||'—')+'</span><span>👤 '+esc(r.expert||'—')+'</span><span>'+esc(r.type||'—')+' · '+esc(r.appMode||'—')+'</span><span>📊 '+(r.rate||0)+'%</span></div>'+
+    '</div>';
+  });
+  if (schools.length>80) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(schools.length-80)+' autres écoles</div>';
+  body += '</div>';
+  showDrillDown(title, body);
+}
+
+// Drill-down: Ambassador estimator — per-school commission + notes
+function drillDownAmbassador(mode){
+  if (!_ddDashboard) return;
+  var allRecs = _ddDashboard.records || [];
+  var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+  // Filter records by stage based on mode
+  var records;
+  var title;
+  if (mode === 'earned'){
+    records = allRecs.filter(function(r){return r.stage==='gagne' && (r.ambassadorAmount||0)>0;});
+    title = '🤝 Commission Ambassadeur — Déjà gagné';
+  } else if (mode === 'potential'){
+    records = allRecs.filter(function(r){return (r.stage==='chaud'||r.stage==='tiede');});
+    title = '🤝 Commission Ambassadeur — Potentiel (chaud + tiède)';
+  } else {
+    records = allRecs.filter(function(r){return r.stage==='gagne' || r.stage==='chaud' || r.stage==='tiede';});
+    title = '🤝 Commission Ambassadeur — Total projeté';
+  }
+  // Apply ambassador category filter from DASH_STATE
+  var ambCat = (typeof DASH_STATE!=='undefined' && DASH_STATE.ambCategory) || 'all';
+  if (ambCat !== 'all'){
+    records = records.filter(function(r){ return (typeof ambKeyForRecord==='function') && ambKeyForRecord(r) === ambCat; });
+  }
+  records.sort(function(a,b){
+    var aAmb = a.stage==='gagne' ? (a.ambassadorAmount||0) : (typeof estimateAmbForPotential==='function'?estimateAmbForPotential(a):0);
+    var bAmb = b.stage==='gagne' ? (b.ambassadorAmount||0) : (typeof estimateAmbForPotential==='function'?estimateAmbForPotential(b):0);
+    return bAmb - aAmb;
+  });
+  // Build school → most recent note from any followup
+  var notesBySchool = {};
+  allFu.forEach(function(f){
+    var k = schoolKey(f.SchoolName);
+    if (!k) return;
+    var clean = (typeof getFollowupPlainNotes === 'function') ? getFollowupPlainNotes(f) : (f.Notes||'');
+    if (!clean) return;
+    if (!notesBySchool[k] || new Date(f.Timestamp) > new Date(notesBySchool[k].ts)){
+      notesBySchool[k] = { ts: f.Timestamp, by: f.Expert, type: f.FollowupType, text: clean };
+    }
+  });
+  var totalAmb = 0;
+  var rowsHtml = records.slice(0,80).map(function(r){
+    var ambAmount = r.stage==='gagne' ? (r.ambassadorAmount||0) : (typeof estimateAmbForPotential==='function'?estimateAmbForPotential(r):0);
+    totalAmb += ambAmount;
+    var stageLabel = r.stage==='gagne'?'🏆 Gagné':r.stage==='chaud'?'🔥 Chaud':'🟠 Tiède';
+    var stageColor = r.stage==='gagne'?'var(--green)':r.stage==='chaud'?'var(--red)':'var(--saffron)';
+    var catKey = (typeof ambKeyForRecord==='function') ? ambKeyForRecord(r) : '';
+    var catLabel = AMBASSADOR_RATES && AMBASSADOR_RATES[catKey] ? AMBASSADOR_RATES[catKey].label : '—';
+    var k = schoolKey(r.schoolName);
+    var note = notesBySchool[k];
+    return '<div class="amb-drill-row">'+
+      '<div class="adr-head">'+
+        '<div class="adr-school">'+esc(r.schoolName||'—')+'</div>'+
+        '<div class="adr-amount" style="color:'+stageColor+'">'+moneyCompact(ambAmount)+'</div>'+
+      '</div>'+
+      '<div class="adr-meta">'+
+        '<span class="adr-stage" style="background:'+stageColor+'1a;color:'+stageColor+'">'+stageLabel+'</span>'+
+        '<span>📊 '+(r.rate||0)+'%</span>'+
+        '<span>📍 '+esc(r.city||'—')+'</span>'+
+        '<span>👤 '+esc(r.expert||'—')+'</span>'+
+        '<span class="adr-cat">'+esc(catLabel)+'</span>'+
+        (r.effectif?'<span>👥 '+fmt(r.effectif)+' élèves</span>':'')+
+      '</div>'+
+      (note ? '<div class="adr-note"><b>📝 Dernière note ('+esc(note.type||'?')+' · '+esc(note.by||'?')+'):</b> '+esc(note.text.length>240?note.text.slice(0,240)+'…':note.text)+'</div>' : '<div class="adr-note adr-note-empty">Aucune note rédigée sur cette école</div>')+
+    '</div>';
+  }).join('');
+  var body = '<div class="adr-summary">'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Écoles concernées</div><div class="adr-sum-val">'+records.length+'</div></div>'+
+    '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Commission totale</div><div class="adr-sum-val">'+moneyCompact(totalAmb)+'</div></div>'+
+    (ambCat!=='all' && AMBASSADOR_RATES[ambCat] ? '<div class="adr-sum-card"><div class="adr-sum-lbl">Filtré sur</div><div class="adr-sum-val-small">'+esc(AMBASSADOR_RATES[ambCat].label)+'</div></div>' : '')+
+  '</div>';
+  body += '<div class="amb-drill-list">'+rowsHtml+'</div>';
+  if (records.length>80) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(records.length-80)+' autres écoles</div>';
+  showDrillDown(title, body);
+}
+
 function drillDownRevenue(segmentKey){
   if(!_ddDashboard)return;
   var d=_ddDashboard;
@@ -5790,20 +5948,20 @@ function rHome(){
           '<select onchange="setAmbCategory(this.value)" style="padding:8px 12px;border-radius:10px;border:1.5px solid var(--g200);font-family:inherit;font-weight:600;font-size:13px;background:#fff;cursor:pointer">'+categoryOptions+'</select>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">'+
-          '<div class="stat-modern" style="border-top:3px solid var(--purple)">'+
+          '<div class="stat-modern lift" style="border-top:3px solid var(--purple);cursor:pointer" onclick="drillDownAmbassador(\'earned\')" tabindex="0" role="button" title="Voir le détail des écoles + commissions + notes">'+
             '<div class="stat-head"><span class="stat-label">💸 Déjà gagné</span><span class="stat-icon" style="background:var(--purple-soft);color:var(--purple)">🏆</span></div>'+
             '<div class="stat-val" style="color:var(--purple)">'+moneyCompact(ambEarnedFiltered)+'</div>'+
-            '<div class="stat-sub">'+gagneCount+' conversion'+(gagneCount>1?'s':'')+' close'+(gagneCount>1?'es':'')+'</div>'+
+            '<div class="stat-sub">'+gagneCount+' conversion'+(gagneCount>1?'s':'')+' close'+(gagneCount>1?'es':'')+' · cliquer pour le détail</div>'+
           '</div>'+
-          '<div class="stat-modern" style="border-top:3px solid var(--red)">'+
+          '<div class="stat-modern lift" style="border-top:3px solid var(--red);cursor:pointer" onclick="drillDownAmbassador(\'potential\')" tabindex="0" role="button" title="Voir les écoles chaudes/tièdes + commissions estimées + notes">'+
             '<div class="stat-head"><span class="stat-label">🎯 Potentiel chaud + tiède</span><span class="stat-icon" style="background:var(--red-soft);color:var(--red)">⚡</span></div>'+
             '<div class="stat-val" style="color:var(--red)">'+moneyCompact(ambPotFiltered)+'</div>'+
-            '<div class="stat-sub">'+chaudCount+' chaud · '+tiedeCount+' tiède · pondéré par taux</div>'+
+            '<div class="stat-sub">'+chaudCount+' chaud · '+tiedeCount+' tiède · cliquer pour le détail</div>'+
           '</div>'+
-          '<div class="stat-modern" style="border-top:3px solid var(--green)">'+
+          '<div class="stat-modern lift" style="border-top:3px solid var(--green);cursor:pointer" onclick="drillDownAmbassador(\'total\')" tabindex="0" role="button" title="Voir tout le pipeline ambassadeur + notes par école">'+
             '<div class="stat-head"><span class="stat-label">💎 Total projeté</span><span class="stat-icon" style="background:var(--green-soft);color:var(--green)">∑</span></div>'+
             '<div class="stat-val" style="color:var(--green)">'+moneyCompact(ambEarnedFiltered + ambPotFiltered)+'</div>'+
-            '<div class="stat-sub">si tout le pipeline converti à son taux actuel</div>'+
+            '<div class="stat-sub">si tout le pipeline converti · cliquer pour le détail</div>'+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -5852,6 +6010,80 @@ function rHome(){
     <div class="stage-grid">${dashboard.pipeline.map(function(stage){ return renderStageMetric(stage,revenueVisible); }).join('')}</div>
     <div class="note saffron"><b>Lecture rapide:</b> <b>Chauds = 60% et +</b>, <b>Tièdes = 40% à 59%</b>, <b>Froids = 1% à 39%</b>, <b>Nouveau</b> = pas encore noté, <b>Gagné</b> = deal clos dans les suivis.</div>
   </div>
+
+  <!-- 👔 DÉCIDEUR vs NON-DÉCIDEUR — où on a le plus de chance de closer -->
+  ${(function(){
+    var withD = [];      // schools where décideur reached
+    var withoutD = [];   // schools where décideur not reached
+    dashboard.records.forEach(function(r){
+      if (hasDecideurReached(r)) withD.push(r); else withoutD.push(r);
+    });
+    function _sum(arr, key){ return arr.reduce(function(s,r){return s+(r[key]||0);},0); }
+    function _byStage(arr){
+      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){ if (r.stage in m) m[r.stage]++; });
+      return m;
+    }
+    function _revByStage(arr){
+      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){ if (r.stage in m) m[r.stage]+=(r.amount||0); });
+      return m;
+    }
+    var withRev = _sum(withD,'amount');
+    var withoutRev = _sum(withoutD,'amount');
+    var totalSchools = withD.length + withoutD.length;
+    var pctReached = totalSchools ? Math.round((withD.length/totalSchools)*100) : 0;
+    var withByStage = _byStage(withD), withoutByStage = _byStage(withoutD);
+    var withRevByStage = _revByStage(withD), withoutRevByStage = _revByStage(withoutD);
+    var STAGES = [
+      {key:'gagne', label:'🏆 Gagné',  color:'var(--green)'},
+      {key:'chaud', label:'🔥 Chaud',  color:'var(--red)'},
+      {key:'tiede', label:'🟠 Tiède',  color:'var(--saffron)'},
+      {key:'froid', label:'🔵 Froid',  color:'var(--teal)'},
+      {key:'nouveau',label:'🆕 Nouveau', color:'var(--g500)'},
+      {key:'perdu', label:'⛔ Perdu',  color:'var(--g700)'}
+    ];
+    // Max per stage for bar scaling
+    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, withByStage[s.key]+withoutByStage[s.key]);},0));
+    return '<div class="section dec-split"><div class="sec-head">'+
+      '<h2>👔 Décideur <span class="it">vs Non-décideur</span></h2>'+
+      '<span class="anno">Où concentrer l\'effort : les écoles où on a joint le décideur convertissent bien mieux</span>'+
+    '</div>'+
+    '<div class="dec-topcards">'+
+      '<div class="dec-card dec-yes" onclick="drillDownDecider(\'yes\')"><div class="dec-icon">👔</div><div class="dec-body"><div class="dec-lbl">Décideur joint</div><div class="dec-val">'+withD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctReached+'% du portefeuille · '+moneyCompact(withRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-card dec-no" onclick="drillDownDecider(\'no\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Décideur PAS joint</div><div class="dec-val">'+withoutD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+(100-pctReached)+'% du portefeuille · '+moneyCompact(withoutRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-insight">'+
+        '<div class="dec-insight-title">💡 Lecture stratégique</div>'+
+        '<div class="dec-insight-body">'+
+          (withD.length>0?'Les <b>'+withD.length+'</b> écoles avec décideur joint pèsent <b>'+moneyCompact(withRev)+'</b>.':'')+
+          (withoutD.length>0?' Les <b>'+withoutD.length+'</b> écoles sans décideur représentent <b>'+moneyCompact(withoutRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
+          (pctReached>=60?' <b style="color:var(--green)">Taux d\'accès décideur excellent</b> — concentrer sur le closing.':pctReached>=30?' <b style="color:var(--saffron-deep)">Effort terrain à intensifier</b> sur les écoles sans décideur joint.':' <b style="color:var(--red)">Priorité absolue : atteindre les décideurs</b> — la majorité du pipeline est bloqué.')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    // Stacked bar chart per stage
+    '<div class="dec-chart">'+
+      '<div class="dec-chart-legend"><span><i class="dl dl-yes"></i> Décideur joint</span><span><i class="dl dl-no"></i> Pas joint</span></div>'+
+      '<div class="dec-chart-bars">'+
+        STAGES.map(function(s){
+          var yes = withByStage[s.key]||0, no = withoutByStage[s.key]||0;
+          var total = yes + no;
+          if (total === 0) return '';
+          var yesPct = (yes/maxStage)*100, noPct = (no/maxStage)*100;
+          var pct = total ? Math.round((yes/total)*100) : 0;
+          return '<div class="dec-bar-row" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+')">'+
+            '<div class="dec-bar-label" style="color:'+s.color+'">'+s.label+'</div>'+
+            '<div class="dec-bar-track">'+
+              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" title="'+yes+' décideur joint"><span class="dec-bar-num">'+yes+'</span></div>':'')+
+              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" title="'+no+' sans décideur"><span class="dec-bar-num">'+no+'</span></div>':'')+
+            '</div>'+
+            '<div class="dec-bar-pct">'+pct+'%</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+    '</div>';
+  })()}
 
   ${revenueVisible ? (function(){
     var wonSchools=dashboard.records.filter(function(r){return r.stage==='gagne';});
