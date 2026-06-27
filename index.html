@@ -2799,6 +2799,99 @@ button,select,input,textarea{outline:none}
 .adr-note{font-size:12.5px;line-height:1.5;color:var(--g700);background:var(--g50);padding:8px 10px;border-radius:8px}
 .adr-note b{color:var(--ink)}
 .adr-note-empty{color:var(--g400);font-style:italic}
+
+/* ============================================
+   ✨ v11.24 — Sleek polish layer
+   Decision-oriented, hyper-modern, professional
+   ============================================ */
+/* Top page-intro becomes the executive hero */
+.page-intro.page-intro-hero{
+  background:linear-gradient(135deg,#fff 0%,#fffaf0 60%,#fff5e6 100%);
+  border:1px solid var(--g100);border-radius:20px;
+  padding:24px 28px;margin-bottom:14px;
+  box-shadow:0 8px 28px rgba(245,158,11,.08);
+  position:relative;overflow:hidden;
+  animation:heroRise .55s cubic-bezier(.16,1,.3,1) both;
+}
+.page-intro.page-intro-hero::before{
+  content:'';position:absolute;top:-80px;right:-80px;width:300px;height:300px;
+  background:radial-gradient(circle,rgba(220,38,38,.08),transparent 60%);
+  pointer-events:none;animation:pulse-glow 7s ease-in-out infinite;
+}
+.page-intro.page-intro-hero h2{margin-bottom:14px;position:relative;z-index:1}
+.page-intro.page-intro-hero .quick-links{position:relative;z-index:1}
+.page-intro.page-intro-hero .summary-tags{position:relative;z-index:1;margin-top:12px}
+
+/* Décideur split — extra polish */
+.dec-split{animation:cardPop .5s cubic-bezier(.16,1,.3,1) both}
+.dec-card{position:relative;overflow:hidden}
+.dec-card::after{
+  content:'';position:absolute;top:-50%;right:-50%;width:160%;height:160%;
+  background:radial-gradient(ellipse at center,currentColor,transparent 65%);
+  opacity:0;transition:opacity .4s ease;pointer-events:none;
+}
+.dec-card.dec-yes::after{color:var(--green)}
+.dec-card.dec-no::after{color:var(--red)}
+.dec-card:hover::after{opacity:.06}
+.dec-bar{position:relative}
+.dec-bar::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  transform:translateX(-100%);transition:transform .6s ease;
+}
+.dec-card:hover .dec-bar::after,.dec-bar-row:hover .dec-bar::after{transform:translateX(100%)}
+
+/* Live feed in Workspace — pulsing live chip */
+.feed-item{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) both;transition:all .25s ease}
+.feed-item:hover{transform:translateX(4px)}
+
+/* Pulse Live strip — enhanced backdrop */
+.section .stat-modern{position:relative;overflow:hidden}
+.section .stat-modern::after{
+  content:'';position:absolute;top:0;right:0;width:80px;height:80px;
+  background:radial-gradient(circle at top right,currentColor,transparent 70%);
+  opacity:.05;pointer-events:none;
+}
+
+/* NLP cards — opportunity highlight pulse */
+.agent-card{position:relative;transition:all .3s cubic-bezier(.16,1,.3,1);cursor:default}
+.agent-card.clickable{cursor:pointer}
+.agent-card.clickable:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.1);border-color:var(--saffron)}
+.agent-card.clickable:hover .agent-head strong{color:var(--saffron-deep)}
+
+/* Section reveal staggered animation */
+.pane.act > .section,.pane.act > .form-card{
+  animation:sectionReveal .5s cubic-bezier(.16,1,.3,1) both;
+}
+.pane.act > .section:nth-of-type(1){animation-delay:.02s}
+.pane.act > .section:nth-of-type(2){animation-delay:.06s}
+.pane.act > .section:nth-of-type(3){animation-delay:.1s}
+.pane.act > .section:nth-of-type(4){animation-delay:.14s}
+.pane.act > .section:nth-of-type(5){animation-delay:.18s}
+.pane.act > .section:nth-of-type(6){animation-delay:.22s}
+.pane.act > .section:nth-of-type(7){animation-delay:.26s}
+@keyframes sectionReveal{
+  from{opacity:0;transform:translateY(20px) scale(.99);filter:blur(4px)}
+  to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+}
+
+/* Workspace qualification — gradient border */
+.workspace-qual{
+  border:1px solid var(--g100);
+  background:linear-gradient(180deg,var(--paper) 0%,rgba(13,148,136,.02) 100%);
+  position:relative;overflow:hidden;
+}
+.workspace-qual::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--teal),var(--purple),var(--saffron));
+}
+
+/* Executive feel: subtle parallax shadow on stat-modern hover */
+.stat-modern.lift:hover{box-shadow:0 16px 36px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.04)}
+
+/* Drill-down modal — entrance polish */
+.dd-modal,.me-modal,.ddrev-modal{animation:modalRise .35s cubic-bezier(.16,1,.3,1) both}
+@keyframes modalRise{from{opacity:0;transform:translateY(40px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 .uh-sub{font-size:12.5px;color:var(--g600);line-height:1.45;margin-bottom:10px}
 .uh-pills{display:flex;flex-wrap:wrap;gap:6px}
 .uh-pill{
@@ -5761,6 +5854,15 @@ function rHome(){
   var _conversionRate=uniqueSchools>0 ? Math.round((wonStage.count/uniqueSchools)*100) : 0;
 
   let h=`
+  <!-- 📌 NATEIVA SALES ANALYTIC — page-intro at the very top -->
+  <div class="page-intro page-intro-hero" data-num="01">
+    <h2>Nateiva <span class="it">Sale Analytic</span></h2>
+    <div class="quick-links">${quickLinks}</div>
+    <div class="summary-tags">
+      ${summaryTags.map(function(tag){ return '<span>' + tag + '</span>'; }).join('')}
+    </div>
+  </div>
+
   <!-- LIVE PULSE STRIP (admin instant overview) -->
   <div class="section" style="background:linear-gradient(135deg, rgba(220,38,38,.04), rgba(245,158,11,.04));border:1px solid var(--g100);padding:18px;margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -5807,41 +5909,79 @@ function rHome(){
     </div>
   </div>
 
-  <!-- 🏅 TOP PERFORMERS (just below Vue d'ensemble Pulse Live) -->
-  ${(typeof buildTopPerformersStrip === 'function') ? buildTopPerformersStrip('Cliquez une carte pour le détail · Classement complet plus bas sous « Revenus en FCFA ».') : ''}
+  <!-- Top Performers removed from Dashboard (kept in Workspace). Activity Feed moved to Workspace via buildActivityFeedStrip(). page-intro moved to top. -->
 
-  <!-- LIVE ACTIVITY FEED -->
-  ${_feedItems.length ? `
-  <div class="section" style="padding:18px;margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">📡 Flux d'activité équipe</span>
-        <span class="chip-modern live">TEMPS RÉEL</span>
-      </div>
-      <a href="#" data-jump="suivi" style="color:var(--red);font-weight:700;font-size:12px;text-decoration:none">Voir tout →</a>
-    </div>
-    <div class="feed">
-      ${_feedItems.map(function(f){
-        var fi=_feedIcon(f.FollowupType);
-        return '<div class="feed-item">'+
-          '<div class="feed-dot '+fi.cls+'">'+fi.icon+'</div>'+
-          '<div class="feed-content">'+
-            '<div class="feed-title">'+(f.Expert||'—')+' · '+(f.SchoolName||'—')+'</div>'+
-            '<div class="feed-meta"><b>'+(f.FollowupType||'').toUpperCase()+'</b> · '+(f.Outcome||f.NextAction||'aucune note')+' · '+_relTime(f.Timestamp)+'</div>'+
-          '</div>'+
-        '</div>';
-      }).join('')}
-    </div>
-  </div>
-  ` : ''}
-
-  <div class="page-intro" data-num="01">
-    <h2>Nateiva <span class="it">Sale Analytic</span></h2>
-    <div class="quick-links">${quickLinks}</div>
-    <div class="summary-tags">
-      ${summaryTags.map(function(tag){ return '<span>' + tag + '</span>'; }).join('')}
-    </div>
-  </div>
+  <!-- 👔 DÉCIDEUR vs NON-DÉCIDEUR — repositioned above Revenue Tracker -->
+  ${(function(){
+    var withD = [];
+    var withoutD = [];
+    dashboard.records.forEach(function(r){
+      if (hasDecideurReached(r)) withD.push(r); else withoutD.push(r);
+    });
+    function _sum(arr, key){ return arr.reduce(function(s,r){return s+(r[key]||0);},0); }
+    function _byStage(arr){
+      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){ if (r.stage in m) m[r.stage]++; });
+      return m;
+    }
+    function _revByStage(arr){
+      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){ if (r.stage in m) m[r.stage]+=(r.amount||0); });
+      return m;
+    }
+    var withRev = _sum(withD,'amount');
+    var withoutRev = _sum(withoutD,'amount');
+    var totalSchools = withD.length + withoutD.length;
+    var pctReached = totalSchools ? Math.round((withD.length/totalSchools)*100) : 0;
+    var withByStage = _byStage(withD), withoutByStage = _byStage(withoutD);
+    var withRevByStage = _revByStage(withD), withoutRevByStage = _revByStage(withoutD);
+    var STAGES = [
+      {key:'gagne', label:'🏆 Gagné',  color:'var(--green)'},
+      {key:'chaud', label:'🔥 Chaud',  color:'var(--red)'},
+      {key:'tiede', label:'🟠 Tiède',  color:'var(--saffron)'},
+      {key:'froid', label:'🔵 Froid',  color:'var(--teal)'},
+      {key:'nouveau',label:'🆕 Nouveau', color:'var(--g500)'},
+      {key:'perdu', label:'⛔ Perdu',  color:'var(--g700)'}
+    ];
+    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, withByStage[s.key]+withoutByStage[s.key]);},0));
+    return '<div class="section dec-split"><div class="sec-head">'+
+      '<h2>👔 Décideur <span class="it">vs Non-décideur</span></h2>'+
+      '<span class="anno">Où concentrer l\'effort : les écoles où on a joint le décideur convertissent bien mieux</span>'+
+    '</div>'+
+    '<div class="dec-topcards">'+
+      '<div class="dec-card dec-yes" onclick="drillDownDecider(\'yes\')"><div class="dec-icon">👔</div><div class="dec-body"><div class="dec-lbl">Décideur joint</div><div class="dec-val">'+withD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctReached+'% du portefeuille · '+moneyCompact(withRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-card dec-no" onclick="drillDownDecider(\'no\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Décideur PAS joint</div><div class="dec-val">'+withoutD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+(100-pctReached)+'% du portefeuille · '+moneyCompact(withoutRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-insight">'+
+        '<div class="dec-insight-title">💡 Lecture stratégique</div>'+
+        '<div class="dec-insight-body">'+
+          (withD.length>0?'Les <b>'+withD.length+'</b> écoles avec décideur joint pèsent <b>'+moneyCompact(withRev)+'</b>.':'')+
+          (withoutD.length>0?' Les <b>'+withoutD.length+'</b> écoles sans décideur représentent <b>'+moneyCompact(withoutRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
+          (pctReached>=60?' <b style="color:var(--green)">Taux d\'accès décideur excellent</b> — concentrer sur le closing.':pctReached>=30?' <b style="color:var(--saffron-deep)">Effort terrain à intensifier</b> sur les écoles sans décideur joint.':' <b style="color:var(--red)">Priorité absolue : atteindre les décideurs</b> — la majorité du pipeline est bloqué.')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="dec-chart">'+
+      '<div class="dec-chart-legend"><span><i class="dl dl-yes"></i> Décideur joint</span><span><i class="dl dl-no"></i> Pas joint</span></div>'+
+      '<div class="dec-chart-bars">'+
+        STAGES.map(function(s){
+          var yes = withByStage[s.key]||0, no = withoutByStage[s.key]||0;
+          var total = yes + no;
+          if (total === 0) return '';
+          var yesPct = (yes/maxStage)*100, noPct = (no/maxStage)*100;
+          var pct = total ? Math.round((yes/total)*100) : 0;
+          return '<div class="dec-bar-row" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+')">'+
+            '<div class="dec-bar-label" style="color:'+s.color+'">'+s.label+'</div>'+
+            '<div class="dec-bar-track">'+
+              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" title="'+yes+' décideur joint"><span class="dec-bar-num">'+yes+'</span></div>':'')+
+              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" title="'+no+' sans décideur"><span class="dec-bar-num">'+no+'</span></div>':'')+
+            '</div>'+
+            '<div class="dec-bar-pct">'+pct+'%</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+    '</div>';
+  })()}
 
   <!-- 💰 REVENUE TRACKER (visible by everyone) — 3 periods stacked -->
   ${(function(){
@@ -6011,79 +6151,8 @@ function rHome(){
     <div class="note saffron"><b>Lecture rapide:</b> <b>Chauds = 60% et +</b>, <b>Tièdes = 40% à 59%</b>, <b>Froids = 1% à 39%</b>, <b>Nouveau</b> = pas encore noté, <b>Gagné</b> = deal clos dans les suivis.</div>
   </div>
 
-  <!-- 👔 DÉCIDEUR vs NON-DÉCIDEUR — où on a le plus de chance de closer -->
-  ${(function(){
-    var withD = [];      // schools where décideur reached
-    var withoutD = [];   // schools where décideur not reached
-    dashboard.records.forEach(function(r){
-      if (hasDecideurReached(r)) withD.push(r); else withoutD.push(r);
-    });
-    function _sum(arr, key){ return arr.reduce(function(s,r){return s+(r[key]||0);},0); }
-    function _byStage(arr){
-      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
-      arr.forEach(function(r){ if (r.stage in m) m[r.stage]++; });
-      return m;
-    }
-    function _revByStage(arr){
-      var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
-      arr.forEach(function(r){ if (r.stage in m) m[r.stage]+=(r.amount||0); });
-      return m;
-    }
-    var withRev = _sum(withD,'amount');
-    var withoutRev = _sum(withoutD,'amount');
-    var totalSchools = withD.length + withoutD.length;
-    var pctReached = totalSchools ? Math.round((withD.length/totalSchools)*100) : 0;
-    var withByStage = _byStage(withD), withoutByStage = _byStage(withoutD);
-    var withRevByStage = _revByStage(withD), withoutRevByStage = _revByStage(withoutD);
-    var STAGES = [
-      {key:'gagne', label:'🏆 Gagné',  color:'var(--green)'},
-      {key:'chaud', label:'🔥 Chaud',  color:'var(--red)'},
-      {key:'tiede', label:'🟠 Tiède',  color:'var(--saffron)'},
-      {key:'froid', label:'🔵 Froid',  color:'var(--teal)'},
-      {key:'nouveau',label:'🆕 Nouveau', color:'var(--g500)'},
-      {key:'perdu', label:'⛔ Perdu',  color:'var(--g700)'}
-    ];
-    // Max per stage for bar scaling
-    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, withByStage[s.key]+withoutByStage[s.key]);},0));
-    return '<div class="section dec-split"><div class="sec-head">'+
-      '<h2>👔 Décideur <span class="it">vs Non-décideur</span></h2>'+
-      '<span class="anno">Où concentrer l\'effort : les écoles où on a joint le décideur convertissent bien mieux</span>'+
-    '</div>'+
-    '<div class="dec-topcards">'+
-      '<div class="dec-card dec-yes" onclick="drillDownDecider(\'yes\')"><div class="dec-icon">👔</div><div class="dec-body"><div class="dec-lbl">Décideur joint</div><div class="dec-val">'+withD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctReached+'% du portefeuille · '+moneyCompact(withRev)+' de revenu pondéré</div></div></div>'+
-      '<div class="dec-card dec-no" onclick="drillDownDecider(\'no\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Décideur PAS joint</div><div class="dec-val">'+withoutD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+(100-pctReached)+'% du portefeuille · '+moneyCompact(withoutRev)+' de revenu pondéré</div></div></div>'+
-      '<div class="dec-insight">'+
-        '<div class="dec-insight-title">💡 Lecture stratégique</div>'+
-        '<div class="dec-insight-body">'+
-          (withD.length>0?'Les <b>'+withD.length+'</b> écoles avec décideur joint pèsent <b>'+moneyCompact(withRev)+'</b>.':'')+
-          (withoutD.length>0?' Les <b>'+withoutD.length+'</b> écoles sans décideur représentent <b>'+moneyCompact(withoutRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
-          (pctReached>=60?' <b style="color:var(--green)">Taux d\'accès décideur excellent</b> — concentrer sur le closing.':pctReached>=30?' <b style="color:var(--saffron-deep)">Effort terrain à intensifier</b> sur les écoles sans décideur joint.':' <b style="color:var(--red)">Priorité absolue : atteindre les décideurs</b> — la majorité du pipeline est bloqué.')+
-        '</div>'+
-      '</div>'+
-    '</div>'+
-    // Stacked bar chart per stage
-    '<div class="dec-chart">'+
-      '<div class="dec-chart-legend"><span><i class="dl dl-yes"></i> Décideur joint</span><span><i class="dl dl-no"></i> Pas joint</span></div>'+
-      '<div class="dec-chart-bars">'+
-        STAGES.map(function(s){
-          var yes = withByStage[s.key]||0, no = withoutByStage[s.key]||0;
-          var total = yes + no;
-          if (total === 0) return '';
-          var yesPct = (yes/maxStage)*100, noPct = (no/maxStage)*100;
-          var pct = total ? Math.round((yes/total)*100) : 0;
-          return '<div class="dec-bar-row" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+')">'+
-            '<div class="dec-bar-label" style="color:'+s.color+'">'+s.label+'</div>'+
-            '<div class="dec-bar-track">'+
-              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" title="'+yes+' décideur joint"><span class="dec-bar-num">'+yes+'</span></div>':'')+
-              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" title="'+no+' sans décideur"><span class="dec-bar-num">'+no+'</span></div>':'')+
-            '</div>'+
-            '<div class="dec-bar-pct">'+pct+'%</div>'+
-          '</div>';
-        }).join('')+
-      '</div>'+
-    '</div>'+
-    '</div>';
-  })()}
+  <!-- Décideur vs Non-décideur moved up: now renders above Revenue Tracker -->
+
 
   ${revenueVisible ? (function(){
     var wonSchools=dashboard.records.filter(function(r){return r.stage==='gagne';});
@@ -10820,6 +10889,11 @@ function rSuivi() {
     if (!topExpert) h += 'Aucune donnée de prospection disponible.';
     h += '</span></div>';
 
+    // 📡 LIVE ACTIVITY FEED — moved from Dashboard, sits right before Vue d'ensemble
+    if (typeof buildActivityFeedStrip === 'function') {
+      h += buildActivityFeedStrip(8);
+    }
+
     // Section 1: Vue d'ensemble
     h += '<div class="exec-section" style="animation-delay:.1s"><div class="exec-section-title">📈 Vue d\'ensemble <span class="exec-badge">' + teamSize + ' experts</span></div>';
     h += '<div class="exec-grid">';
@@ -10856,6 +10930,24 @@ function rSuivi() {
     h += '</div></div>';
 
     // Top Performers strip now rendered at the top of Workspace, see buildTopPerformersStrip() call above
+
+    // 🧾 QUALIFICATION & SEGMENTATION — moved above Classement rapide
+    var _qualScopeLbl = isSuper ? 'Toute l\'équipe' : (canSeeTeamData(currentUser) ? 'Votre équipe' : 'Votre portefeuille');
+    var _qualFuCount = isSuper ? getVisibleFollowups().length : (canSeeTeamData(currentUser) ? getVisibleFollowups().length : myFollowups.length);
+    h += '<div class="form-card workspace-qual"><h3>🧾 Qualification & <span class="it">segmentation</span></h3>';
+    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">' + _qualScopeLbl + ' — ' + qualification.total + ' écoles analysées. Type, quartier, effectif, version, système actuel, signaux d\'urgence.</p>';
+    h += '<div class="agent-grid">';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + ' (' + (qualification.total ? Math.round(qualification.qualified / qualification.total * 100) : 0) + '%)</span></div>';
+    h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés</span></div><div><b>' + qualification.averageStudents + '</b><span>moy. élèves/école</span></div><div><b>' + _qualFuCount + '</b><span>suivis ' + (isSuper ? 'équipe' : 'visibles') + '</span></div></div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'levels\',\'Niveau d\\\'établissement\')" style="cursor:pointer"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">' + _qualScopeLbl + '</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'productTypes\',\'Produit discuté\')" style="cursor:pointer"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'appModes\',\'Version discutée\')" style="cursor:pointer"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'quartiers\',\'Quartiers\')" style="cursor:pointer"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top ' + _qualScopeLbl.toLowerCase() + '</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'systems\',\'Systèmes en place\')" style="cursor:pointer"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'internet\',\'Qualité Internet\')" style="cursor:pointer"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
+    h += '<div class="agent-card clickable" onclick="drillDownQualification(\'power\',\'Qualité Électricité\')" style="cursor:pointer"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
+    h += '</div></div>';
+    var _qualEmitted = true;
 
     // Expert Leaderboard mini
     h += '<div class="exec-breakdown"><h4>🏅 Classement rapide</h4><div class="exec-breakdown-grid">';
@@ -10933,21 +11025,25 @@ function rSuivi() {
     h += '</div></div>';
   }
 
-  var qualScopeLabel = isSuper ? 'Toute l\'équipe' : (canSeeTeamData(currentUser) ? 'Votre équipe' : 'Votre portefeuille');
-  var qualFollowupCount = isSuper ? getVisibleFollowups().length : (canSeeTeamData(currentUser) ? getVisibleFollowups().length : myFollowups.length);
-  h += '<div class="form-card"><h3>Qualification & <span class="it">segmentation</span></h3>';
-  h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">' + qualScopeLabel + ' — ' + qualification.total + ' écoles analysées. Type d\'école, quartier, effectif, mode online/offline, système actuel et signaux d\'urgence.</p>';
-  h += '<div class="agent-grid">';
-  h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + ' (' + (qualification.total ? Math.round(qualification.qualified / qualification.total * 100) : 0) + '%)</span></div>';
-  h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés</span></div><div><b>' + qualification.averageStudents + '</b><span>moy. élèves/école</span></div><div><b>' + qualFollowupCount + '</b><span>suivis ' + (isSuper ? 'équipe' : 'visibles') + '</span></div></div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'levels\',\'Niveau d\\\'établissement\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">' + qualScopeLabel + '</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'productTypes\',\'Produit discuté\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'appModes\',\'Version discutée\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline · hybride</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'quartiers\',\'Quartiers\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top ' + qualScopeLabel.toLowerCase() + '</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'systems\',\'Systèmes en place\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'internet\',\'Qualité Internet\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
-  h += '<div class="agent-card' + (isSuper ? ' clickable" onclick="drillDownQualification(\'power\',\'Qualité Électricité\')" style="cursor:pointer' : '') + '"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
-  h += '</div></div>';
+  // Qualification & Segmentation block now rendered ABOVE Classement rapide for admins (see block above).
+  // For non-admin experts, render here once.
+  if (!isSuper) {
+    var qualScopeLabel = canSeeTeamData(currentUser) ? 'Votre équipe' : 'Votre portefeuille';
+    var qualFollowupCount = canSeeTeamData(currentUser) ? getVisibleFollowups().length : myFollowups.length;
+    h += '<div class="form-card"><h3>🧾 Qualification & <span class="it">segmentation</span></h3>';
+    h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">' + qualScopeLabel + ' — ' + qualification.total + ' écoles analysées. Type, quartier, effectif, version, système actuel, signaux d\'urgence.</p>';
+    h += '<div class="agent-grid">';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🧾 Couverture du questionnaire</strong><span class="trend-chip flat">' + qualification.qualified + ' / ' + qualification.total + ' (' + (qualification.total ? Math.round(qualification.qualified / qualification.total * 100) : 0) + '%)</span></div>';
+    h += '<div class="agent-meta"><div><b>' + qualification.effectifKnown + '</b><span>écoles avec effectif</span></div><div><b>' + fmt(qualification.totalStudents) + '</b><span>élèves cumulés</span></div><div><b>' + qualification.averageStudents + '</b><span>moy. élèves/école</span></div><div><b>' + qualFollowupCount + '</b><span>suivis visibles</span></div></div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🏫 Niveau d\'établissement</strong><span class="trend-chip flat">' + qualScopeLabel + '</span></div><div class="summary-tags">' + tagCloud(qualification.levels, 'Niveau à qualifier') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🧰 Produit discuté</strong><span class="trend-chip flat">School · Learn · Pack</span></div><div class="summary-tags">' + tagCloud(qualification.productTypes, 'Produit à préciser') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🌐 Version discutée</strong><span class="trend-chip flat">online · offline</span></div><div class="summary-tags">' + tagCloud(qualification.appModes, 'Version à préciser') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>📍 Quartiers à travailler</strong><span class="trend-chip flat">top ' + qualScopeLabel.toLowerCase() + '</span></div><div class="summary-tags">' + tagCloud(qualification.quartiers, 'Quartier non renseigné') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>🧩 Systèmes en place</strong><span class="trend-chip flat">concurrent / Excel / papier</span></div><div class="summary-tags">' + tagCloud(qualification.systems, 'Non renseigné') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>📶 Internet</strong><span class="trend-chip flat">qualité terrain</span></div><div class="summary-tags">' + tagCloud(qualification.internet, 'Non renseigné') + '</div></div>';
+    h += '<div class="agent-card"><div class="agent-head"><strong>💡 Électricité</strong><span class="trend-chip flat">risque d\'usage</span></div><div class="summary-tags">' + tagCloud(qualification.power, 'Non renseigné') + '</div></div>';
+    h += '</div></div>';
+  }
 
   // Sub-tabs — Historique en premier, puis Rappels — les deux mis en avant
   h += '<div class="suivi-tabs">';
@@ -11768,6 +11864,53 @@ function showMyEntries(){
   document.body.style.overflow='hidden';
 }
 function closeMyEntries(){ var o=document.getElementById('me-overlay'); if (o){ o.remove(); document.body.style.overflow=''; } }
+
+// 📡 Activity feed strip — reusable standalone (was previously inline in rHome)
+function buildActivityFeedStrip(limit){
+  limit = limit || 6;
+  var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+  var feed = allFu.slice().sort(function(a,b){return String(b.Timestamp||'').localeCompare(String(a.Timestamp||''));}).slice(0, limit);
+  if (!feed.length) return '';
+  function _icon(type){
+    type=String(type||'').toUpperCase();
+    if (type==='CALL')     return {icon:'📞', cls:'call'};
+    if (type==='VISIT')    return {icon:'🚶', cls:'visit'};
+    if (type==='WHATSAPP') return {icon:'💬', cls:'whatsapp'};
+    if (type==='SMS')      return {icon:'✉️', cls:'whatsapp'};
+    if (type==='EMAIL')    return {icon:'📧', cls:'visit'};
+    if (type==='LETTER')   return {icon:'📨', cls:'visit'};
+    return {icon:'•', cls:''};
+  }
+  function _rel(ts){
+    if (!ts) return '—';
+    var d = new Date(ts); if (isNaN(d.getTime())) return ts;
+    var diff = Math.floor((Date.now()-d.getTime())/60000);
+    if (diff<1) return "à l'instant";
+    if (diff<60) return 'il y a '+diff+' min';
+    if (diff<1440) return 'il y a '+Math.floor(diff/60)+'h';
+    return 'il y a '+Math.floor(diff/1440)+'j';
+  }
+  return '<div class="section" style="padding:18px;margin-bottom:14px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span style="font-family:\'Fraunces\',serif;font-size:18px;font-weight:700">📡 Flux d\'activité équipe</span>'+
+        '<span class="chip-modern live">TEMPS RÉEL</span>'+
+      '</div>'+
+    '</div>'+
+    '<div class="feed">'+
+      feed.map(function(f){
+        var fi = _icon(f.FollowupType);
+        return '<div class="feed-item">'+
+          '<div class="feed-dot '+fi.cls+'">'+fi.icon+'</div>'+
+          '<div class="feed-content">'+
+            '<div class="feed-title">'+esc(f.Expert||'—')+' · '+esc(f.SchoolName||'—')+'</div>'+
+            '<div class="feed-meta"><b>'+esc(String(f.FollowupType||'').toUpperCase())+'</b> · '+esc(f.Outcome||f.NextAction||'aucune note')+' · '+esc(_rel(f.Timestamp))+'</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+  '</div>';
+}
 
 // 🏅 Top performers strip — reusable in Workspace and Dashboard
 function buildTopPerformersStrip(noteHref){
