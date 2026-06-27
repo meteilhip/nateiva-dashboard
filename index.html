@@ -2892,6 +2892,77 @@ button,select,input,textarea{outline:none}
 /* Drill-down modal — entrance polish */
 .dd-modal,.me-modal,.ddrev-modal{animation:modalRise .35s cubic-bezier(.16,1,.3,1) both}
 @keyframes modalRise{from{opacity:0;transform:translateY(40px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* — Lecture stratégique clickable + drill — */
+.dec-insight{cursor:pointer;transition:all .25s ease;border:1px solid rgba(245,158,11,.2);outline:none}
+.dec-insight:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(245,158,11,.16);border-color:var(--saffron)}
+.dec-insight:focus-visible{outline:3px solid var(--saffron);outline-offset:3px}
+.dec-insight-cta{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--saffron-deep);background:var(--paper);padding:2px 8px;border-radius:6px;margin-left:8px;border:1px solid rgba(245,158,11,.3)}
+.strat-header{margin-bottom:14px}
+.strat-verdict{background:var(--g50);padding:14px 16px;border-radius:12px}
+.strat-verdict-head{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.strat-verdict-text{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--ink)}
+.strat-verdict-meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--g600);padding-left:36px}
+.strat-list{display:flex;flex-direction:column;gap:10px}
+.strat-row{display:flex;gap:14px;background:var(--paper);border:1px solid var(--g200);border-radius:12px;padding:12px 14px;transition:all .2s ease;animation:cardPop .35s cubic-bezier(.16,1,.3,1) both}
+.strat-row:hover{box-shadow:var(--shadow);border-color:var(--saffron)}
+.strat-rank{flex-shrink:0;width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--ink),var(--g800));color:var(--saffron-bright);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:14px}
+.strat-body{flex:1;min-width:0}
+.strat-row-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.strat-school{font-weight:800;font-size:14px;color:var(--ink);flex:1;min-width:0}
+.strat-amount{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.strat-meta{display:flex;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--g600);margin-bottom:8px}
+.strat-meta span{background:var(--g100);padding:2px 7px;border-radius:6px}
+.strat-meta .strat-stage{font-weight:700;border:1px solid currentColor;background:transparent !important}
+.strat-meta .strat-dec{font-weight:700;border:1px solid transparent}
+.strat-meta .strat-dec-yes{background:var(--green-soft) !important;color:var(--green);border-color:rgba(5,150,105,.25)}
+.strat-meta .strat-dec-no{background:var(--red-soft) !important;color:var(--red);border-color:rgba(220,38,38,.25)}
+.strat-note{background:var(--g50);border-left:3px solid var(--teal);padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;color:var(--g700)}
+.strat-note-head{font-size:11px;font-weight:700;color:var(--g600);margin-bottom:4px}
+.strat-note-text{color:var(--ink)}
+.strat-note-empty{font-style:italic;color:var(--g400)}
+.strat-note-next{font-size:11.5px;color:var(--saffron-deep);margin-top:6px;font-weight:700}
+.strat-amb-note{margin-top:6px;background:linear-gradient(135deg,rgba(124,58,237,.06),transparent);border-left:3px solid var(--purple);padding:6px 12px;border-radius:8px;font-size:12px;color:var(--g700)}
+
+/* — Online vs Offline split — */
+.vo-split{padding:18px;background:linear-gradient(180deg,rgba(124,58,237,.03),transparent);border:1px solid var(--g100);border-radius:18px}
+.vo-topcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 16px}
+.vo-card{display:flex;gap:14px;padding:14px;border-radius:14px;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);border:1px solid var(--g100);background:var(--paper);animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
+.vo-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.vo-card.vo-online{border-left:5px solid var(--purple);background:linear-gradient(135deg,rgba(124,58,237,.06),var(--paper))}
+.vo-card.vo-offline{border-left:5px solid var(--teal-deep);background:linear-gradient(135deg,var(--teal-soft),var(--paper))}
+.vo-card .vo-icon{font-size:32px;flex-shrink:0;width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:var(--paper);border-radius:14px;box-shadow:var(--shadow-sm)}
+.vo-card .vo-body{flex:1;min-width:0}
+.vo-card .vo-lbl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
+.vo-card .vo-val{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1}
+.vo-card .vo-val .vo-of{font-size:14px;color:var(--g500);font-weight:600}
+.vo-card .vo-sub{font-size:11.5px;color:var(--g600);margin-top:6px}
+.vo-card .vo-breakdown{display:flex;gap:10px;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g700)}
+.vo-card .vo-breakdown span{background:var(--g100);padding:3px 8px;border-radius:6px}
+.vo-card .vo-breakdown b{color:var(--ink)}
+.vo-insight{padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(13,148,136,.04));border:1px solid rgba(124,58,237,.2);grid-column:1/-1}
+.vo-insight-title{font-weight:800;color:var(--ink);font-size:12px;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase}
+.vo-insight-body{font-size:13px;line-height:1.55;color:var(--g700)}
+.vo-insight-body b{color:var(--ink)}
+.vo-chart{background:var(--paper);border:1px solid var(--g100);border-radius:14px;padding:14px}
+.vo-chart-legend{display:flex;gap:18px;justify-content:flex-end;margin-bottom:12px;font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.06em}
+.vo-chart-legend .vol{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.vo-chart-legend .vol-on{background:var(--purple)}
+.vo-chart-legend .vol-off{background:var(--teal-deep)}
+.vo-chart-bars{display:flex;flex-direction:column;gap:8px}
+.vo-bar-row{display:flex;align-items:center;gap:12px}
+.vo-bar-label{flex:0 0 100px;font-weight:700;font-size:12px}
+.vo-bar-track{flex:1;display:flex;gap:0;height:28px;background:var(--g50);border-radius:8px;overflow:hidden;border:1px solid var(--g100)}
+.vo-bar{display:flex;align-items:center;justify-content:center;height:100%;transition:width .55s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both;min-width:24px}
+.vo-bar.vo-bar-on{background:linear-gradient(135deg,#9b6df0,var(--purple))}
+.vo-bar.vo-bar-off{background:linear-gradient(135deg,var(--teal-bright),var(--teal-deep))}
+.vo-bar-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff}
+.vo-bar-pct{flex:0 0 60px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--ink)}
+@media(max-width:600px){
+  .vo-bar-label{flex:0 0 70px;font-size:11px}
+  .vo-bar-pct{flex:0 0 50px;font-size:10px}
+  .vo-card .vo-val{font-size:22px}
+}
 .uh-sub{font-size:12.5px;color:var(--g600);line-height:1.45;margin-bottom:10px}
 .uh-pills{display:flex;flex-wrap:wrap;gap:6px}
 .uh-pill{
@@ -4746,6 +4817,149 @@ function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
 }
 function closeDdRev(){ var o=document.getElementById('ddrev-overlay'); if(o){o.remove(); document.body.style.overflow='';} }
 
+// Drill-down: 🌐 Online / 💾 Offline — list of schools + revenue + last note
+function drillDownAppMode(mode){
+  if (!_ddDashboard) return;
+  var allRecs = _ddDashboard.records || [];
+  var rx = mode === 'online' ? /online/i : /offline/i;
+  var schools = allRecs.filter(function(r){return rx.test(String(r.appMode||''));}).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
+  var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+  function _lastNote(k){
+    var matching = allFu.filter(function(f){return schoolKey(f.SchoolName) === k;});
+    if (!matching.length) return null;
+    matching.sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    var clean = (typeof getFollowupPlainNotes==='function')?getFollowupPlainNotes(matching[0]):(matching[0].Notes||'');
+    return { ts: matching[0].Timestamp, by: matching[0].Expert, type: matching[0].FollowupType, text: clean };
+  }
+  var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
+  var univ = schools.filter(function(r){return /universit/i.test(String(r.type||''));}).length;
+  var primSec = schools.length - univ;
+  var byStage = {};
+  schools.forEach(function(r){byStage[r.stage]=(byStage[r.stage]||0)+1;});
+  var icon = mode === 'online' ? '🌐' : '💾';
+  var title = icon+' '+mode.charAt(0).toUpperCase()+mode.slice(1)+' — '+schools.length+' école'+(schools.length>1?'s':'');
+  var body = '<div class="adr-summary">'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Écoles</div><div class="adr-sum-val">'+schools.length+'</div></div>'+
+    '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Revenu pondéré</div><div class="adr-sum-val">'+moneyCompact(totalRev)+'</div></div>'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">🎓 Université</div><div class="adr-sum-val">'+univ+'</div></div>'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">🏫 Primaire/Sec</div><div class="adr-sum-val">'+primSec+'</div></div>'+
+  '</div>';
+  // Stage breakdown
+  body += '<h4 style="margin:14px 0 8px;font-size:14px">Répartition par étape</h4>';
+  body += '<div class="dd-school-list" style="margin-bottom:14px">';
+  ['gagne','chaud','tiede','froid','nouveau','perdu'].forEach(function(st){
+    if (!byStage[st]) return;
+    var lbl = st==='gagne'?'🏆 Gagné':st==='chaud'?'🔥 Chaud':st==='tiede'?'🟠 Tiède':st==='froid'?'🔵 Froid':st==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
+    body += '<div class="dd-stat-row"><span class="dd-stat-label">'+lbl+'</span><span class="dd-stat-value">'+byStage[st]+'</span></div>';
+  });
+  body += '</div>';
+  // Schools list with notes
+  body += '<h4 style="margin:14px 0 8px;font-size:14px">Détail des écoles (triées par revenu)</h4>';
+  body += '<div class="amb-drill-list">';
+  schools.slice(0,60).forEach(function(r){
+    var stageLabel = r.stage==='gagne'?'🏆 Gagné':r.stage==='chaud'?'🔥 Chaud':r.stage==='tiede'?'🟠 Tiède':r.stage==='froid'?'🔵 Froid':r.stage==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
+    var stageColor = r.stage==='gagne'?'var(--green)':r.stage==='chaud'?'var(--red)':r.stage==='tiede'?'var(--saffron)':r.stage==='froid'?'var(--teal)':r.stage==='nouveau'?'var(--g500)':'var(--g700)';
+    var note = _lastNote(schoolKey(r.schoolName));
+    body += '<div class="amb-drill-row">'+
+      '<div class="adr-head"><div class="adr-school">'+esc(r.schoolName||'—')+'</div><div class="adr-amount" style="color:'+stageColor+'">'+moneyCompact(r.amount||0)+'</div></div>'+
+      '<div class="adr-meta">'+
+        '<span class="adr-stage" style="background:'+stageColor+'1a;color:'+stageColor+'">'+stageLabel+'</span>'+
+        '<span>📊 '+(r.rate||0)+'%</span>'+
+        '<span>📍 '+esc(r.city||'—')+'</span>'+
+        '<span>👤 '+esc(r.expert||'—')+'</span>'+
+        '<span>'+esc(r.type||'—')+'</span>'+
+        (r.effectif?'<span>👥 '+fmt(r.effectif)+'</span>':'')+
+      '</div>'+
+      (note ? '<div class="adr-note"><b>📝 '+esc(note.type||'?')+' · '+esc(note.by||'?')+':</b> '+esc(note.text?(note.text.length>200?note.text.slice(0,200)+'…':note.text):'(vide)')+'</div>' : '<div class="adr-note adr-note-empty">Aucune note sur cette école</div>')+
+    '</div>';
+  });
+  body += '</div>';
+  if (schools.length>60) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(schools.length-60)+' autres</div>';
+  showDrillDown(title, body);
+}
+
+// Drill-down: 💡 Lecture stratégique — schools to act on first, with their notes
+function drillDownStrategicReading(){
+  if (!_ddDashboard) return;
+  var recs = _ddDashboard.records || [];
+  var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+  var ambNames = (typeof getAmbassadorNames === 'function') ? getAmbassadorNames() : [];
+  // Priority score: higher = more strategic to work
+  // Decideur joint + chaud/tiede + high revenue + high rate = top priority
+  // Decideur PAS joint + chaud/tiede + high revenue = also high (need to unblock)
+  function _priority(r){
+    var stageWeight = r.stage==='gagne'?0:r.stage==='chaud'?5:r.stage==='tiede'?3:r.stage==='nouveau'?1:r.stage==='froid'?1:0;
+    var decBoost = hasDecideurReached(r) ? 2 : 1.5; // both matter — joint = ready to close, not joint = unblock
+    var rateBoost = (r.rate||0)/100;
+    var revBoost = Math.log10(Math.max(1, r.amount||0))/8;
+    return stageWeight * decBoost * (1 + rateBoost + revBoost);
+  }
+  function _latestNote(schoolKeyStr){
+    var matching = allFu.filter(function(f){return schoolKey(f.SchoolName) === schoolKeyStr;});
+    if (!matching.length) return null;
+    matching.sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    var clean = (typeof getFollowupPlainNotes==='function') ? getFollowupPlainNotes(matching[0]) : (matching[0].Notes||'');
+    return { ts: matching[0].Timestamp, by: matching[0].Expert, type: matching[0].FollowupType, text: clean, outcome: matching[0].Outcome, nextAction: matching[0].NextAction };
+  }
+  function _ambNote(schoolKeyStr){
+    var matching = allFu.filter(function(f){return schoolKey(f.SchoolName) === schoolKeyStr && ambNames.some(function(n){return samePerson(n, f.Expert);});});
+    if (!matching.length) return null;
+    matching.sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    var clean = (typeof getFollowupPlainNotes==='function') ? getFollowupPlainNotes(matching[0]) : (matching[0].Notes||'');
+    return { ts: matching[0].Timestamp, by: matching[0].Expert, type: matching[0].FollowupType, text: clean };
+  }
+  var actionable = recs.filter(function(r){return r.stage==='chaud'||r.stage==='tiede'||r.stage==='nouveau';})
+                        .map(function(r){r._priority = _priority(r); return r;})
+                        .sort(function(a,b){return b._priority - a._priority;})
+                        .slice(0, 30);
+
+  var nbWithD = recs.filter(hasDecideurReached).length;
+  var nbWithoutD = recs.length - nbWithD;
+  var pctDec = recs.length ? Math.round((nbWithD/recs.length)*100) : 0;
+  var verdict = pctDec>=60 ? {color:'var(--green)', icon:'🎯', text:'Accès décideur excellent — focus closing.'}
+              : pctDec>=30 ? {color:'var(--saffron-deep)', icon:'⏰', text:'Effort terrain à intensifier sur les non-joints.'}
+              : {color:'var(--red)', icon:'🚨', text:'Priorité absolue : atteindre les décideurs.'};
+
+  var body = '<div class="strat-header">'+
+    '<div class="strat-verdict" style="border-left:4px solid '+verdict.color+'">'+
+      '<div class="strat-verdict-head"><span style="font-size:24px">'+verdict.icon+'</span><span class="strat-verdict-text">'+esc(verdict.text)+'</span></div>'+
+      '<div class="strat-verdict-meta">'+nbWithD+' écoles avec décideur joint · '+nbWithoutD+' sans · '+pctDec+'% d\'accès</div>'+
+    '</div>'+
+  '</div>';
+  body += '<h4 style="margin:18px 0 10px;font-size:14px">📋 Top '+actionable.length+' écoles prioritaires (chaud/tiède/nouveau, classées par impact)</h4>';
+  body += '<div class="strat-list">';
+  actionable.forEach(function(r,i){
+    var dec = hasDecideurReached(r);
+    var stageLabel = r.stage==='chaud'?'🔥 Chaud':r.stage==='tiede'?'🟠 Tiède':'🆕 Nouveau';
+    var stageColor = r.stage==='chaud'?'var(--red)':r.stage==='tiede'?'var(--saffron)':'var(--teal)';
+    var k = schoolKey(r.schoolName);
+    var note = _latestNote(k);
+    var amb = _ambNote(k);
+    body += '<div class="strat-row">'+
+      '<div class="strat-rank">#'+(i+1)+'</div>'+
+      '<div class="strat-body">'+
+        '<div class="strat-row-head">'+
+          '<div class="strat-school">'+esc(r.schoolName||'—')+'</div>'+
+          '<div class="strat-amount">'+moneyCompact(r.amount||0)+'</div>'+
+        '</div>'+
+        '<div class="strat-meta">'+
+          '<span class="strat-stage" style="background:'+stageColor+'1a;color:'+stageColor+';border-color:'+stageColor+'33">'+stageLabel+'</span>'+
+          '<span class="strat-dec '+(dec?'strat-dec-yes':'strat-dec-no')+'">'+(dec?'👔 Décideur joint':'🚪 Décideur PAS joint')+'</span>'+
+          '<span>📊 '+(r.rate||0)+'%</span>'+
+          '<span>📍 '+esc(r.city||'—')+'</span>'+
+          '<span>👤 '+esc(r.expert||'—')+'</span>'+
+          (r.type?'<span>'+esc(r.type)+'</span>':'')+
+          (r.appMode?'<span>'+esc(r.appMode)+'</span>':'')+
+        '</div>'+
+        (note ? '<div class="strat-note"><div class="strat-note-head">📝 <b>'+esc(note.type||'?')+' · '+esc(note.by||'?')+'</b> · '+(note.ts?new Date(note.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}):'—')+(note.outcome?' · '+esc(note.outcome):'')+'</div>'+(note.text?'<div class="strat-note-text">'+esc(note.text.length>280?note.text.slice(0,280)+'…':note.text)+'</div>':'<div class="strat-note-empty">(pas de note rédigée)</div>')+(note.nextAction?'<div class="strat-note-next">⏰ Prochain : '+esc(note.nextAction)+'</div>':'')+'</div>' : '<div class="strat-note strat-note-empty">📝 Aucun suivi enregistré encore sur cette école</div>')+
+        (amb ? '<div class="strat-amb-note">🤝 <b>Note ambassadeur ('+esc(amb.by||'?')+')</b> : '+esc(amb.text?amb.text.slice(0,220):'(vide)')+'</div>' : '')+
+      '</div>'+
+    '</div>';
+  });
+  body += '</div>';
+  showDrillDown('💡 Lecture stratégique — '+actionable.length+' écoles prioritaires + notes', body);
+}
+
 // Drill-down: Décideur vs Non-décideur — list schools
 function drillDownDecider(mode){
   if (!_ddDashboard) return;
@@ -5951,8 +6165,8 @@ function rHome(){
     '<div class="dec-topcards">'+
       '<div class="dec-card dec-yes" onclick="drillDownDecider(\'yes\')"><div class="dec-icon">👔</div><div class="dec-body"><div class="dec-lbl">Décideur joint</div><div class="dec-val">'+withD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctReached+'% du portefeuille · '+moneyCompact(withRev)+' de revenu pondéré</div></div></div>'+
       '<div class="dec-card dec-no" onclick="drillDownDecider(\'no\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Décideur PAS joint</div><div class="dec-val">'+withoutD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+(100-pctReached)+'% du portefeuille · '+moneyCompact(withoutRev)+' de revenu pondéré</div></div></div>'+
-      '<div class="dec-insight">'+
-        '<div class="dec-insight-title">💡 Lecture stratégique</div>'+
+      '<div class="dec-insight" onclick="drillDownStrategicReading()" role="button" tabindex="0" title="Cliquez pour voir les écoles prioritaires et leurs notes">'+
+        '<div class="dec-insight-title">💡 Lecture stratégique <span class="dec-insight-cta">cliquez pour le détail →</span></div>'+
         '<div class="dec-insight-body">'+
           (withD.length>0?'Les <b>'+withD.length+'</b> écoles avec décideur joint pèsent <b>'+moneyCompact(withRev)+'</b>.':'')+
           (withoutD.length>0?' Les <b>'+withoutD.length+'</b> écoles sans décideur représentent <b>'+moneyCompact(withoutRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
@@ -6152,6 +6366,93 @@ function rHome(){
   </div>
 
   <!-- Décideur vs Non-décideur moved up: now renders above Revenue Tracker -->
+
+  <!-- 🌐 ONLINE vs OFFLINE — distribution + revenu par version -->
+  ${(function(){
+    var on = [], off = [];
+    dashboard.records.forEach(function(r){
+      var m = String(r.appMode||'').toLowerCase();
+      if (/online/.test(m)) on.push(r);
+      else if (/offline/.test(m)) off.push(r);
+    });
+    function _sum(arr, key){ return arr.reduce(function(s,r){return s+(r[key]||0);},0); }
+    function _isUniv(r){ return /universit/i.test(String(r.type||'')); }
+    function _byStage(arr){
+      var m={gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){if(r.stage in m)m[r.stage]++;});
+      return m;
+    }
+    function _revByStage(arr){
+      var m={gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
+      arr.forEach(function(r){if(r.stage in m)m[r.stage]+=(r.amount||0);});
+      return m;
+    }
+    var onRev = _sum(on,'amount'), offRev = _sum(off,'amount');
+    var onUniv = on.filter(_isUniv).length, onPS = on.length - onUniv;
+    var offUniv = off.filter(_isUniv).length, offPS = off.length - offUniv;
+    var totalQual = on.length + off.length;
+    var onPct = totalQual ? Math.round((on.length/totalQual)*100) : 0;
+    var unqualified = dashboard.records.length - totalQual;
+    var onByStage = _byStage(on), offByStage = _byStage(off);
+    var onRevByStage = _revByStage(on), offRevByStage = _revByStage(off);
+    var STAGES = [
+      {key:'gagne', label:'🏆 Gagné'}, {key:'chaud', label:'🔥 Chaud'}, {key:'tiede', label:'🟠 Tiède'},
+      {key:'froid', label:'🔵 Froid'}, {key:'nouveau',label:'🆕 Nouveau'}, {key:'perdu', label:'⛔ Perdu'}
+    ];
+    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, onByStage[s.key]+offByStage[s.key]);},0));
+    return '<div class="section vo-split"><div class="sec-head">'+
+      '<h2>🌐 Online <span class="it">vs Offline</span></h2>'+
+      '<span class="anno">Distribution de la version discutée · '+unqualified+' écoles encore sans version renseignée</span>'+
+    '</div>'+
+    '<div class="vo-topcards">'+
+      '<div class="vo-card vo-online" onclick="drillDownAppMode(\'online\')" role="button" tabindex="0">'+
+        '<div class="vo-icon">🌐</div>'+
+        '<div class="vo-body">'+
+          '<div class="vo-lbl">Online</div>'+
+          '<div class="vo-val">'+on.length+' <span class="vo-of">/ '+totalQual+'</span></div>'+
+          '<div class="vo-sub">'+onPct+'% des qualifiés · '+moneyCompact(onRev)+' de revenu</div>'+
+          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+onUniv+'</b></span><span>🏫 Prim/Sec: <b>'+onPS+'</b></span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="vo-card vo-offline" onclick="drillDownAppMode(\'offline\')" role="button" tabindex="0">'+
+        '<div class="vo-icon">💾</div>'+
+        '<div class="vo-body">'+
+          '<div class="vo-lbl">Offline</div>'+
+          '<div class="vo-val">'+off.length+' <span class="vo-of">/ '+totalQual+'</span></div>'+
+          '<div class="vo-sub">'+(100-onPct)+'% des qualifiés · '+moneyCompact(offRev)+' de revenu</div>'+
+          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+offUniv+'</b></span><span>🏫 Prim/Sec: <b>'+offPS+'</b></span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="vo-insight">'+
+        '<div class="vo-insight-title">💡 Lecture business</div>'+
+        '<div class="vo-insight-body">'+
+          'Online <b>'+on.length+' écoles</b> ('+moneyCompact(onRev)+') · Offline <b>'+off.length+' écoles</b> ('+moneyCompact(offRev)+').'+
+          (onPct>=70?' <b style="color:var(--green)">Adoption Online dominante</b> — capacité de paiement et infra présente.':onPct>=40?' <b style="color:var(--saffron-deep)">Mix équilibré</b> — pricing premium online ouvert, offline reste majoritaire au volume.':' <b style="color:var(--teal-deep)">Offline dominant</b> — focus sur le terrain et la version 60K.')+
+          (unqualified>0?' <b>'+unqualified+'</b> écoles à qualifier (version non renseignée).':'')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="vo-chart">'+
+      '<div class="vo-chart-legend"><span><i class="vol vol-on"></i> Online</span><span><i class="vol vol-off"></i> Offline</span></div>'+
+      '<div class="vo-chart-bars">'+
+        STAGES.map(function(s){
+          var y = onByStage[s.key]||0, n = offByStage[s.key]||0;
+          var total = y + n; if (!total) return '';
+          var yPct = (y/maxStage)*100, nPct = (n/maxStage)*100;
+          var pct = Math.round((y/total)*100);
+          return '<div class="vo-bar-row" title="'+s.label+' — '+y+' Online ('+moneyCompact(onRevByStage[s.key])+') · '+n+' Offline ('+moneyCompact(offRevByStage[s.key])+')">'+
+            '<div class="vo-bar-label">'+s.label+'</div>'+
+            '<div class="vo-bar-track">'+
+              (y>0?'<div class="vo-bar vo-bar-on" style="width:'+yPct+'%"><span class="vo-bar-num">'+y+'</span></div>':'')+
+              (n>0?'<div class="vo-bar vo-bar-off" style="width:'+nPct+'%"><span class="vo-bar-num">'+n+'</span></div>':'')+
+            '</div>'+
+            '<div class="vo-bar-pct">'+pct+'% on</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+    '</div>';
+  })()}
 
 
   ${revenueVisible ? (function(){
