@@ -2966,6 +2966,52 @@ button,select,input,textarea{outline:none}
 .vo-bar.vo-bar-off{background:linear-gradient(135deg,var(--teal-bright),var(--teal-deep))}
 .vo-bar-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff}
 .vo-bar-pct{flex:0 0 60px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--ink)}
+
+/* — Mes Saisies: stage filter chips — */
+.me-stage-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding:10px;background:var(--g50);border-radius:10px;border:1px solid var(--g100)}
+.me-stage-chip{background:var(--paper);border:1.5px solid var(--g200);padding:6px 12px;border-radius:100px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--g700);transition:all .2s ease;display:inline-flex;align-items:center;gap:6px}
+.me-stage-chip:hover{transform:translateY(-1px);border-color:var(--saffron)}
+.me-stage-chip.act{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:var(--shadow-sm)}
+.me-stage-chip.me-stage-chaud.act{background:var(--red);border-color:var(--red)}
+.me-stage-chip.me-stage-tiede.act{background:var(--saffron);border-color:var(--saffron)}
+.me-stage-chip.me-stage-gagne.act{background:var(--green);border-color:var(--green)}
+.me-stage-chip.me-stage-froid.act{background:var(--teal);border-color:var(--teal)}
+.me-stage-count{background:rgba(0,0,0,.12);padding:1px 7px;border-radius:100px;font-size:10.5px;font-family:'JetBrains Mono',monospace}
+.me-stage-chip.act .me-stage-count{background:rgba(255,255,255,.22);color:#fff}
+
+/* — Mes Saisies: per-school stats line — */
+.me-stats{margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--g600);padding:6px 10px;background:var(--g50);border-radius:8px;border-left:3px solid var(--teal)}
+.me-stats b{color:var(--ink)}
+.me-stats-empty{border-left-color:var(--red);background:var(--red-soft)}
+.me-stats-empty b{color:var(--red)}
+
+/* — Mes Saisies: highlight colors + blink — */
+.me-row.me-hi{position:relative;overflow:visible}
+.me-row.me-hi::before{content:'';position:absolute;left:-3px;top:0;bottom:0;width:5px;border-radius:5px 0 0 5px}
+.me-row.me-hi-rouge::before{background:var(--red);box-shadow:0 0 12px rgba(220,38,38,.5)}
+.me-row.me-hi-rouge{background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)}
+.me-row.me-hi-saffron::before{background:var(--saffron);box-shadow:0 0 12px rgba(245,158,11,.5)}
+.me-row.me-hi-saffron{background:linear-gradient(135deg,var(--saffron-soft),var(--paper));border-color:var(--saffron)}
+.me-row.me-hi-teal::before{background:var(--teal);box-shadow:0 0 12px rgba(13,148,136,.5)}
+.me-row.me-hi-teal{background:linear-gradient(135deg,var(--teal-soft),var(--paper));border-color:var(--teal)}
+.me-row.me-hi-green::before{background:var(--green);box-shadow:0 0 12px rgba(5,150,105,.5)}
+.me-row.me-hi-green{background:linear-gradient(135deg,var(--green-soft),var(--paper));border-color:var(--green)}
+.me-row.me-hi-purple::before{background:var(--purple);box-shadow:0 0 12px rgba(124,58,237,.5)}
+.me-row.me-hi-purple{background:linear-gradient(135deg,var(--purple-soft),var(--paper));border-color:var(--purple)}
+.me-row.me-hi-blink{animation:meBlink 1.2s ease-in-out infinite;border-color:var(--red)}
+.me-row.me-hi-blink::before{background:var(--red);animation:meBlink 1.2s ease-in-out infinite}
+@keyframes meBlink{
+  0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.6);background:linear-gradient(135deg,var(--red-soft),var(--paper))}
+  50%{box-shadow:0 0 0 8px rgba(220,38,38,0);background:linear-gradient(135deg,#fee2e2,var(--paper))}
+}
+
+/* — Mes Saisies: highlight controls bar — */
+.me-hl-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;background:var(--g50);border-radius:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--g700)}
+.me-hl-btn{background:var(--paper);border:1.5px solid var(--g200);padding:4px 10px;border-radius:100px;cursor:pointer;font-size:14px;line-height:1;transition:all .2s ease}
+.me-hl-btn:hover{transform:scale(1.15)}
+.me-hl-btn.act{background:var(--ink);border-color:var(--ink);box-shadow:var(--shadow-sm)}
+.me-blink-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--g700);cursor:pointer;margin-left:auto;background:var(--paper);padding:4px 10px;border-radius:8px;border:1.5px solid var(--g200)}
+.me-blink-toggle input{margin:0;accent-color:var(--red)}
 @media(max-width:600px){
   .vo-bar-label{flex:0 0 70px;font-size:11px}
   .vo-bar-pct{flex:0 0 50px;font-size:10px}
@@ -11085,8 +11131,39 @@ function rSuivi() {
   }).join('');
   // 360 view for super-admin & coordo (canSeeAllData) — they see every expert's data
   // everywhere in Workspace (Historique, Rappels, Coûts, Planner). Others see their portfolio.
-  var workspaceRaw = isSuper ? getVisibleRaw() : getWorkspaceRawForUser(me);
-  var workspaceFollowups = isSuper ? getVisibleFollowups() : getWorkspaceFollowupsForUser(me);
+  // Apply the top filter bar (ville/expert/secteur/catégorie/taux) to admin view too
+  // so filters work for Noah/Coordo on the Workspace pane.
+  function _applyTopFiltersToRaw(rows){
+    return rows.filter(function(r){
+      if (ST.city && r.v !== ST.city) return false;
+      if (ST.expert && !samePerson(r.e, ST.expert)) return false;
+      if (ST.sec && typeof sec === 'function' && sec(r) !== ST.sec) return false;
+      if (ST.cat && r.ca !== ST.cat) return false;
+      if (ST.rate > 0 && (r.r == null || r.r < ST.rate)) return false;
+      return true;
+    });
+  }
+  function _applyTopFiltersToFollowups(fups, allowedSchoolKeys){
+    return fups.filter(function(f){
+      if (ST.city && f.City && f.City !== ST.city) return false;
+      if (ST.expert && f.Expert && !samePerson(f.Expert, ST.expert)) return false;
+      if (ST.sec && f.Sector && f.Sector !== ST.sec) return false;
+      if (allowedSchoolKeys){
+        var k = f.SchoolKey || schoolKey(f.SchoolName);
+        if (k && !allowedSchoolKeys.has(k)) return false;
+      }
+      return true;
+    });
+  }
+  var workspaceRaw, workspaceFollowups;
+  if (isSuper){
+    workspaceRaw = _applyTopFiltersToRaw(getVisibleRaw());
+    var _allowed = new Set(workspaceRaw.map(function(r){return schoolKey(r.n);}).filter(Boolean));
+    workspaceFollowups = _applyTopFiltersToFollowups(getVisibleFollowups(), _allowed);
+  } else {
+    workspaceRaw = getWorkspaceRawForUser(me);
+    workspaceFollowups = getWorkspaceFollowupsForUser(me);
+  }
   var stats = isSuper ? computeVisibleWorkspaceStats() : computeExpertStats(me);
   var myRank = suiviRankings.find(function(r) { return samePerson(r.expert, me); });
   var myFollowups = workspaceFollowups.sort(function(a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
@@ -12076,15 +12153,69 @@ function showMyEntries(){
   var recByKey = {}; allRecords.forEach(function(r){ recByKey[r.key]=r; });
   // Existing modal cleanup
   var prev=document.getElementById('me-overlay'); if (prev) prev.remove();
-  // Build schools list
-  var schoolsHtml = allRecords.length ? allRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(function(r){
+  // Per-school stats from followups (call count, visit count, last contact date)
+  var statsBySchool = {};
+  myFu.forEach(function(f){
+    var k = schoolKey(f.SchoolName); if (!k) return;
+    if (!statsBySchool[k]) statsBySchool[k] = {calls:0, visits:0, whatsapp:0, sms:0, emails:0, letters:0, total:0, lastContact:null, lastType:''};
+    var s = statsBySchool[k]; s.total++;
+    var t = String(f.FollowupType||'').toUpperCase();
+    if (t==='CALL') s.calls++;
+    else if (t==='VISIT') s.visits++;
+    else if (t==='WHATSAPP') s.whatsapp++;
+    else if (t==='SMS') s.sms++;
+    else if (t==='EMAIL') s.emails++;
+    else if (t==='LETTER') s.letters++;
+    var ts = f.Timestamp ? new Date(f.Timestamp) : null;
+    if (ts && !isNaN(ts.getTime()) && (!s.lastContact || ts > s.lastContact)) { s.lastContact = ts; s.lastType = t; }
+  });
+  function _daysSince(d){
+    if (!d) return null;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  }
+  function _highlightKey(schoolKey){ return 'highlight:'+(currentUser?currentUser.username:'anon')+':'+schoolKey; }
+  function _getHighlight(k){ return localStorage.getItem(_highlightKey(k)) || ''; }
+
+  // Build "Non contactées" pool (schools with 0 followups)
+  var nonContactedSchools = allRecords.filter(function(r){ return !statsBySchool[r.key] || statsBySchool[r.key].total === 0; });
+
+  // Render a school row with stats + highlight controls (used by both Mes écoles and Non contactées tabs)
+  function _renderSchoolRow(r){
     var notes = getMyEntryNotes('school:'+r.key);
-    return '<div class="me-row" data-entry="school:'+esc(r.key)+'">'+
-      '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
+    var stats = statsBySchool[r.key] || {calls:0, visits:0, whatsapp:0, sms:0, emails:0, letters:0, total:0, lastContact:null, lastType:''};
+    var hi = _getHighlight(r.key);
+    var hiClass = hi ? ' me-hi me-hi-'+hi : '';
+    var daysAgo = _daysSince(stats.lastContact);
+    var contactedLabel = stats.lastContact
+      ? '📅 Dernier contact: '+_myEntriesFmtDate(stats.lastContact) + (daysAgo!==null ? ' <b>('+(daysAgo===0?'aujourd\'hui':'il y a '+daysAgo+'j')+')</b>' : '')
+      : '🚫 <b style="color:var(--red)">Jamais contactée</b>';
+    var statsLine = stats.total > 0
+      ? '<div class="me-stats">📊 '+stats.total+' suivi'+(stats.total>1?'s':'')+' · '+
+          (stats.calls?'📞 '+stats.calls+' · ':'')+
+          (stats.visits?'🚶 '+stats.visits+' · ':'')+
+          (stats.whatsapp?'💬 '+stats.whatsapp+' · ':'')+
+          (stats.sms?'📱 '+stats.sms+' · ':'')+
+          (stats.emails?'📧 '+stats.emails+' · ':'')+
+          (stats.letters?'📨 '+stats.letters+' · ':'')+
+          contactedLabel+
+        '</div>'
+      : '<div class="me-stats me-stats-empty">'+contactedLabel+'</div>';
+    var safeKey = esc(r.key).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+    var hlBar = '<div class="me-hl-bar">🎨 Couleur:'+
+      ['','rouge','saffron','teal','green','purple'].map(function(c){
+        var cls = c||'none', sel = hi===c ? ' act' : '';
+        var lbl = c==='rouge'?'🔴':c==='saffron'?'🟡':c==='teal'?'🩵':c==='green'?'🟢':c==='purple'?'🟣':'⚪';
+        return '<button class="me-hl-btn me-hl-'+cls+sel+'" onclick="setMyEntryHighlight(\''+safeKey+'\',\''+c+'\')" title="'+(c?'Marquer en '+c:'Retirer la couleur')+'">'+lbl+'</button>';
+      }).join('')+
+      ' <label class="me-blink-toggle"><input type="checkbox"'+(hi==='blink'?' checked':'')+' onchange="setMyEntryHighlight(\''+safeKey+'\', this.checked?\'blink\':\'\')"> ⚡ clignoter</label>'+
+    '</div>';
+    return '<div class="me-row'+hiClass+'" data-entry="school:'+esc(r.key)+'" data-stage="'+esc(r.stage||'')+'">'+
+      '<div class="me-row-head" onclick="if(!event.target.closest(\'.me-hl-btn,.me-blink-toggle,input,label\'))this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
           '<div class="me-row-title">🏫 '+esc(r.schoolName||'—')+' '+_myEntriesStageBadge(r.stage)+'</div>'+
           '<div class="me-row-sub">'+(seeAll&&r.expert?'<b style="color:var(--teal-deep)">👤 '+esc(r.expert)+'</b> · ':'')+esc(r.city||'—')+(r.zone?' · '+esc(r.zone):'')+(r.type?' · '+esc(r.type):'')+(r.appMode?' · '+esc(r.appMode):'')+' · '+(r.rate||0)+'% · '+(r.effectif?fmt(r.effectif)+' élèves':'effectif n/r')+'</div>'+
           (r.contactName||r.phone?'<div class="me-row-sub">👤 '+esc(r.contactName||'?')+' · 📞 '+esc(r.phone||'?')+'</div>':'')+
+          statsLine+
         '</div>'+
         '<div class="me-row-meta">'+
           '<div class="me-tag">'+r.rawCount+' fiche'+(r.rawCount>1?'s':'')+'</div>'+
@@ -12094,6 +12225,7 @@ function showMyEntries(){
         '</div>'+
       '</div>'+
       '<div class="me-row-body">'+
+        hlBar+
         (r.notes?'<div class="me-field"><b>📝 Notes terrain:</b> '+esc(r.notes)+'</div>':'')+
         (r.decisionReach?'<div class="me-field"><b>👔 Décideur:</b> '+esc(r.decisionReach)+'</div>':'')+
         (r.currentSystem?'<div class="me-field"><b>💻 Système actuel:</b> '+esc(r.currentSystem)+'</div>':'')+
@@ -12103,12 +12235,32 @@ function showMyEntries(){
         '</div>'+
         '<div class="me-add-note">'+
           '<textarea id="me-note-school:'+esc(r.key)+'" placeholder="Ajouter une note d\'explication (lecture seule pour la fiche d\'origine — cette note s\'ajoute en bas)…" rows="2"></textarea>'+
-          '<button onclick="submitMyEntryNote(\'school:'+esc(r.key).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">+ Ajouter note</button>'+
+          '<button onclick="submitMyEntryNote(\'school:'+safeKey+'\')">+ Ajouter note</button>'+
         '</div>'+
         '<div class="me-edit-cta"><span>⚠️ Pour <b>modifier</b> ces données, ouvrez « Nouveau suivi » — la sélection de l\'école pré-remplit automatiquement tout ce qui est déjà saisi.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(r.schoolName).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi pour cette école</button></div>'+
       '</div>'+
     '</div>';
-  }).join('') : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
+  }
+
+  // Build schools list with stage filter chips
+  var stageCounts = {all:allRecords.length, gagne:0, chaud:0, tiede:0, froid:0, nouveau:0, perdu:0};
+  allRecords.forEach(function(r){ if (stageCounts[r.stage]!==undefined) stageCounts[r.stage]++; });
+  var stageFilterHtml = '<div class="me-stage-filter">'+
+    ['all','gagne','chaud','tiede','froid','nouveau','perdu'].map(function(s){
+      var lbl = s==='all'?'Tous':s==='gagne'?'🏆 Gagné':s==='chaud'?'🔥 Chaud':s==='tiede'?'🟠 Tiède':s==='froid'?'🔵 Froid':s==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
+      return '<button class="me-stage-chip me-stage-'+s+(s==='all'?' act':'')+'" onclick="filterMyEntriesByStage(\''+s+'\')">'+lbl+' <span class="me-stage-count">'+(stageCounts[s]||0)+'</span></button>';
+    }).join('')+
+  '</div>';
+  var schoolsRowsHtml = allRecords.length
+    ? allRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
+    : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
+  var schoolsHtml = stageFilterHtml + '<div id="me-schools-rows">' + schoolsRowsHtml + '</div>';
+
+  // Build Non contactées list (schools with 0 followups)
+  var nonContactedHtml = nonContactedSchools.length
+    ? '<div class="me-banner" style="background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)">🚫 <b>'+nonContactedSchools.length+' école'+(nonContactedSchools.length>1?'s':'')+' sans aucun contact</b> — priorisez ces fiches pour ouvrir le pipeline. Cliquez « → Nouveau suivi » pour démarrer.</div>'+
+      nonContactedSchools.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
+    : '<div class="me-empty">🎉 Toutes vos écoles ont au moins un contact enregistré.</div>';
   // Build followup rows — reused by both Mes Suivis and Courriers/Emails tabs
   function _renderFuRow(f){
     var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
@@ -12160,10 +12312,12 @@ function showMyEntries(){
         '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
         '<div class="me-tabs">'+
           '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Mes écoles ('+allRecords.length+')</button>'+
+          '<button class="me-tab" onclick="setMyEntriesTab(this,\'noncontact\')">🚫 Non contactées ('+nonContactedSchools.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+standardFu.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'mail\')">📨 Courriers & Emails ('+mailFu.length+')</button>'+
         '</div>'+
         '<div id="me-tab-schools" class="me-tab-panel act">'+schoolsHtml+'</div>'+
+        '<div id="me-tab-noncontact" class="me-tab-panel">'+nonContactedHtml+'</div>'+
         '<div id="me-tab-fu" class="me-tab-panel">'+fuHtml+'</div>'+
         '<div id="me-tab-mail" class="me-tab-panel">'+mailHtml+'</div>'+
       '</div>'+
@@ -12309,6 +12463,31 @@ function setMyEntriesTab(btn, key){
   btn.classList.add('act');
   document.querySelectorAll('.me-tab-panel').forEach(function(p){p.classList.remove('act');});
   document.getElementById('me-tab-'+key).classList.add('act');
+}
+// Filter the schools list by stage (Hot/Tiede/Froid/...)
+function filterMyEntriesByStage(stage){
+  document.querySelectorAll('.me-stage-chip').forEach(function(c){c.classList.remove('act');});
+  var btn = document.querySelector('.me-stage-'+stage); if (btn) btn.classList.add('act');
+  var rows = document.querySelectorAll('#me-schools-rows .me-row');
+  rows.forEach(function(r){
+    var st = r.dataset.stage || '';
+    r.style.display = (stage==='all' || st===stage) ? '' : 'none';
+  });
+}
+// Highlight a school with a color (or 'blink' or '' to clear)
+function setMyEntryHighlight(schoolKeyStr, color){
+  var k = 'highlight:'+(currentUser?currentUser.username:'anon')+':'+schoolKeyStr;
+  if (color) localStorage.setItem(k, color); else localStorage.removeItem(k);
+  // Update the row visual
+  document.querySelectorAll('.me-row[data-entry="school:'+CSS.escape(schoolKeyStr)+'"]').forEach(function(row){
+    row.className = row.className.replace(/\s*me-hi(?:-\w+)?/g, '');
+    if (color) row.className += ' me-hi me-hi-'+color;
+  });
+  // Update the active button state inside this row
+  document.querySelectorAll('.me-row[data-entry="school:'+CSS.escape(schoolKeyStr)+'"] .me-hl-btn').forEach(function(b){b.classList.remove('act');});
+  var sel = document.querySelector('.me-row[data-entry="school:'+CSS.escape(schoolKeyStr)+'"] .me-hl-'+(color||'none'));
+  if (sel) sel.classList.add('act');
+  if (typeof toast === 'function') toast(color ? '🎨 École marquée' : '✓ Couleur retirée', 'success');
 }
 function submitMyEntryNote(entryId){
   var ta = document.getElementById('me-note-'+entryId);
