@@ -11449,6 +11449,10 @@ function rSuivi() {
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>École</label><select id="fuSchool" onchange="prefillSchool()"><option value="">-- Sélectionner --</option>' + schoolOpts + '<option value="__other__">✏️ Autre (saisir)</option></select></div>';
   h += '<div class="form-field" id="fuSchoolCustomWrap" style="display:none"><label>Nom de l\'école</label><input type="text" id="fuSchoolCustom" placeholder="Nom de l\'école" oninput="updateSchoolOwnershipNotice()"></div>';
+  // 📞 Canal de contact — moved to TOP so the form layout adapts based on the channel chosen
+  h += '<div class="form-field channel-pick" style="grid-column:1/-1;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));padding:14px 16px;border-radius:12px;border:1.5px solid var(--saffron)"><label style="font-weight:800;color:var(--saffron-deep);text-transform:uppercase;letter-spacing:.06em;font-size:11px">📞 Canal de contact <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--g600)">— choisir d\'abord pour adapter le formulaire</span></label><select id="fuType" onchange="toggleLetterEmailFields()" style="margin-top:6px"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option>'+
+    (canSeeLetterEmail(currentUser) ? '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>' : '')+
+  '</select></div>';
   h += '<div class="form-field full" id="newSchoolInfoWrap" style="background:var(--bg-warm);padding:20px;border-radius:14px;border:1.5px solid var(--g200);margin-bottom:14px">';
   h += '<h4 style="margin-bottom:14px;color:var(--saffron-deep)">✏️ Qualification école</h4>';
   h += '<div class="form-grid" style="grid-gap:14px;display:grid;margin:0">';
@@ -11474,9 +11478,8 @@ function rSuivi() {
   h += '</div>';
   h += '<div class="form-field full"><div id="fuSchoolNotice" class="note teal" style="display:none;margin:0"></div></div>';
   h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="fuRecordedAt" readonly></div>';
-  h += '<div class="form-field"><label>Type de suivi</label><select id="fuType" onchange="toggleLetterEmailFields()"><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="VISIT">🚶 Visite terrain</option>';
-  if (canSeeLetterEmail(currentUser)) h += '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>';
-  h += '</select></div>';
+  // Type de suivi moved to top of form as "Canal de contact" — see above
+
   h += '<div class="form-field"><label>Heure auto du contact</label><input type="text" id="fuCallStart" readonly></div>';
   h += '<div class="form-field"><label>Durée observée</label><input type="time" id="fuCallDuration" step="1"></div>';
   h += '<div class="form-field"><label>Nom du contact</label><input type="text" id="fuContact" placeholder="Ex: M. Agbor"></div>';
@@ -11538,6 +11541,10 @@ function rSuivi() {
   h += '<p style="font-size:13px;color:var(--g600);line-height:1.7;margin-bottom:18px">Utilisez cette fiche quand vous découvrez une nouvelle école, ou pour enregistrer un <b>courrier</b> ou <b>email</b> envoyé à une école, un sponsor, une ambassade, une université ou toute organisation. On reprend les questions clés pour bien classer l\'entrée dès le premier contact.</p>';
   h += '<div class="form-grid">';
   h += '<div class="form-field"><label>Nom de l\'école / organisation</label><input type="text" id="nsSchoolName" placeholder="Ex: Lycée de Ndoghem, Ambassade de France" oninput="updateNewSchoolOwnershipNotice()"></div>';
+  // 📞 Canal de contact — moved to TOP so courrier/email fields appear immediately when relevant
+  h += '<div class="form-field channel-pick" style="grid-column:1/-1;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));padding:14px 16px;border-radius:12px;border:1.5px solid var(--saffron)"><label style="font-weight:800;color:var(--saffron-deep);text-transform:uppercase;letter-spacing:.06em;font-size:11px">📞 Canal du 1er contact <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--g600)">— sélectionnez avant de remplir</span></label><select id="nsEntryType" onchange="toggleNsLetterEmailFields()" style="margin-top:6px"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option>'+
+    (canSeeLetterEmail(currentUser) ? '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>' : '')+
+  '</select></div>';
   h += '<div class="form-field"><label>Type d\'établissement</label><select id="nsSchoolType"><option value="Primaire">Primaire et / ou Maternelle</option><option value="Sécondaire">Secondaire</option><option value="Université">Université</option><option value="École publique">École publique</option><option value="Sponsor">Sponsor / Mécène</option><option value="Organisation">Organisation / ONG</option><option value="Ambassade">Ambassade / Consulat</option><option value="Entreprise">Entreprise partenaire</option><option value="Autre">Autre</option></select></div>';
   h += '<div class="form-field"><label>Standing / Catégorie</label><select id="nsCategory" onchange="updateStandingTip(\'ns\')"><option value="TRES HAUTE STANDING">Très Haute Standing</option><option value="HAUTE STANDING">Haute Standing</option><option value="STANDIG MOYEN" selected>Standing Moyen</option><option value="BASSE STANDING">Basse Standing</option><option value="TRES BASSE STANDING">Très Basse Standing</option></select></div>';
   h += '<div id="nsStandingTip" style="display:none;grid-column:1/-1;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08));border:1.5px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;color:var(--g700,#374151)"></div>';
@@ -11546,9 +11553,8 @@ function rSuivi() {
   h += '<div class="form-field"><label>Ville</label><select id="nsCity">' + cityOptions + '</select></div>';
   h += '<div class="form-field"><label>Secteur / zone</label><input type="text" id="nsSector" placeholder="BONABERIE, MIMBOMAN..."></div>';
   h += '<div class="form-field"><label>Quartier</label><input type="text" id="nsQuartier" placeholder="Ex: Bojongo, Bastos"></div>';
-  h += '<div class="form-field"><label>Canal du 1er contact</label><select id="nsEntryType" onchange="toggleNsLetterEmailFields()"><option value="VISIT">🚶 Descente terrain</option><option value="CALL">📞 Appel</option><option value="WHATSAPP">💬 WhatsApp</option><option value="SMS">📱 SMS</option><option value="CREATION">📝 Création simple</option>';
-  if (canSeeLetterEmail(currentUser)) h += '<option value="EMAIL">📧 Email</option><option value="LETTER">📨 Lettre / Courrier</option>';
-  h += '</select></div>';
+  // Canal du 1er contact moved to top of form — see channel-pick block above
+
   h += '<div class="form-field"><label>Horodatage automatique</label><input type="text" id="nsRecordedAt" readonly></div>';
   h += '<div class="form-field full" style="grid-column:1/-1"><label>Localisation / Repères précis</label><input type="text" id="nsLocation" placeholder="Ex: En face de la pharmacie, après le carrefour"></div>';
   h += '<div class="form-field"><label>Nom du contact principal</label><input type="text" id="nsContactName" placeholder="Ex: M. Nkoum"></div>';
