@@ -3012,6 +3012,23 @@ button,select,input,textarea{outline:none}
 .me-hl-btn.act{background:var(--ink);border-color:var(--ink);box-shadow:var(--shadow-sm)}
 .me-blink-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--g700);cursor:pointer;margin-left:auto;background:var(--paper);padding:4px 10px;border-radius:8px;border:1.5px solid var(--g200)}
 .me-blink-toggle input{margin:0;accent-color:var(--red)}
+
+/* — Mes Saisies: unified multi-filter bar — */
+.me-filterbar{background:linear-gradient(180deg,var(--g50),var(--paper));border:1px solid var(--g200);border-radius:14px;padding:14px;margin-bottom:14px;animation:fadeInUp .35s cubic-bezier(.16,1,.3,1) both}
+.me-fb-head{font-size:12.5px;color:var(--g700);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.me-fb-head b{color:var(--ink)}
+.me-fb-reset{margin-left:auto;background:var(--paper);border:1.5px solid var(--g200);color:var(--g600);padding:4px 10px;border-radius:8px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s ease}
+.me-fb-reset:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.me-fb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.me-fb-input{padding:8px 12px;border:1.5px solid var(--g200);border-radius:10px;font-family:inherit;font-size:12.5px;background:var(--paper);transition:border-color .2s ease;width:100%;min-width:0}
+.me-fb-input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(13,148,136,.1)}
+.me-fb-input::placeholder{color:var(--g400)}
+.me-fb-status{margin-top:8px;font-size:11.5px;color:var(--teal-deep);font-weight:700;font-family:'JetBrains Mono',monospace;min-height:16px}
+.me-fb-status b{color:var(--ink)}
+@media(max-width:600px){
+  .me-fb-grid{grid-template-columns:1fr 1fr}
+  .me-fb-input{font-size:12px;padding:7px 10px}
+}
 @media(max-width:600px){
   .vo-bar-label{flex:0 0 70px;font-size:11px}
   .vo-bar-pct{flex:0 0 50px;font-size:10px}
@@ -12215,7 +12232,16 @@ function showMyEntries(){
       }).join('')+
       ' <label class="me-blink-toggle"><input type="checkbox"'+(hi==='blink'?' checked':'')+' onchange="setMyEntryHighlight(\''+safeKey+'\', this.checked?\'blink\':\'\')"> ⚡ clignoter</label>'+
     '</div>';
-    return '<div class="me-row'+hiClass+'" data-entry="school:'+esc(r.key)+'" data-stage="'+esc(r.stage||'')+'">'+
+    // Data attributes used by the unified filter bar to filter without re-rendering
+    var dataAttrs = ' data-name="'+esc(String(r.schoolName||'').toLowerCase())+'"'+
+      ' data-city="'+esc(String(r.city||'').toLowerCase())+'"'+
+      ' data-quartier="'+esc(String(r.quartier||r.zone||'').toLowerCase())+'"'+
+      ' data-product="'+esc(String(r.productType||'').toLowerCase())+'"'+
+      ' data-appmode="'+esc(String(r.appMode||'').toLowerCase())+'"'+
+      ' data-rate="'+(r.rate||0)+'"'+
+      ' data-contacts="'+stats.total+'"'+
+      ' data-lastdays="'+(daysAgo==null?'9999':daysAgo)+'"';
+    return '<div class="me-row'+hiClass+'" data-entry="school:'+esc(r.key)+'" data-stage="'+esc(r.stage||'')+'"'+dataAttrs+'>'+
       '<div class="me-row-head" onclick="if(!event.target.closest(\'.me-hl-btn,.me-blink-toggle,input,label\'))this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
           '<div class="me-row-title">🏫 '+esc(r.schoolName||'—')+' '+_myEntriesStageBadge(r.stage)+'</div>'+
@@ -12248,31 +12274,78 @@ function showMyEntries(){
     '</div>';
   }
 
-  // Build schools list with stage filter chips
+  // Build the stage-filter chip row (reused for all 3 tabs that show schools/followups)
   var stageCounts = {all:allRecords.length, gagne:0, chaud:0, tiede:0, froid:0, nouveau:0, perdu:0};
   allRecords.forEach(function(r){ if (stageCounts[r.stage]!==undefined) stageCounts[r.stage]++; });
-  var stageFilterHtml = '<div class="me-stage-filter">'+
-    ['all','gagne','chaud','tiede','froid','nouveau','perdu'].map(function(s){
-      var lbl = s==='all'?'Tous':s==='gagne'?'🏆 Gagné':s==='chaud'?'🔥 Chaud':s==='tiede'?'🟠 Tiède':s==='froid'?'🔵 Froid':s==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
-      return '<button class="me-stage-chip me-stage-'+s+(s==='all'?' act':'')+'" onclick="filterMyEntriesByStage(\''+s+'\')">'+lbl+' <span class="me-stage-count">'+(stageCounts[s]||0)+'</span></button>';
-    }).join('')+
+  function _buildStageChips(){
+    return '<div class="me-stage-filter">'+
+      ['all','gagne','chaud','tiede','froid','nouveau','perdu'].map(function(s){
+        var lbl = s==='all'?'Tous':s==='gagne'?'🏆 Gagné':s==='chaud'?'🔥 Chaud':s==='tiede'?'🟠 Tiède':s==='froid'?'🔵 Froid':s==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
+        return '<button class="me-stage-chip me-stage-'+s+(s==='all'?' act':'')+'" onclick="setMyEntriesStage(\''+s+'\')">'+lbl+' <span class="me-stage-count">'+(stageCounts[s]||0)+'</span></button>';
+      }).join('')+
+    '</div>';
+  }
+
+  // Build unified multi-filter bar — applies to schools, non contactées, suivis, courriers
+  var allCities = [];
+  var citySeen = {};
+  allRecords.forEach(function(r){ var c=(r.city||'').trim(); if (c && !citySeen[c]){citySeen[c]=1; allCities.push(c);} });
+  allCities.sort();
+  var allProducts = [];
+  var prodSeen = {};
+  allRecords.forEach(function(r){ var p=(r.productType||'').trim(); if (p && !prodSeen[p]){prodSeen[p]=1; allProducts.push(p);} });
+  allProducts.sort();
+  var filterBarHtml = '<div class="me-filterbar" id="me-filterbar">'+
+    '<div class="me-fb-head">🔎 <b>Filtres</b> — combinables, s\'appliquent à l\'onglet actif <button class="me-fb-reset" onclick="resetMyEntriesFilters()" type="button">🗑 réinitialiser</button></div>'+
+    '<div class="me-fb-grid">'+
+      '<input type="text" class="me-fb-input" id="me-f-search" placeholder="🔍 Rechercher école..." oninput="applyMyEntriesFilters()">'+
+      '<select class="me-fb-input" id="me-f-city" onchange="applyMyEntriesFilters()"><option value="">📍 Toutes villes</option>'+allCities.map(function(c){return '<option value="'+esc(c.toLowerCase())+'">'+esc(c)+'</option>';}).join('')+'</select>'+
+      '<input type="text" class="me-fb-input" id="me-f-quartier" placeholder="🏘 Quartier..." oninput="applyMyEntriesFilters()">'+
+      '<select class="me-fb-input" id="me-f-product" onchange="applyMyEntriesFilters()"><option value="">🧰 Tous produits</option>'+allProducts.map(function(p){return '<option value="'+esc(p.toLowerCase())+'">'+esc(p)+'</option>';}).join('')+'</select>'+
+      '<select class="me-fb-input" id="me-f-appmode" onchange="applyMyEntriesFilters()"><option value="">🌐 Toute version</option><option value="online">Online</option><option value="offline">Offline</option></select>'+
+      '<input type="number" class="me-fb-input" id="me-f-rate" placeholder="📊 % min" min="0" max="100" oninput="applyMyEntriesFilters()">'+
+      '<input type="number" class="me-fb-input" id="me-f-contacts" placeholder="📞 Contacts min" min="0" oninput="applyMyEntriesFilters()">'+
+      '<select class="me-fb-input" id="me-f-lastcontact" onchange="applyMyEntriesFilters()">'+
+        '<option value="">⏱ Dernier contact</option>'+
+        '<option value="7">≤ 7 jours</option>'+
+        '<option value="30">≤ 30 jours</option>'+
+        '<option value="90">≤ 90 jours</option>'+
+        '<option value="never">Jamais contactée</option>'+
+        '<option value="old">> 90 jours</option>'+
+      '</select>'+
+    '</div>'+
+    '<div class="me-fb-status" id="me-fb-status"></div>'+
   '</div>';
   var schoolsRowsHtml = allRecords.length
     ? allRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
     : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
-  var schoolsHtml = stageFilterHtml + '<div id="me-schools-rows">' + schoolsRowsHtml + '</div>';
+  var schoolsHtml = _buildStageChips() + '<div class="me-rows-pool" id="me-schools-rows">' + schoolsRowsHtml + '</div>';
 
-  // Build Non contactées list (schools with 0 followups)
-  var nonContactedHtml = nonContactedSchools.length
-    ? '<div class="me-banner" style="background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)">🚫 <b>'+nonContactedSchools.length+' école'+(nonContactedSchools.length>1?'s':'')+' sans aucun contact</b> — priorisez ces fiches pour ouvrir le pipeline. Cliquez « → Nouveau suivi » pour démarrer.</div>'+
-      nonContactedSchools.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
+  // Build Non contactées list (schools with 0 followups) — same stage chips + same row UX
+  var nonContactedRowsHtml = nonContactedSchools.length
+    ? nonContactedSchools.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
     : '<div class="me-empty">🎉 Toutes vos écoles ont au moins un contact enregistré.</div>';
+  var nonContactedHtml = '<div class="me-banner" style="background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)">🚫 <b>'+nonContactedSchools.length+' école'+(nonContactedSchools.length>1?'s':'')+' sans aucun contact</b> — priorisez ces fiches pour ouvrir le pipeline. Cliquez « → Nouveau suivi » pour démarrer.</div>'+
+    _buildStageChips() + '<div class="me-rows-pool" id="me-noncontact-rows">' + nonContactedRowsHtml + '</div>';
   // Build followup rows — reused by both Mes Suivis and Courriers/Emails tabs
   function _renderFuRow(f){
     var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
     var notes = getMyEntryNotes(entryId);
     var typeIcon = (f.FollowupType==='CALL'?'📞':f.FollowupType==='VISIT'?'🚶':f.FollowupType==='WHATSAPP'?'💬':f.FollowupType==='SMS'?'📱':f.FollowupType==='EMAIL'?'📧':f.FollowupType==='LETTER'?'📨':'📝');
-    return '<div class="me-row" data-entry="'+esc(entryId)+'">'+
+    // Pull school's stage + meta for filtering
+    var _sk = schoolKey(f.SchoolName);
+    var _rec = (_sk && recByKey[_sk]) || {};
+    var _fuDays = f.Timestamp ? Math.floor((Date.now() - new Date(f.Timestamp).getTime()) / 86400000) : 9999;
+    var fuDataAttrs = ' data-stage="'+esc(_rec.stage||'')+'"'+
+      ' data-name="'+esc(String(f.SchoolName||'').toLowerCase())+'"'+
+      ' data-city="'+esc(String(f.City || _rec.city || '').toLowerCase())+'"'+
+      ' data-quartier="'+esc(String(_rec.quartier||_rec.zone||'').toLowerCase())+'"'+
+      ' data-product="'+esc(String(_rec.productType||'').toLowerCase())+'"'+
+      ' data-appmode="'+esc(String(_rec.appMode||'').toLowerCase())+'"'+
+      ' data-rate="'+(_rec.rate||0)+'"'+
+      ' data-contacts="'+((statsBySchool[_sk]||{}).total||0)+'"'+
+      ' data-lastdays="'+_fuDays+'"';
+    return '<div class="me-row" data-entry="'+esc(entryId)+'"'+fuDataAttrs+'>'+
       '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
           '<div class="me-row-title">'+typeIcon+' '+esc(f.FollowupType||'—')+' · '+esc(f.SchoolName||'—')+'</div>'+
@@ -12302,8 +12375,10 @@ function showMyEntries(){
   function _isMailType(f){ var t=String(f.FollowupType||'').toUpperCase(); return t==='EMAIL'||t==='LETTER'; }
   var standardFu = myFu.filter(function(f){ return !_isMailType(f); });
   var mailFu     = myFu.filter(_isMailType);
-  var fuHtml   = standardFu.length ? standardFu.map(_renderFuRow).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
-  var mailHtml = mailFu.length     ? mailFu.map(_renderFuRow).join('')     : '<div class="me-empty">Aucun courrier ni email enregistré pour le moment.</div>';
+  var fuRowsHtml   = standardFu.length ? standardFu.map(_renderFuRow).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
+  var mailRowsHtml = mailFu.length     ? mailFu.map(_renderFuRow).join('')     : '<div class="me-empty">Aucun courrier ni email enregistré pour le moment.</div>';
+  var fuHtml   = _buildStageChips() + '<div class="me-rows-pool" id="me-fu-rows">' + fuRowsHtml + '</div>';
+  var mailHtml = _buildStageChips() + '<div class="me-rows-pool" id="me-mail-rows">' + mailRowsHtml + '</div>';
 
   var html = '<div id="me-overlay" class="dd-overlay" onclick="if(event.target===this)closeMyEntries()">'+
     '<div class="dd-modal me-modal">'+
@@ -12316,6 +12391,7 @@ function showMyEntries(){
       '</div>'+
       '<div class="dd-body me-body">'+
         '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
+        filterBarHtml+
         '<div class="me-tabs">'+
           '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Mes écoles ('+allRecords.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'noncontact\')">🚫 Non contactées ('+nonContactedSchools.length+')</button>'+
@@ -12470,15 +12546,96 @@ function setMyEntriesTab(btn, key){
   document.querySelectorAll('.me-tab-panel').forEach(function(p){p.classList.remove('act');});
   document.getElementById('me-tab-'+key).classList.add('act');
 }
-// Filter the schools list by stage (Hot/Tiede/Froid/...)
-function filterMyEntriesByStage(stage){
-  document.querySelectorAll('.me-stage-chip').forEach(function(c){c.classList.remove('act');});
-  var btn = document.querySelector('.me-stage-'+stage); if (btn) btn.classList.add('act');
-  var rows = document.querySelectorAll('#me-schools-rows .me-row');
-  rows.forEach(function(r){
-    var st = r.dataset.stage || '';
-    r.style.display = (stage==='all' || st===stage) ? '' : 'none';
+// Active stage filter (one of all/gagne/chaud/tiede/froid/nouveau/perdu)
+window.__meStageFilter = 'all';
+// Stage chip clicked — updates the active filter and re-applies
+function setMyEntriesStage(stage){
+  window.__meStageFilter = stage;
+  // Update visual state on all 3+ chip rows (they all live in the modal)
+  document.querySelectorAll('#me-overlay .me-stage-filter').forEach(function(bar){
+    bar.querySelectorAll('.me-stage-chip').forEach(function(c){c.classList.remove('act');});
+    var sel = bar.querySelector('.me-stage-'+stage);
+    if (sel) sel.classList.add('act');
   });
+  applyMyEntriesFilters();
+}
+// Back-compat for old callers
+function filterMyEntriesByStage(stage){ setMyEntriesStage(stage); }
+
+// Apply ALL active filters (stage + search + city + quartier + product + appmode + rate + contacts + lastcontact)
+// to every row in every pool. Pure DOM hide/show — no re-render.
+function applyMyEntriesFilters(){
+  var stage = window.__meStageFilter || 'all';
+  function val(id){ var el=document.getElementById(id); return el ? String(el.value||'').toLowerCase().trim() : ''; }
+  function num(id){ var el=document.getElementById(id); var n=el?parseFloat(el.value):NaN; return isFinite(n)?n:null; }
+  var q = val('me-f-search');
+  var city = val('me-f-city');
+  var quartier = val('me-f-quartier');
+  var product = val('me-f-product');
+  var appmode = val('me-f-appmode');
+  var rateMin = num('me-f-rate');
+  var contactsMin = num('me-f-contacts');
+  var lc = val('me-f-lastcontact');
+  var pools = document.querySelectorAll('#me-overlay .me-rows-pool');
+  var totalShown = 0, totalRows = 0;
+  pools.forEach(function(pool){
+    pool.querySelectorAll('.me-row').forEach(function(row){
+      totalRows++;
+      var keep = true;
+      var ds = row.dataset;
+      // Stage
+      if (stage !== 'all' && (ds.stage||'') !== stage) keep = false;
+      // Search (name)
+      if (keep && q && (ds.name||'').indexOf(q) === -1) keep = false;
+      // City
+      if (keep && city && (ds.city||'') !== city) keep = false;
+      // Quartier (substring)
+      if (keep && quartier && (ds.quartier||'').indexOf(quartier) === -1) keep = false;
+      // Product
+      if (keep && product && (ds.product||'').indexOf(product) === -1) keep = false;
+      // AppMode (online/offline)
+      if (keep && appmode && (ds.appmode||'') !== appmode) keep = false;
+      // Rate min
+      if (keep && rateMin != null){
+        var r = parseFloat(ds.rate||'0');
+        if (!(r >= rateMin)) keep = false;
+      }
+      // Contacts min
+      if (keep && contactsMin != null){
+        var c = parseInt(ds.contacts||'0', 10);
+        if (!(c >= contactsMin)) keep = false;
+      }
+      // Last contact bucket
+      if (keep && lc){
+        var d = parseInt(ds.lastdays||'9999', 10);
+        if (lc === 'never') { if (d < 9999) keep = false; }
+        else if (lc === 'old') { if (d <= 90) keep = false; }
+        else { var maxDays = parseInt(lc,10); if (!(d <= maxDays)) keep = false; }
+      }
+      row.style.display = keep ? '' : 'none';
+      if (keep) totalShown++;
+    });
+  });
+  var status = document.getElementById('me-fb-status');
+  if (status){
+    var filtersActive = !!(q || city || quartier || product || appmode || rateMin != null || contactsMin != null || lc || stage !== 'all');
+    status.innerHTML = filtersActive
+      ? '<b>'+totalShown+'</b> entrée'+(totalShown>1?'s':'')+' visible'+(totalShown>1?'s':'')+' sur '+totalRows+' (filtres actifs)'
+      : '';
+  }
+}
+function resetMyEntriesFilters(){
+  ['me-f-search','me-f-city','me-f-quartier','me-f-product','me-f-appmode','me-f-rate','me-f-contacts','me-f-lastcontact'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  window.__meStageFilter = 'all';
+  document.querySelectorAll('#me-overlay .me-stage-filter').forEach(function(bar){
+    bar.querySelectorAll('.me-stage-chip').forEach(function(c){c.classList.remove('act');});
+    var sel = bar.querySelector('.me-stage-all');
+    if (sel) sel.classList.add('act');
+  });
+  applyMyEntriesFilters();
+  if (typeof toast === 'function') toast('Filtres réinitialisés', 'success');
 }
 // Highlight a school with a color (or 'blink' or '' to clear)
 function setMyEntryHighlight(schoolKeyStr, color){
