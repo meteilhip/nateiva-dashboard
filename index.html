@@ -3029,6 +3029,76 @@ button,select,input,textarea{outline:none}
   .me-fb-grid{grid-template-columns:1fr 1fr}
   .me-fb-input{font-size:12px;padding:7px 10px}
 }
+
+/* — 📞💬 Phone action chips (call + WhatsApp) — */
+.phone-actions{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle}
+.pa-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;text-decoration:none;font-size:13px;transition:all .2s cubic-bezier(.16,1,.3,1);border:1px solid transparent}
+.pa-btn.pa-call{background:var(--teal-soft);border-color:rgba(13,148,136,.25)}
+.pa-btn.pa-call:hover{background:var(--teal);transform:scale(1.15)}
+.pa-btn.pa-wa{background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.3)}
+.pa-btn.pa-wa:hover{background:#25D366;transform:scale(1.15)}
+
+/* — 🎯 Objectifs du mois — */
+.goals-strip{background:var(--paper);border:1px solid var(--g100);border-radius:16px;padding:16px 18px;margin-bottom:14px;animation:cardPop .45s cubic-bezier(.16,1,.3,1) both;box-shadow:var(--shadow-sm)}
+.goals-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.goals-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--ink);text-transform:capitalize}
+.goals-scope{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--teal-soft);color:var(--teal-deep);padding:3px 8px;border-radius:100px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
+.goals-pace{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g500);font-weight:700}
+.goals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.goal-card{background:var(--g50);border:1px solid var(--g100);border-top:3px solid var(--teal);border-radius:12px;padding:12px;position:relative;transition:all .25s cubic-bezier(.16,1,.3,1)}
+.goal-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.goal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.goal-icon{font-size:18px}
+.goal-status{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:100px;letter-spacing:-.01em}
+.goal-status.ok{background:var(--green-soft);color:var(--green)}
+.goal-status.behind{background:var(--red-soft);color:var(--red)}
+.goal-val{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--ink);line-height:1}
+.goal-tgt{font-size:13px;color:var(--g500);font-weight:600}
+.goal-lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin:4px 0 8px}
+.goal-bar{height:7px;background:var(--g200);border-radius:4px;overflow:visible;position:relative}
+.goal-fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.16,1,.3,1);animation:barRise .6s cubic-bezier(.16,1,.3,1) both}
+.goal-pace-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.4;border-radius:1px}
+.goal-pct{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--g700);margin-top:6px;text-align:right}
+
+/* — 🧊 Deals dormants strip — */
+.stale-strip{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(13,148,136,.07),rgba(59,130,246,.05));border:1.5px dashed var(--teal);border-radius:14px;padding:12px 16px;margin-bottom:14px;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);animation:cardPop .45s cubic-bezier(.16,1,.3,1) .1s both}
+.stale-strip:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(13,148,136,.18);border-style:solid}
+.stale-icon{font-size:26px;flex-shrink:0;animation:breathe 3s ease infinite}
+.stale-text{flex:1;font-size:13px;color:var(--g700);line-height:1.5}
+.stale-text b{color:var(--ink)}
+.stale-cta{flex-shrink:0;background:var(--teal);color:#fff;padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;transition:all .25s ease}
+.stale-strip:hover .stale-cta{background:var(--teal-deep);transform:translateX(3px)}
+
+/* — ⏰ Meilleures heures d'appel — */
+.besthours{background:linear-gradient(180deg,var(--g50),var(--paper));border:1px solid var(--g100);border-radius:14px;padding:16px;margin-bottom:16px;animation:fadeInUp .4s cubic-bezier(.16,1,.3,1) both}
+.bh-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.bh-title{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--ink)}
+.bh-verdict{font-size:12.5px;color:var(--g700);background:var(--green-soft);padding:5px 12px;border-radius:100px;border:1px solid rgba(5,150,105,.2)}
+.bh-verdict b{color:var(--green)}
+.bh-bars{display:flex;gap:8px;align-items:flex-end;justify-content:space-around;padding:4px 2px}
+.bh-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;max-width:64px}
+.bh-rate{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800}
+.bh-rate.hi{color:var(--green)} .bh-rate.mid{color:var(--saffron-deep)} .bh-rate.lo{color:var(--g400)}
+.bh-bar{width:100%;max-width:34px;background:linear-gradient(180deg,var(--g300),var(--g400));border-radius:5px 5px 0 0;transition:all .3s ease;animation:barRise .55s cubic-bezier(.16,1,.3,1) both}
+.bh-col.best .bh-bar{background:linear-gradient(180deg,var(--green-bright),var(--green));box-shadow:0 -2px 10px rgba(5,150,105,.35)}
+.bh-col.best .bh-hr{color:var(--green);font-weight:800}
+.bh-col:hover .bh-bar{filter:brightness(1.12);transform:scaleX(1.08)}
+.bh-hr{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--g600);font-weight:700}
+.bh-hint{margin-top:10px;font-size:11px;color:var(--g500);text-align:center;font-style:italic}
+
+/* — 📤 Export CSV button — */
+.me-export-btn{background:var(--ink);color:var(--saffron-bright);border:none;border-radius:10px;padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;cursor:pointer;transition:all .25s cubic-bezier(.16,1,.3,1);letter-spacing:.02em}
+.me-export-btn:hover{background:var(--green);color:#fff;transform:translateY(-2px);box-shadow:var(--shadow)}
+
+@media(max-width:600px){
+  .goals-grid{grid-template-columns:1fr 1fr}
+  .goal-val{font-size:20px}
+  .stale-strip{flex-direction:column;text-align:center}
+  .stale-cta{width:100%;text-align:center}
+  .bh-bars{gap:4px}
+  .bh-rate{font-size:9px}
+  .bh-hr{font-size:9px}
+}
 @media(max-width:600px){
   .vo-bar-label{flex:0 0 70px;font-size:11px}
   .vo-bar-pct{flex:0 0 50px;font-size:10px}
@@ -3638,6 +3708,23 @@ function schoolKey(value){ return normalizeText(value); }
 function phoneHref(value){
   const clean=digitsOnly(value);
   return clean ? 'tel:'+clean : '';
+}
+// wa.me deep link — prefixes the Cameroon country code when the number is local (9 digits)
+function whatsappHref(value){
+  var clean=digitsOnly(value);
+  if(!clean) return '';
+  var cc=((window.NATEIVA_CONFIG||{}).PHONE_COUNTRY_CODE)||'237';
+  if(clean.length===9 && clean.charAt(0)==='6') clean=cc+clean;
+  return 'https://wa.me/'+clean;
+}
+// Tappable action chips (call + WhatsApp) for any phone number — core channel in Cameroon
+function phoneActionLinks(value){
+  var clean=digitsOnly(value);
+  if(!clean) return '';
+  return '<span class="phone-actions">'+
+    '<a class="pa-btn pa-call" href="'+attrEsc(phoneHref(value))+'" title="Appeler" onclick="event.stopPropagation()">📞</a>'+
+    '<a class="pa-btn pa-wa" href="'+attrEsc(whatsappHref(value))+'" target="_blank" rel="noopener" title="Ouvrir WhatsApp" onclick="event.stopPropagation()">💬</a>'+
+  '</span>';
 }
 function moneyFCFA(value){
   return fmt(Math.round(Number(value)||0))+' FCFA';
@@ -4786,7 +4873,7 @@ function ddCallItem(item){
   var phone=item.ContactPhone?esc(item.ContactPhone):'';
   var notes=getFollowupPlainNotes(item);
   var noteSnippet=notes?esc(notes.length>80?notes.slice(0,80)+'...':notes):'';
-  return '<div class="dd-school-item" style="padding:10px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="dd-school-name">'+school+'</span>'+outcome+'</div><div class="dd-school-meta" style="margin-top:4px"><span>👤 '+expert+'</span>'+(dt?'<span>📅 '+dt+'</span>':'')+(contact?'<span>📇 '+contact+'</span>':'')+(phone?'<span>📞 '+phone+'</span>':'')+'</div>'+(noteSnippet?'<div style="margin-top:6px;font-size:12px;color:var(--g500);font-style:italic">'+noteSnippet+'</div>':'')+'</div>';
+  return '<div class="dd-school-item" style="padding:10px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="dd-school-name">'+school+'</span>'+outcome+'</div><div class="dd-school-meta" style="margin-top:4px"><span>👤 '+expert+'</span>'+(dt?'<span>📅 '+dt+'</span>':'')+(contact?'<span>📇 '+contact+'</span>':'')+(phone?'<span>📞 '+phone+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(item.ContactPhone):'')+'</span>':'')+'</div>'+(noteSnippet?'<div style="margin-top:6px;font-size:12px;color:var(--g500);font-style:italic">'+noteSnippet+'</div>':'')+'</div>';
 }
 function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
   var buckets = (window.__revBuckets && window.__revBuckets[periodKey]) || [];
@@ -4887,6 +4974,40 @@ function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
   document.body.style.overflow = 'hidden';
 }
 function closeDdRev(){ var o=document.getElementById('ddrev-overlay'); if(o){o.remove(); document.body.style.overflow='';} }
+
+// Drill-down: 🧊 Deals dormants — hot/warm schools gone silent, ready-to-relance list
+function drillDownStaleDeals(){
+  var deals = window.__staleDeals || [];
+  if (!deals.length) { showToast('Aucun deal dormant 🎉'); return; }
+  var staleDays = ((window.NATEIVA_CONFIG||{}).STALE_DEAL_DAYS) || 14;
+  var totalRev = deals.reduce(function(s,r){return s+(r.amount||0);},0);
+  var body = '<div class="adr-summary">'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Deals dormants</div><div class="adr-sum-val">'+deals.length+'</div></div>'+
+    '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Revenu à risque</div><div class="adr-sum-val">'+moneyCompact(totalRev)+'</div></div>'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Seuil</div><div class="adr-sum-val">'+staleDays+'j</div></div>'+
+  '</div>';
+  body += '<div class="amb-drill-list">';
+  deals.slice(0,60).forEach(function(r){
+    var days = r.lastTouch ? Math.floor((Date.now()-r.lastTouch.getTime())/86400000) : null;
+    var stageColor = r.stage==='chaud'?'var(--red)':'var(--saffron)';
+    var stageLabel = r.stage==='chaud'?'🔥 Chaud':'🟠 Tiède';
+    body += '<div class="amb-drill-row" style="border-left-color:'+stageColor+'">'+
+      '<div class="adr-head"><div class="adr-school">'+esc(r.schoolName||'—')+'</div><div class="adr-amount" style="color:'+stageColor+'">'+moneyCompact(r.amount||0)+'</div></div>'+
+      '<div class="adr-meta">'+
+        '<span class="adr-stage" style="background:'+stageColor+'1a;color:'+stageColor+'">'+stageLabel+'</span>'+
+        '<span>🧊 '+(days!=null?days+' jours sans contact':'jamais contacté')+'</span>'+
+        '<span>📊 '+(r.rate||0)+'%</span>'+
+        '<span>📍 '+esc(r.city||'—')+'</span>'+
+        '<span>👤 '+esc(r.expert||'—')+'</span>'+
+        (r.phone?'<span>📞 '+esc(r.phone)+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(r.phone):'')+'</span>':'')+
+      '</div>'+
+      '<div class="me-edit-cta" style="margin-top:8px"><span>Relancer maintenant — appel, WhatsApp, ou visite.</span><button onclick="closeDrillDown();showFollowupFromSchool(\''+esc(r.schoolName||'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi</button></div>'+
+    '</div>';
+  });
+  body += '</div>';
+  if (deals.length>60) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(deals.length-60)+' autres</div>';
+  showDrillDown('🧊 Deals dormants — '+deals.length+' à relancer ('+moneyCompact(totalRev)+' à risque)', body);
+}
 
 // Drill-down: 🌐 Online / 💾 Offline — list of schools + revenue + last note
 function drillDownAppMode(mode){
@@ -6628,6 +6749,48 @@ function rHome(){
       <span class="anno">${dashboard.sourceCallCount} appels suivis · ${dashboard.importedCallSourceCount} importés · ${dashboard.systemCallCount} saisis dans l'app</span>
     </div>
     ${dashboard.sourceCallGap ? `<div class="note teal"><b>Volume import confirmé:</b> la feuille appels montre <b>${dashboard.importedCallSourceCount}</b> réponses (ligne ${dashboard.sourceCallRows} avec entête). L'analyse détaillée importée visible ici en couvre déjà <b>${dashboard.importedDetailedCallCount}</b>, donc <b>${dashboard.sourceCallGap}</b> imports restent à relire ligne par ligne.</div>` : ''}
+
+    <!-- ⏰ MEILLEURES HEURES D'APPEL — connect rate par tranche horaire -->
+    ${(function(){
+      var calls = dashboard.followups.filter(function(f){return f.FollowupType==='CALL';});
+      var byHour = {};
+      calls.forEach(function(f){
+        var d = f.Timestamp ? new Date(f.Timestamp) : null;
+        if (!d || isNaN(d.getTime())) return;
+        var hr = d.getHours();
+        if (hr < 7 || hr > 19) return; // business hours only
+        if (!byHour[hr]) byHour[hr] = {total:0, connected:0};
+        byHour[hr].total++;
+        if (/personne concern[ée]e jointe/i.test(String(f.Outcome||''))) byHour[hr].connected++;
+      });
+      var hours = Object.keys(byHour).map(Number).sort(function(a,b){return a-b;})
+        .filter(function(hr){ return byHour[hr].total >= 3; }); // need sample size
+      if (hours.length < 2) return '';
+      var maxTotal = Math.max.apply(null, hours.map(function(hr){return byHour[hr].total;}));
+      var ranked = hours.slice().sort(function(a,b){
+        return (byHour[b].connected/byHour[b].total) - (byHour[a].connected/byHour[a].total);
+      });
+      var best = ranked.slice(0,2).sort(function(a,b){return a-b;});
+      return '<div class="besthours">'+
+        '<div class="bh-head"><span class="bh-title">⏰ Meilleures heures pour joindre les écoles</span>'+
+          '<span class="bh-verdict">🎯 Créneaux gagnants : <b>'+best.map(function(hr){return hr+'h-'+(hr+1)+'h';}).join(' et ')+'</b></span>'+
+        '</div>'+
+        '<div class="bh-bars">'+
+          hours.map(function(hr){
+            var s = byHour[hr];
+            var rate = Math.round((s.connected/s.total)*100);
+            var hBar = Math.max(8, (s.total/maxTotal)*72);
+            var isBest = best.indexOf(hr) !== -1;
+            return '<div class="bh-col'+(isBest?' best':'')+'" title="'+hr+'h : '+s.connected+' joints / '+s.total+' appels ('+rate+'%)">'+
+              '<div class="bh-rate'+(rate>=50?' hi':rate>=30?' mid':' lo')+'">'+rate+'%</div>'+
+              '<div class="bh-bar" style="height:'+hBar+'px"></div>'+
+              '<div class="bh-hr">'+hr+'h</div>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+        '<div class="bh-hint">% = taux de contact établi · hauteur = volume · concentrez vos sessions sur les créneaux verts</div>'+
+      '</div>';
+    })()}
     <div class="kpis">
       <div class="kpi teal clickable" onclick="drillDownCallKPI('appels_suivis')">
         <div class="lbl">Appels suivis ›</div>
@@ -8771,6 +8934,20 @@ window.NATEIVA_CONFIG = Object.assign({
 
   // — Revenue Tracker window sizes (last N periods) —
   REV_WINDOWS: { week: 12, month: 12, year: 5 },
+
+  // — Monthly targets per expert (Objectifs du mois) —
+  MONTHLY_TARGETS: {
+    entries: 100,       // fiches terrain / mois (≈10/jour × 22j ÷ 2 marge)
+    calls: 80,          // appels / mois
+    visits: 40,         // visites terrain / mois
+    conversions: 2      // écoles signées / mois
+  },
+
+  // — Stale deal threshold (days without touch on chaud/tiède) —
+  STALE_DEAL_DAYS: 14,
+
+  // — WhatsApp country code for wa.me deep links —
+  PHONE_COUNTRY_CODE: '237',
 
   // — Expert remap rules (year-scoped) —
   EXPERT_REMAP: {
@@ -11268,6 +11445,72 @@ function rSuivi() {
     '</div>';
   })();
 
+  // 🎯 OBJECTIFS DU MOIS — quota tracking like top sales CRMs, scoped to the user
+  (function(){
+    var T = ((window.NATEIVA_CONFIG||{}).MONTHLY_TARGETS) || {entries:100, calls:80, visits:40, conversions:2};
+    var now = new Date();
+    var monthKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    function _inMonth(ts){ return String(ts||'').slice(0,7) === monthKey; }
+    var pRaw = isSuper ? workspaceRaw : getWorkspaceRawForUser(me);
+    var pFu  = isSuper ? workspaceFollowups : getWorkspaceFollowupsForUser(me);
+    var mEntries = pRaw.filter(function(r){return _inMonth(r.t);}).length;
+    var mCalls = 0, mVisits = 0, mConv = 0;
+    pFu.forEach(function(f){
+      if (!_inMonth(f.Timestamp)) return;
+      var t = String(f.FollowupType||'').toUpperCase();
+      if (t==='CALL') mCalls++;
+      else if (t==='VISIT') mVisits++;
+      if (/conver|gagn|won/i.test(String(f.Outcome||''))) mConv++;
+    });
+    // Team scope multiplies targets by expert count
+    var mult = isSuper ? Math.max(1, suiviRankings.length) : 1;
+    var goals = [
+      {icon:'📋', lbl:'Fiches terrain', cur:mEntries, tgt:T.entries*mult, color:'var(--teal)'},
+      {icon:'📞', lbl:'Appels',         cur:mCalls,   tgt:T.calls*mult,   color:'var(--purple)'},
+      {icon:'🚶', lbl:'Visites',        cur:mVisits,  tgt:T.visits*mult,  color:'var(--saffron)'},
+      {icon:'✅', lbl:'Conversions',    cur:mConv,    tgt:T.conversions*mult, color:'var(--green)'}
+    ];
+    var monthLabel = now.toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
+    var dayOfMonth = now.getDate();
+    var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    var pacePct = Math.round((dayOfMonth/daysInMonth)*100);
+    h += '<div class="goals-strip">'+
+      '<div class="goals-head"><span class="goals-title">🎯 Objectifs '+esc(monthLabel)+(isSuper?' <span class="goals-scope">équipe ×'+mult+'</span>':'')+'</span><span class="goals-pace">Mois écoulé à '+pacePct+'%</span></div>'+
+      '<div class="goals-grid">'+
+        goals.map(function(g){
+          var pct = g.tgt ? Math.min(100, Math.round((g.cur/g.tgt)*100)) : 0;
+          var onTrack = pct >= pacePct;
+          return '<div class="goal-card" style="border-top-color:'+g.color+'">'+
+            '<div class="goal-top"><span class="goal-icon">'+g.icon+'</span><span class="goal-status '+(onTrack?'ok':'behind')+'">'+(onTrack?'✓ en avance':'⚠ en retard')+'</span></div>'+
+            '<div class="goal-val">'+g.cur+' <span class="goal-tgt">/ '+g.tgt+'</span></div>'+
+            '<div class="goal-lbl">'+g.lbl+'</div>'+
+            '<div class="goal-bar"><div class="goal-fill" style="width:'+pct+'%;background:'+g.color+'"></div><div class="goal-pace-mark" style="left:'+pacePct+'%" title="Rythme attendu à ce jour"></div></div>'+
+            '<div class="goal-pct">'+pct+'%</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+    '</div>';
+  })();
+
+  // 🧊 DEALS DORMANTS — chaud/tiède schools untouched beyond the stale threshold
+  (function(){
+    var staleDays = ((window.NATEIVA_CONFIG||{}).STALE_DEAL_DAYS) || 14;
+    var recsPool = buildSchoolRecords(workspaceRaw, workspaceFollowups);
+    var staleDeals = recsPool.filter(function(r){
+      if (r.stage !== 'chaud' && r.stage !== 'tiede') return false;
+      if (!r.lastTouch) return true;
+      return (Date.now() - r.lastTouch.getTime()) / 86400000 > staleDays;
+    }).sort(function(a,b){ return (b.amount||0)-(a.amount||0); });
+    if (!staleDeals.length) return;
+    var staleRev = staleDeals.reduce(function(s,r){return s+(r.amount||0);},0);
+    window.__staleDeals = staleDeals;
+    h += '<div class="stale-strip" onclick="drillDownStaleDeals()" role="button" tabindex="0" title="Cliquez pour voir la liste et relancer">'+
+      '<span class="stale-icon">🧊</span>'+
+      '<span class="stale-text"><b>'+staleDeals.length+' deal'+(staleDeals.length>1?'s':'')+' chaud/tiède dormant'+(staleDeals.length>1?'s':'')+'</b> — sans contact depuis plus de '+staleDays+' jours · <b>'+moneyCompact(staleRev)+'</b> à risque de refroidir</span>'+
+      '<span class="stale-cta">Relancer →</span>'+
+    '</div>';
+  })();
+
   // 🏅 Top performers strip — right below the account owner header
   if (isSuper) {
     h += buildTopPerformersStrip('Le classement complet est dans le <a href="#" data-jump="home" style="color:var(--red);font-weight:700;text-decoration:underline">Dashboard</a> sous « Revenus en FCFA ».');
@@ -12174,6 +12417,7 @@ function showMyEntries(){
   }
   var allRecords = (typeof buildSchoolRecords === 'function') ? buildSchoolRecords(myRaw, myFu) : [];
   var recByKey = {}; allRecords.forEach(function(r){ recByKey[r.key]=r; });
+  window.__meExportRecords = allRecords; // used by exportMyEntriesCSV
   // Existing modal cleanup
   var prev=document.getElementById('me-overlay'); if (prev) prev.remove();
   // Per-school stats from followups (call count, visit count, last contact date)
@@ -12246,7 +12490,7 @@ function showMyEntries(){
         '<div class="me-row-main">'+
           '<div class="me-row-title">🏫 '+esc(r.schoolName||'—')+' '+_myEntriesStageBadge(r.stage)+'</div>'+
           '<div class="me-row-sub">'+(seeAll&&r.expert?'<b style="color:var(--teal-deep)">👤 '+esc(r.expert)+'</b> · ':'')+esc(r.city||'—')+(r.zone?' · '+esc(r.zone):'')+(r.type?' · '+esc(r.type):'')+(r.appMode?' · '+esc(r.appMode):'')+' · '+(r.rate||0)+'% · '+(r.effectif?fmt(r.effectif)+' élèves':'effectif n/r')+'</div>'+
-          (r.contactName||r.phone?'<div class="me-row-sub">👤 '+esc(r.contactName||'?')+' · 📞 '+esc(r.phone||'?')+'</div>':'')+
+          (r.contactName||r.phone?'<div class="me-row-sub">👤 '+esc(r.contactName||'?')+' · 📞 '+esc(r.phone||'?')+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(r.phone):'')+'</div>':'')+
           statsLine+
         '</div>'+
         '<div class="me-row-meta">'+
@@ -12387,7 +12631,10 @@ function showMyEntries(){
           '<h3>📚 '+(seeAll?'Saisies — toute l\'équipe':'Mes saisies')+' <span style="font-size:11px;background:var(--g100);color:var(--g700);padding:3px 8px;border-radius:6px;font-weight:700;font-family:JetBrains Mono,monospace;letter-spacing:.04em;text-transform:uppercase">Lecture seule</span></h3>'+
           '<div class="me-subtitle">'+(seeAll?'<b style="color:var(--teal-deep)">Vue admin · vous voyez les saisies de tous les experts</b> · ':'')+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+standardFu.length+' suivi'+(standardFu.length>1?'s':'')+' · '+mailFu.length+' courrier'+(mailFu.length>1?'s':'')+'/email'+(mailFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
         '</div>'+
-        '<button class="dd-close" onclick="closeMyEntries()">×</button>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<button class="me-export-btn" onclick="exportMyEntriesCSV()" title="Télécharger toutes les écoles visibles en CSV (Excel)">📤 CSV</button>'+
+          '<button class="dd-close" onclick="closeMyEntries()">×</button>'+
+        '</div>'+
       '</div>'+
       '<div class="dd-body me-body">'+
         '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
@@ -12409,6 +12656,31 @@ function showMyEntries(){
   document.body.style.overflow='hidden';
 }
 function closeMyEntries(){ var o=document.getElementById('me-overlay'); if (o){ o.remove(); document.body.style.overflow=''; } }
+
+// 📤 Export the visible school records as CSV (Excel-friendly, UTF-8 BOM, ; separator for FR locale)
+function exportMyEntriesCSV(){
+  var recs = window.__meExportRecords || [];
+  if (!recs.length){ showToast('Rien à exporter', true); return; }
+  function q(v){ v = String(v==null?'':v).replace(/"/g,'""'); return '"'+v+'"'; }
+  var head = ['École/Organisation','Stage','Taux %','Ville','Zone','Quartier','Type','Version','Effectif','Contact','Téléphone','Rôle contact','Expert','Décideur','Système actuel','Produit','Revenu pondéré (FCFA)','Dernière touche','Fiches','Suivis'];
+  var lines = [head.join(';')];
+  recs.forEach(function(r){
+    lines.push([
+      q(r.schoolName), q(r.stage), q(r.rate||0), q(r.city), q(r.zone), q(r.quartier),
+      q(r.type), q(r.appMode), q(r.effectif||''), q(r.contactName), q(r.phone), q(r.contactRole),
+      q(r.expert), q(r.decisionReach), q(r.currentSystem), q(r.productType),
+      q(r.amount||0), q(r.lastTouch ? r.lastTouch.toISOString().slice(0,10) : ''),
+      q(r.rawCount||0), q(r.followupCount||0)
+    ].join(';'));
+  });
+  var blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nateiva_saisies_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  if (typeof toast === 'function') toast('📤 '+recs.length+' écoles exportées en CSV', 'success');
+}
 
 // 📡 Activity feed strip — reusable standalone (was previously inline in rHome)
 function buildActivityFeedStrip(limit){
