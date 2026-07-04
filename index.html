@@ -2763,6 +2763,10 @@ button,select,input,textarea{outline:none}
 .dec-chart-legend .dl-no{background:var(--red)}
 .dec-chart-bars{display:flex;flex-direction:column;gap:8px}
 .dec-bar-row{display:flex;align-items:center;gap:12px}
+.dec-bar-row.clickable-row{cursor:pointer;border-radius:8px;padding:2px 4px;transition:background .2s ease}
+.dec-bar-row.clickable-row:hover{background:var(--g50)}
+.dec-bar-row .dec-bar[onclick]{cursor:pointer}
+.dec-bar-row .dec-bar[onclick]:hover{filter:brightness(1.12) saturate(1.1)}
 .dec-bar-label{flex:0 0 100px;font-weight:700;font-size:12px}
 .dec-bar-track{flex:1;display:flex;gap:0;height:28px;background:var(--g50);border-radius:8px;overflow:hidden;border:1px solid var(--g100)}
 .dec-bar{display:flex;align-items:center;justify-content:center;height:100%;transition:width .55s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both;min-width:24px}
@@ -2959,6 +2963,8 @@ button,select,input,textarea{outline:none}
 .vo-chart-legend .vol-off{background:var(--teal-deep)}
 .vo-chart-bars{display:flex;flex-direction:column;gap:8px}
 .vo-bar-row{display:flex;align-items:center;gap:12px}
+.vo-bar-row .vo-bar[onclick]{cursor:pointer;transition:filter .2s ease}
+.vo-bar-row .vo-bar[onclick]:hover{filter:brightness(1.12) saturate(1.1)}
 .vo-bar-label{flex:0 0 100px;font-weight:700;font-size:12px}
 .vo-bar-track{flex:1;display:flex;gap:0;height:28px;background:var(--g50);border-radius:8px;overflow:hidden;border:1px solid var(--g100)}
 .vo-bar{display:flex;align-items:center;justify-content:center;height:100%;transition:width .55s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both;min-width:24px}
@@ -5010,11 +5016,15 @@ function drillDownStaleDeals(){
 }
 
 // Drill-down: 🌐 Online / 💾 Offline — list of schools + revenue + last note
-function drillDownAppMode(mode){
+function drillDownAppMode(mode, stageFilter){
   if (!_ddDashboard) return;
   var allRecs = _ddDashboard.records || [];
   var rx = mode === 'online' ? /online/i : /offline/i;
-  var schools = allRecs.filter(function(r){return rx.test(String(r.appMode||''));}).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
+  var schools = allRecs.filter(function(r){
+    if (!rx.test(String(r.appMode||''))) return false;
+    if (stageFilter && r.stage !== stageFilter) return false;
+    return true;
+  }).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
   var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
   function _lastNote(k){
     var matching = allFu.filter(function(f){return schoolKey(f.SchoolName) === k;});
@@ -5024,15 +5034,18 @@ function drillDownAppMode(mode){
     return { ts: matching[0].Timestamp, by: matching[0].Expert, type: matching[0].FollowupType, text: clean };
   }
   var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
+  var totalStudents = schools.reduce(function(s,r){return s+(r.effectif||0);},0);
   var univ = schools.filter(function(r){return /universit/i.test(String(r.type||''));}).length;
   var primSec = schools.length - univ;
   var byStage = {};
   schools.forEach(function(r){byStage[r.stage]=(byStage[r.stage]||0)+1;});
   var icon = mode === 'online' ? '🌐' : '💾';
-  var title = icon+' '+mode.charAt(0).toUpperCase()+mode.slice(1)+' — '+schools.length+' école'+(schools.length>1?'s':'');
+  var _stageLbl = {gagne:'🏆 Gagné',chaud:'🔥 Chaud',tiede:'🟠 Tiède',froid:'🔵 Froid',nouveau:'🆕 Nouveau',perdu:'⛔ Perdu'};
+  var title = icon+' '+mode.charAt(0).toUpperCase()+mode.slice(1)+(stageFilter?' · '+(_stageLbl[stageFilter]||stageFilter):'')+' — '+schools.length+' école'+(schools.length>1?'s':'');
   var body = '<div class="adr-summary">'+
     '<div class="adr-sum-card"><div class="adr-sum-lbl">Écoles</div><div class="adr-sum-val">'+schools.length+'</div></div>'+
     '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Revenu pondéré</div><div class="adr-sum-val">'+moneyCompact(totalRev)+'</div></div>'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">👥 Élèves cumulés</div><div class="adr-sum-val">'+fmt(totalStudents)+'</div></div>'+
     '<div class="adr-sum-card"><div class="adr-sum-lbl">🎓 Université</div><div class="adr-sum-val">'+univ+'</div></div>'+
     '<div class="adr-sum-card"><div class="adr-sum-lbl">🏫 Primaire/Sec</div><div class="adr-sum-val">'+primSec+'</div></div>'+
   '</div>';
@@ -5150,6 +5163,58 @@ function drillDownStrategicReading(){
   });
   body += '</div>';
   showDrillDown('💡 Lecture stratégique — '+actionable.length+' écoles prioritaires + notes', body);
+}
+
+// Drill-down: a single pipeline stage split by décideur status (clicked from the décideur chart bar)
+function drillDownDeciderStage(stageKey, decMode){
+  if (!_ddDashboard) return;
+  var recs = _ddDashboard.records || [];
+  var stageMeta = {gagne:{l:'🏆 Gagné',c:'var(--green)'},chaud:{l:'🔥 Chaud',c:'var(--red)'},tiede:{l:'🟠 Tiède',c:'var(--saffron)'},froid:{l:'🔵 Froid',c:'var(--teal)'},nouveau:{l:'🆕 Nouveau',c:'var(--g500)'},perdu:{l:'⛔ Perdu',c:'var(--g700)'}};
+  var sm = stageMeta[stageKey] || {l:stageKey,c:'var(--ink)'};
+  var schools = recs.filter(function(r){
+    if (r.stage !== stageKey) return false;
+    if (decMode === 'yes') return hasDecideurReached(r);
+    if (decMode === 'no') return !hasDecideurReached(r);
+    return true;
+  }).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
+  var allFu = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+  function _lastNote(k){
+    var m = allFu.filter(function(f){return schoolKey(f.SchoolName)===k;});
+    if (!m.length) return null;
+    m.sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    var clean = (typeof getFollowupPlainNotes==='function')?getFollowupPlainNotes(m[0]):(m[0].Notes||'');
+    return {ts:m[0].Timestamp,by:m[0].Expert,type:m[0].FollowupType,text:clean};
+  }
+  var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
+  var totalStudents = schools.reduce(function(s,r){return s+(r.effectif||0);},0);
+  var decLabel = decMode==='yes'?' · 👔 décideur joint':decMode==='no'?' · 🚪 décideur PAS joint':'';
+  var title = sm.l + decLabel + ' — ' + schools.length + ' école'+(schools.length>1?'s':'');
+  var body = '<div class="adr-summary">'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Écoles</div><div class="adr-sum-val">'+schools.length+'</div></div>'+
+    '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Revenu pondéré</div><div class="adr-sum-val">'+moneyCompact(totalRev)+'</div></div>'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">👥 Élèves cumulés</div><div class="adr-sum-val">'+fmt(totalStudents)+'</div></div>'+
+  '</div>';
+  body += '<div class="amb-drill-list">';
+  schools.slice(0,80).forEach(function(r){
+    var dec = hasDecideurReached(r);
+    var note = _lastNote(schoolKey(r.schoolName));
+    body += '<div class="amb-drill-row" style="border-left-color:'+sm.c+'">'+
+      '<div class="adr-head"><div class="adr-school">'+esc(r.schoolName||'—')+'</div><div class="adr-amount" style="color:'+sm.c+'">'+moneyCompact(r.amount||0)+'</div></div>'+
+      '<div class="adr-meta">'+
+        '<span class="adr-stage" style="background:'+sm.c+'1a;color:'+sm.c+'">'+sm.l+'</span>'+
+        '<span class="'+(dec?'strat-dec-yes':'strat-dec-no')+'" style="padding:2px 7px;border-radius:6px;font-weight:700">'+(dec?'👔 joint':'🚪 non joint')+'</span>'+
+        '<span>📊 '+(r.rate||0)+'%</span>'+
+        '<span>📍 '+esc(r.city||'—')+'</span>'+
+        '<span>👤 '+esc(r.expert||'—')+'</span>'+
+        (r.effectif?'<span>👥 '+fmt(r.effectif)+'</span>':'')+
+        (r.phone?'<span>📞 '+esc(r.phone)+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(r.phone):'')+'</span>':'')+
+      '</div>'+
+      (note ? '<div class="adr-note"><b>📝 '+esc(note.type||'?')+' · '+esc(note.by||'?')+':</b> '+esc(note.text?(note.text.length>200?note.text.slice(0,200)+'…':note.text):'(vide)')+'</div>' : '')+
+    '</div>';
+  });
+  body += '</div>';
+  if (schools.length>80) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(schools.length-80)+' autres</div>';
+  showDrillDown(title, body);
 }
 
 // Drill-down: Décideur vs Non-décideur — list schools
@@ -6375,11 +6440,12 @@ function rHome(){
           if (total === 0) return '';
           var yesPct = (yes/maxStage)*100, noPct = (no/maxStage)*100;
           var pct = total ? Math.round((yes/total)*100) : 0;
-          return '<div class="dec-bar-row" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+')">'+
+          var sk = s.key;
+          return '<div class="dec-bar-row clickable-row" onclick="drillDownDeciderStage(\''+sk+'\',null)" role="button" tabindex="0" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+') · cliquer pour le détail">'+
             '<div class="dec-bar-label" style="color:'+s.color+'">'+s.label+'</div>'+
             '<div class="dec-bar-track">'+
-              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" title="'+yes+' décideur joint"><span class="dec-bar-num">'+yes+'</span></div>':'')+
-              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" title="'+no+' sans décideur"><span class="dec-bar-num">'+no+'</span></div>':'')+
+              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'yes\')" title="'+yes+' décideur joint — cliquer"><span class="dec-bar-num">'+yes+'</span></div>':'')+
+              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'no\')" title="'+no+' sans décideur — cliquer"><span class="dec-bar-num">'+no+'</span></div>':'')+
             '</div>'+
             '<div class="dec-bar-pct">'+pct+'%</div>'+
           '</div>';
@@ -6580,6 +6646,7 @@ function rHome(){
       return m;
     }
     var onRev = _sum(on,'amount'), offRev = _sum(off,'amount');
+    var onStudents = _sum(on,'effectif'), offStudents = _sum(off,'effectif');
     var onUniv = on.filter(_isUniv).length, onPS = on.length - onUniv;
     var offUniv = off.filter(_isUniv).length, offPS = off.length - offUniv;
     var totalQual = on.length + off.length;
@@ -6603,7 +6670,7 @@ function rHome(){
           '<div class="vo-lbl">Online</div>'+
           '<div class="vo-val">'+on.length+' <span class="vo-of">/ '+totalQual+'</span></div>'+
           '<div class="vo-sub">'+onPct+'% des qualifiés · '+moneyCompact(onRev)+' de revenu</div>'+
-          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+onUniv+'</b></span><span>🏫 Prim/Sec: <b>'+onPS+'</b></span></div>'+
+          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+onUniv+'</b></span><span>🏫 Prim/Sec: <b>'+onPS+'</b></span><span>👥 <b>'+fmt(onStudents)+'</b> élèves</span></div>'+
         '</div>'+
       '</div>'+
       '<div class="vo-card vo-offline" onclick="drillDownAppMode(\'offline\')" role="button" tabindex="0">'+
@@ -6612,7 +6679,7 @@ function rHome(){
           '<div class="vo-lbl">Offline</div>'+
           '<div class="vo-val">'+off.length+' <span class="vo-of">/ '+totalQual+'</span></div>'+
           '<div class="vo-sub">'+(100-onPct)+'% des qualifiés · '+moneyCompact(offRev)+' de revenu</div>'+
-          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+offUniv+'</b></span><span>🏫 Prim/Sec: <b>'+offPS+'</b></span></div>'+
+          '<div class="vo-breakdown"><span>🎓 Univ: <b>'+offUniv+'</b></span><span>🏫 Prim/Sec: <b>'+offPS+'</b></span><span>👥 <b>'+fmt(offStudents)+'</b> élèves</span></div>'+
         '</div>'+
       '</div>'+
       '<div class="vo-insight">'+
@@ -6632,11 +6699,12 @@ function rHome(){
           var total = y + n; if (!total) return '';
           var yPct = (y/maxStage)*100, nPct = (n/maxStage)*100;
           var pct = Math.round((y/total)*100);
-          return '<div class="vo-bar-row" title="'+s.label+' — '+y+' Online ('+moneyCompact(onRevByStage[s.key])+') · '+n+' Offline ('+moneyCompact(offRevByStage[s.key])+')">'+
+          var sk = s.key;
+          return '<div class="vo-bar-row" title="'+s.label+' — '+y+' Online ('+moneyCompact(onRevByStage[s.key])+') · '+n+' Offline ('+moneyCompact(offRevByStage[s.key])+') · cliquer une barre pour le détail">'+
             '<div class="vo-bar-label">'+s.label+'</div>'+
             '<div class="vo-bar-track">'+
-              (y>0?'<div class="vo-bar vo-bar-on" style="width:'+yPct+'%"><span class="vo-bar-num">'+y+'</span></div>':'')+
-              (n>0?'<div class="vo-bar vo-bar-off" style="width:'+nPct+'%"><span class="vo-bar-num">'+n+'</span></div>':'')+
+              (y>0?'<div class="vo-bar vo-bar-on" style="width:'+yPct+'%" onclick="drillDownAppMode(\'online\',\''+sk+'\')" role="button" tabindex="0" title="'+y+' Online — cliquer"><span class="vo-bar-num">'+y+'</span></div>':'')+
+              (n>0?'<div class="vo-bar vo-bar-off" style="width:'+nPct+'%" onclick="drillDownAppMode(\'offline\',\''+sk+'\')" role="button" tabindex="0" title="'+n+' Offline — cliquer"><span class="vo-bar-num">'+n+'</span></div>':'')+
             '</div>'+
             '<div class="vo-bar-pct">'+pct+'% on</div>'+
           '</div>';
