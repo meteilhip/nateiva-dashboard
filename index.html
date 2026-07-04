@@ -2210,21 +2210,17 @@ vercel-live-feedback, [class*="vercel-feedback-widget"], [id*="vercel-feedback-w
 .trend-arrow{margin-right:3px}
 
 /* On any COLORED kpi card the plain green/red trend text is invisible
-   against the matching background — render them as high-contrast white
-   pills so the +/-% is always readable regardless of the card color. */
+   against the matching background. Render them in clean white text so
+   the +/-% is always legible; direction is conveyed by the ▲/▼ arrow,
+   not by a clashing color. Flat, no pill, no shadow. */
 .kpi.red .trend-up,.kpi.red .trend-down,.kpi.red .trend-flat,
 .kpi.green .trend-up,.kpi.green .trend-down,.kpi.green .trend-flat,
 .kpi.teal .trend-up,.kpi.teal .trend-down,.kpi.teal .trend-flat,
 .kpi.saffron .trend-up,.kpi.saffron .trend-down,.kpi.saffron .trend-flat,
 .kpi.dark .trend-up,.kpi.dark .trend-down,.kpi.dark .trend-flat{
-  display:inline-flex;align-items:center;
-  background:#fff;padding:1px 8px;border-radius:100px;
-  font-weight:800;letter-spacing:-.01em;
-  box-shadow:0 1px 3px rgba(0,0,0,.18);
+  color:#fff;font-weight:700;opacity:.95;
 }
-.kpi.red .trend-up,.kpi.green .trend-up,.kpi.teal .trend-up,.kpi.saffron .trend-up,.kpi.dark .trend-up{color:#047857}
-.kpi.red .trend-down,.kpi.green .trend-down,.kpi.teal .trend-down,.kpi.saffron .trend-down,.kpi.dark .trend-down{color:#dc2626}
-.kpi.red .trend-flat,.kpi.green .trend-flat,.kpi.teal .trend-flat,.kpi.saffron .trend-flat,.kpi.dark .trend-flat{color:#52525b}
+.kpi.red .trend-arrow,.kpi.green .trend-arrow,.kpi.teal .trend-arrow,.kpi.saffron .trend-arrow,.kpi.dark .trend-arrow{opacity:1}
 
 /* ============================================
    🚀 MODERN UX LAYER v11 — 2026
