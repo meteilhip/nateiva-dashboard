@@ -2600,6 +2600,17 @@ button,select,input,textarea{outline:none}
 .me-modal{max-width:880px;width:96%}
 .me-header h3{font-family:'Fraunces',serif;font-size:20px;margin:0}
 .me-subtitle{font-size:12px;color:var(--g500);font-family:'JetBrains Mono',monospace;margin-top:4px}
+/* Admin expert-scope selector */
+.me-expert-scope{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 12px;margin-bottom:12px;background:linear-gradient(135deg,rgba(13,148,136,.06),rgba(124,58,237,.04));border:1px solid var(--g100);border-radius:12px}
+.me-es-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--g600);margin-right:2px}
+.me-es-chip{background:var(--paper);border:1.5px solid var(--g200);color:var(--g700);padding:5px 12px;border-radius:100px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s ease;white-space:nowrap}
+.me-es-chip:hover{transform:translateY(-1px);border-color:var(--teal)}
+.me-es-chip.act{background:var(--teal);color:#fff;border-color:var(--teal);box-shadow:0 2px 8px rgba(13,148,136,.28)}
+.me-es-chip.me-es-mine{border-color:var(--purple);color:var(--purple)}
+.me-es-chip.me-es-mine.act{background:var(--purple);color:#fff;border-color:var(--purple);box-shadow:0 2px 8px rgba(124,58,237,.3)}
+/* Lost (perdu) tab styling */
+.me-tab.me-tab-lost{margin-left:auto;color:var(--g500)}
+.me-tab.me-tab-lost.act{color:var(--g800);border-bottom-color:var(--g700)}
 .me-banner{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(13,148,136,.06));border:1px solid var(--saffron);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--g700);margin-bottom:14px;line-height:1.55}
 .me-banner b{color:var(--ink)}
 .me-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid var(--g100);padding-bottom:0}
@@ -12482,16 +12493,26 @@ function _myEntriesStageBadge(stage){
   var m=map[stage]||{c:'var(--g400)',l:'—'};
   return '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:'+m.c+';color:#fff;font-size:10.5px;font-weight:700">'+m.l+'</span>';
 }
-function showMyEntries(){
+function showMyEntries(expertFilter){
   if (!currentUser){ showToast('Veuillez vous connecter', true); return; }
   var me = currentUser.fullName;
   // Super-admin & coordo (canSeeAllData) see EVERYONE's saisies. Others see only their portfolio.
-  var seeAll = (typeof canSeeAllData === 'function') ? canSeeAllData(currentUser) : false;
+  var canSeeAll = (typeof canSeeAllData === 'function') ? canSeeAllData(currentUser) : false;
+  // Admin can scope to a single expert (incl. themselves) via the selector. undefined = all.
+  window.__meExpertFilter = (expertFilter !== undefined) ? expertFilter : (window.__meExpertFilter || '');
+  var picked = canSeeAll ? window.__meExpertFilter : '';
+  var seeAll = canSeeAll && !picked; // "all team" only when no specific expert picked
   var myRaw, myFu;
-  if (seeAll){
-    myRaw = (typeof getVisibleRaw === 'function') ? getVisibleRaw() : getAllRawRows();
-    myFu  = ((typeof getVisibleFollowups === 'function') ? getVisibleFollowups() : getAllFollowups())
-            .slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+  if (canSeeAll){
+    var baseRaw = (typeof getVisibleRaw === 'function') ? getVisibleRaw() : getAllRawRows();
+    var baseFu  = (typeof getVisibleFollowups === 'function') ? getVisibleFollowups() : getAllFollowups();
+    if (picked){
+      myRaw = baseRaw.filter(function(r){ return samePerson(r.e, picked); });
+      myFu  = baseFu.filter(function(f){ return samePerson(f.Expert, picked); }).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    } else {
+      myRaw = baseRaw;
+      myFu  = baseFu.slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
+    }
   } else {
     myRaw = getWorkspaceRawForUser(me);
     myFu  = getWorkspaceFollowupsForUser(me).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
@@ -12600,11 +12621,15 @@ function showMyEntries(){
   }
 
   // Build the stage-filter chip row (reused for all 3 tabs that show schools/followups)
-  var stageCounts = {all:allRecords.length, gagne:0, chaud:0, tiede:0, froid:0, nouveau:0, perdu:0};
+  var stageCounts = {all:0, gagne:0, chaud:0, tiede:0, froid:0, nouveau:0, perdu:0};
   allRecords.forEach(function(r){ if (stageCounts[r.stage]!==undefined) stageCounts[r.stage]++; });
-  function _buildStageChips(){
+  // "all" in the active chip row = everything except perdu (perdu has its own tab)
+  stageCounts.all = allRecords.length - (stageCounts.perdu||0);
+  // activeOnly=true hides the ⛔ Perdu chip (used on the active pools)
+  function _buildStageChips(activeOnly){
+    var keys = activeOnly ? ['all','gagne','chaud','tiede','froid','nouveau'] : ['all','gagne','chaud','tiede','froid','nouveau','perdu'];
     return '<div class="me-stage-filter">'+
-      ['all','gagne','chaud','tiede','froid','nouveau','perdu'].map(function(s){
+      keys.map(function(s){
         var lbl = s==='all'?'Tous':s==='gagne'?'🏆 Gagné':s==='chaud'?'🔥 Chaud':s==='tiede'?'🟠 Tiède':s==='froid'?'🔵 Froid':s==='nouveau'?'🆕 Nouveau':'⛔ Perdu';
         return '<button class="me-stage-chip me-stage-'+s+(s==='all'?' act':'')+'" onclick="setMyEntriesStage(\''+s+'\')">'+lbl+' <span class="me-stage-count">'+(stageCounts[s]||0)+'</span></button>';
       }).join('')+
@@ -12641,17 +12666,27 @@ function showMyEntries(){
     '</div>'+
     '<div class="me-fb-status" id="me-fb-status"></div>'+
   '</div>';
-  var schoolsRowsHtml = allRecords.length
-    ? allRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
-    : '<div class="me-empty">Aucune école dans votre portefeuille pour le moment.</div>';
-  var schoolsHtml = _buildStageChips() + '<div class="me-rows-pool" id="me-schools-rows">' + schoolsRowsHtml + '</div>';
+  // Separate LOST (perdu) schools from the ACTIVE pipeline so the team focuses on
+  // the schools where there's still a chance. "Mes écoles" = active only; perdu → own tab.
+  var activeRecords = allRecords.filter(function(r){ return r.stage !== 'perdu'; });
+  var lostRecords   = allRecords.filter(function(r){ return r.stage === 'perdu'; });
+  var schoolsRowsHtml = activeRecords.length
+    ? activeRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
+    : '<div class="me-empty">Aucune école active dans votre portefeuille pour le moment.</div>';
+  var schoolsHtml = _buildStageChips(true) + '<div class="me-rows-pool" id="me-schools-rows">' + schoolsRowsHtml + '</div>';
+  // Lost schools tab
+  var lostRowsHtml = lostRecords.length
+    ? lostRecords.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
+    : '<div class="me-empty">🎯 Aucune école perdue — tout votre portefeuille est encore en jeu.</div>';
+  var lostHtml = '<div class="me-banner" style="background:linear-gradient(135deg,rgba(63,63,70,.08),var(--paper));border-color:var(--g700)">⛔ <b>'+lostRecords.length+' école'+(lostRecords.length>1?'s':'')+' perdue'+(lostRecords.length>1?'s':'')+'</b> — sorties du pipeline actif. Gardez-les de côté ; une relance à froid reste possible plus tard, mais concentrez l\'effort ailleurs.</div>'+
+    '<div class="me-rows-pool" id="me-lost-rows">' + lostRowsHtml + '</div>';
 
   // Build Non contactées list (schools with 0 followups) — same stage chips + same row UX
   var nonContactedRowsHtml = nonContactedSchools.length
     ? nonContactedSchools.slice().sort(function(a,b){return (b.lastTouch?b.lastTouch.getTime():0)-(a.lastTouch?a.lastTouch.getTime():0);}).map(_renderSchoolRow).join('')
     : '<div class="me-empty">🎉 Toutes vos écoles ont au moins un contact enregistré.</div>';
   var nonContactedHtml = '<div class="me-banner" style="background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)">🚫 <b>'+nonContactedSchools.length+' école'+(nonContactedSchools.length>1?'s':'')+' sans aucun contact</b> — priorisez ces fiches pour ouvrir le pipeline. Cliquez « → Nouveau suivi » pour démarrer.</div>'+
-    _buildStageChips() + '<div class="me-rows-pool" id="me-noncontact-rows">' + nonContactedRowsHtml + '</div>';
+    _buildStageChips(true) + '<div class="me-rows-pool" id="me-noncontact-rows">' + nonContactedRowsHtml + '</div>';
   // Build followup rows — reused by both Mes Suivis and Courriers/Emails tabs
   function _renderFuRow(f){
     var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
@@ -12702,15 +12737,37 @@ function showMyEntries(){
   var mailFu     = myFu.filter(_isMailType);
   var fuRowsHtml   = standardFu.length ? standardFu.map(_renderFuRow).join('') : '<div class="me-empty">Aucun suivi saisi pour le moment.</div>';
   var mailRowsHtml = mailFu.length     ? mailFu.map(_renderFuRow).join('')     : '<div class="me-empty">Aucun courrier ni email enregistré pour le moment.</div>';
-  var fuHtml   = _buildStageChips() + '<div class="me-rows-pool" id="me-fu-rows">' + fuRowsHtml + '</div>';
-  var mailHtml = _buildStageChips() + '<div class="me-rows-pool" id="me-mail-rows">' + mailRowsHtml + '</div>';
+  var fuHtml   = _buildStageChips(true) + '<div class="me-rows-pool" id="me-fu-rows">' + fuRowsHtml + '</div>';
+  var mailHtml = _buildStageChips(true) + '<div class="me-rows-pool" id="me-mail-rows">' + mailRowsHtml + '</div>';
+
+  // Admin expert-scope selector — lets Noah/Coordo focus on a single expert (incl. themselves)
+  var expertSelectorHtml = '';
+  if (canSeeAll){
+    var expNames = [];
+    var expSeen = {};
+    (getVisibleRaw ? getVisibleRaw() : getAllRawRows()).forEach(function(r){ var e=canonicalPersonName(r.e); if (e && !expSeen[e]){expSeen[e]=1; expNames.push(e);} });
+    (getVisibleFollowups ? getVisibleFollowups() : getAllFollowups()).forEach(function(f){ var e=canonicalPersonName(f.Expert); if (e && !expSeen[e]){expSeen[e]=1; expNames.push(e);} });
+    expNames.sort(function(a,b){return a.localeCompare(b,'fr');});
+    var meCanon = canonicalPersonName(me);
+    expertSelectorHtml = '<div class="me-expert-scope">'+
+      '<span class="me-es-label">👥 Portefeuille :</span>'+
+      '<button class="me-es-chip'+(!picked?' act':'')+'" onclick="setMyEntriesExpert(\'\')">🌐 Toute l\'équipe</button>'+
+      (expNames.indexOf(meCanon)!==-1 ? '<button class="me-es-chip me-es-mine'+(picked&&samePerson(picked,me)?' act':'')+'" onclick="setMyEntriesExpert(\''+esc(meCanon).replace(/'/g,"\\'")+'\')">👤 Moi ('+esc(meCanon)+')</button>' : '')+
+      expNames.filter(function(e){return !samePerson(e,me);}).map(function(e){
+        return '<button class="me-es-chip'+(picked&&samePerson(picked,e)?' act':'')+'" onclick="setMyEntriesExpert(\''+esc(e).replace(/'/g,"\\'")+'\')">'+esc(e)+'</button>';
+      }).join('')+
+    '</div>';
+  }
+  var scopeTitle = seeAll ? 'Saisies — toute l\'équipe' : (picked ? 'Saisies — '+esc(picked) : 'Mes saisies');
+  var scopeSub = seeAll ? '<b style="color:var(--teal-deep)">Vue admin · toutes les saisies de tous les experts</b> · '
+    : (picked ? '<b style="color:var(--teal-deep)">Filtré sur '+esc(picked)+'</b> · ' : '');
 
   var html = '<div id="me-overlay" class="dd-overlay" onclick="if(event.target===this)closeMyEntries()">'+
     '<div class="dd-modal me-modal">'+
       '<div class="dd-header me-header">'+
         '<div>'+
-          '<h3>📚 '+(seeAll?'Saisies — toute l\'équipe':'Mes saisies')+' <span style="font-size:11px;background:var(--g100);color:var(--g700);padding:3px 8px;border-radius:6px;font-weight:700;font-family:JetBrains Mono,monospace;letter-spacing:.04em;text-transform:uppercase">Lecture seule</span></h3>'+
-          '<div class="me-subtitle">'+(seeAll?'<b style="color:var(--teal-deep)">Vue admin · vous voyez les saisies de tous les experts</b> · ':'')+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+standardFu.length+' suivi'+(standardFu.length>1?'s':'')+' · '+mailFu.length+' courrier'+(mailFu.length>1?'s':'')+'/email'+(mailFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
+          '<h3>📚 '+scopeTitle+' <span style="font-size:11px;background:var(--g100);color:var(--g700);padding:3px 8px;border-radius:6px;font-weight:700;font-family:JetBrains Mono,monospace;letter-spacing:.04em;text-transform:uppercase">Lecture seule</span></h3>'+
+          '<div class="me-subtitle">'+scopeSub+allRecords.length+' école'+(allRecords.length>1?'s':'')+' · '+standardFu.length+' suivi'+(standardFu.length>1?'s':'')+' · '+mailFu.length+' courrier'+(mailFu.length>1?'s':'')+'/email'+(mailFu.length>1?'s':'')+' · ajoutez des notes, ou cliquez « Nouveau suivi » pour modifier</div>'+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px">'+
           '<button class="me-export-btn" onclick="exportMyEntriesCSV()" title="Télécharger toutes les écoles visibles en CSV (Excel)">📤 CSV</button>'+
@@ -12718,18 +12775,21 @@ function showMyEntries(){
         '</div>'+
       '</div>'+
       '<div class="dd-body me-body">'+
+        expertSelectorHtml+
         '<div class="me-banner">🔒 <b>Lecture seule.</b> Aucune saisie n\'est modifiée ici. Toute « note complémentaire » s\'ajoute en plus, horodatée. Pour <b>modifier</b> une donnée, allez dans <b>+ Nouveau suivi</b> — quand vous sélectionnez l\'école, tout ce qui est déjà saisi est <b>pré-rempli automatiquement</b>.</div>'+
         filterBarHtml+
         '<div class="me-tabs">'+
-          '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Mes écoles ('+allRecords.length+')</button>'+
+          '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Pipeline actif ('+activeRecords.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'noncontact\')">🚫 Non contactées ('+nonContactedSchools.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+standardFu.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'mail\')">📨 Courriers & Emails ('+mailFu.length+')</button>'+
+          '<button class="me-tab me-tab-lost" onclick="setMyEntriesTab(this,\'lost\')">⛔ Perdues ('+lostRecords.length+')</button>'+
         '</div>'+
         '<div id="me-tab-schools" class="me-tab-panel act">'+schoolsHtml+'</div>'+
         '<div id="me-tab-noncontact" class="me-tab-panel">'+nonContactedHtml+'</div>'+
         '<div id="me-tab-fu" class="me-tab-panel">'+fuHtml+'</div>'+
         '<div id="me-tab-mail" class="me-tab-panel">'+mailHtml+'</div>'+
+        '<div id="me-tab-lost" class="me-tab-panel">'+lostHtml+'</div>'+
       '</div>'+
     '</div>'+
   '</div>';
@@ -12898,6 +12958,11 @@ function setMyEntriesTab(btn, key){
   btn.classList.add('act');
   document.querySelectorAll('.me-tab-panel').forEach(function(p){p.classList.remove('act');});
   document.getElementById('me-tab-'+key).classList.add('act');
+}
+// Admin picks a single expert (or '' for whole team) — re-render Mes Saisies scoped to them
+function setMyEntriesExpert(expert){
+  window.__meStageFilter = 'all'; // reset stage filter on scope change
+  showMyEntries(expert);
 }
 // Active stage filter (one of all/gagne/chaud/tiede/froid/nouveau/perdu)
 window.__meStageFilter = 'all';
