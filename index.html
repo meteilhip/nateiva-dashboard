@@ -2613,7 +2613,9 @@ button,select,input,textarea{outline:none}
 .me-tab.me-tab-lost.act{color:var(--g800);border-bottom-color:var(--g700)}
 .me-banner{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(13,148,136,.06));border:1px solid var(--saffron);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--g700);margin-bottom:14px;line-height:1.55}
 .me-banner b{color:var(--ink)}
-.me-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid var(--g100);padding-bottom:0}
+.me-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid var(--g100);padding-bottom:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.me-tabs::-webkit-scrollbar{display:none}
+.me-tabs .me-tab{white-space:nowrap;flex-shrink:0}
 .me-tab{background:none;border:none;padding:10px 16px;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px;color:var(--g500);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s ease}
 .me-tab:hover{color:var(--ink)}
 .me-tab.act{color:var(--teal);border-bottom-color:var(--teal)}
@@ -3212,7 +3214,11 @@ button,select,input,textarea{outline:none}
   .me-add-note button{width:100%}
   .me-edit-cta{flex-direction:column;align-items:stretch}
   .me-edit-cta button{width:100%}
-  .me-tab{flex:1;padding:10px 8px;font-size:12px}
+  .me-tab{flex:0 0 auto;padding:10px 12px;font-size:12px}
+  .me-tab.me-tab-lost{margin-left:0}
+  .me-expert-scope{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .me-expert-scope::-webkit-scrollbar{display:none}
+  .me-es-chip{flex-shrink:0}
 }
 
 @media(max-width:600px){
@@ -5005,6 +5011,37 @@ function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
 }
 function closeDdRev(){ var o=document.getElementById('ddrev-overlay'); if(o){o.remove(); document.body.style.overflow='';} }
 
+// Drill-down: 🔁 Écoles à 1 seul contact — the follow-up discipline list
+function drillDownOneTouch(){
+  var schools = window.__oneTouchSchools || [];
+  if (!schools.length) { showToast('Aucune école à 1 seul contact 🎉'); return; }
+  var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
+  var body = '<div class="adr-summary">'+
+    '<div class="adr-sum-card"><div class="adr-sum-lbl">Écoles à relancer</div><div class="adr-sum-val">'+schools.length+'</div></div>'+
+    '<div class="adr-sum-card adr-sum-hero"><div class="adr-sum-lbl">Potentiel dormant</div><div class="adr-sum-val">'+moneyCompact(totalRev)+'</div></div>'+
+  '</div>';
+  body += '<div class="note saffron" style="margin-bottom:12px"><b>Règle d\'or :</b> un deal se signe rarement au 1er contact. Chaque école ci-dessous n\'a été touchée qu\'une seule fois — un 2e contact (appel, WhatsApp ou visite) multiplie les chances de closing.</div>';
+  body += '<div class="amb-drill-list">';
+  schools.slice(0,60).forEach(function(r){
+    var stageColor = r.stage==='chaud'?'var(--red)':r.stage==='tiede'?'var(--saffron)':r.stage==='froid'?'var(--teal)':'var(--g500)';
+    var stageLabel = r.stage==='chaud'?'🔥 Chaud':r.stage==='tiede'?'🟠 Tiède':r.stage==='froid'?'🔵 Froid':'🆕 Nouveau';
+    body += '<div class="amb-drill-row" style="border-left-color:'+stageColor+'">'+
+      '<div class="adr-head"><div class="adr-school">'+esc(r.schoolName||'—')+'</div><div class="adr-amount" style="color:'+stageColor+'">'+moneyCompact(r.amount||0)+'</div></div>'+
+      '<div class="adr-meta">'+
+        '<span class="adr-stage" style="background:'+stageColor+'1a;color:'+stageColor+'">'+stageLabel+'</span>'+
+        '<span>📊 '+(r.rate||0)+'%</span>'+
+        '<span>📍 '+esc(r.city||'—')+'</span>'+
+        '<span>👤 '+esc(r.expert||'—')+'</span>'+
+        (r.phone?'<span>📞 '+esc(r.phone)+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(r.phone):'')+'</span>':'')+
+      '</div>'+
+      '<div class="me-edit-cta" style="margin-top:8px"><span>2e contact = relance décisive.</span><button onclick="closeDrillDown();showFollowupFromSchool(\''+esc(r.schoolName||'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi</button></div>'+
+    '</div>';
+  });
+  body += '</div>';
+  if (schools.length>60) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(schools.length-60)+' autres</div>';
+  showDrillDown('🔁 Écoles à 1 seul contact — '+schools.length+' relances à faire', body);
+}
+
 // Drill-down: 🧊 Deals dormants — hot/warm schools gone silent, ready-to-relance list
 function drillDownStaleDeals(){
   var deals = window.__staleDeals || [];
@@ -6283,6 +6320,13 @@ function rHome(){
   const calledSchools=new Set(dashboard.followups.map(function(f){return schoolKey(f.SchoolName);}).filter(Boolean));
   const schoolsCalled=calledSchools.size;
   const schoolCoverage=uniqueSchools>0?Math.round((schoolsCalled/uniqueSchools)*100):0;
+  // 🔁 Relance discipline — active schools touched exactly ONCE (deals close after 5+ touches;
+  // a single touch with no follow-up is where pipelines silently die)
+  const oneTouchSchools=dashboard.records.filter(function(r){
+    return r.stage!=='perdu' && r.stage!=='gagne' && ((r.rawCount||0)+(r.followupCount||0))===1;
+  });
+  window.__oneTouchSchools=oneTouchSchools.slice().sort(function(a,b){return (b.rate||0)-(a.rate||0);});
+  const oneTouchPct=uniqueSchools>0?Math.round((oneTouchSchools.length/uniqueSchools)*100):0;
   const quickLinks=[
     userCanAccessPane(currentUser,'suivi') ? '<a href="#" data-jump="suivi">🗂️ Workspace</a>' : '',
     userCanAccessPane(currentUser,'metrics') ? '<a href="#" data-jump="metrics">📊 BI & KPI</a>' : '',
@@ -6400,6 +6444,14 @@ function rHome(){
         </div>
         <div class="stat-val"><span class="count-up" data-target="${schoolCoverage}" data-suffix="%">0%</span></div>
         <div class="stat-sub">${schoolsCalled} / ${uniqueSchools} écoles contactées</div>
+      </div>
+      <div class="stat-modern lift" style="cursor:pointer" onclick="drillDownOneTouch()" role="button" tabindex="0" title="Écoles actives touchées une seule fois — cliquer pour la liste">
+        <div class="stat-head">
+          <span class="stat-label">🔁 À 1 seul contact</span>
+          <span class="stat-icon" style="background:var(--red-soft);color:var(--red)">⚠</span>
+        </div>
+        <div class="stat-val"><span class="count-up" data-target="${oneTouchSchools.length}">0</span></div>
+        <div class="stat-sub">${oneTouchPct}% du portefeuille · les deals se signent après 5+ contacts</div>
       </div>
     </div>
   </div>
@@ -9846,10 +9898,13 @@ function getWorkspaceFollowupsForUser(expertName) {
   if (!expertName) return [];
   var hit = _cacheGet('wsFup', expertName);
   if (hit) return hit;
+  // Authorship is the only criterion: every saisie a user makes counts in THEIR
+  // stats, even on a school first prospected by another expert. The old
+  // schoolBelongsToUserPortfolio() filter silently dropped admins'/experts'
+  // own follow-ups on colleagues' schools, corrupting personal stats.
   return _cachePut('wsFup', expertName, getAllFollowups().filter(function(f) {
     return samePerson(f.Expert, expertName)
-      && recordMatchesAssignedCity(expertName, f.City)
-      && schoolBelongsToUserPortfolio(expertName, f.SchoolName);
+      && recordMatchesAssignedCity(expertName, f.City);
   }));
 }
 
