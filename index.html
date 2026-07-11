@@ -2611,6 +2611,15 @@ button,select,input,textarea{outline:none}
 /* Lost (perdu) tab styling */
 .me-tab.me-tab-lost{margin-left:auto;color:var(--g500)}
 .me-tab.me-tab-lost.act{color:var(--g800);border-bottom-color:var(--g700)}
+@media(max-width:600px){
+  /* 5 tabs scroll horizontally on mobile — drop the auto-margin gap */
+  .me-tab.me-tab-lost{margin-left:0}
+  .me-tabs{gap:4px}
+  .me-tab{padding:10px 10px;font-size:11.5px;white-space:nowrap;flex-shrink:0}
+  .me-expert-scope{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .me-es-chip{flex-shrink:0}
+  .pat-badge{font-size:9px;padding:2px 7px}
+}
 .me-banner{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(13,148,136,.06));border:1px solid var(--saffron);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--g700);margin-bottom:14px;line-height:1.55}
 .me-banner b{color:var(--ink)}
 .me-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid var(--g100);padding-bottom:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -3121,6 +3130,44 @@ button,select,input,textarea{outline:none}
 /* — 📤 Export CSV button — */
 .me-export-btn{background:var(--ink);color:var(--saffron-bright);border:none;border-radius:10px;padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;cursor:pointer;transition:all .25s cubic-bezier(.16,1,.3,1);letter-spacing:.02em}
 .me-export-btn:hover{background:var(--green);color:#fff;transform:translateY(-2px);box-shadow:var(--shadow)}
+
+/* — 👑 Paternité badges: owner (discoverer) vs colleague follow-up — */
+.pat-badge{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;padding:3px 9px;border-radius:100px;letter-spacing:-.01em;vertical-align:middle;white-space:nowrap;animation:springIn .5s cubic-bezier(.34,1.56,.64,1) both}
+.pat-badge.pat-owner{background:linear-gradient(120deg,#fef3c7,#fde68a,#fef3c7);background-size:200% 100%;color:#92400e;border:1px solid rgba(245,158,11,.4);animation:springIn .5s cubic-bezier(.34,1.56,.64,1) both,goldShift 3.2s ease infinite}
+.pat-badge.pat-helper{background:linear-gradient(120deg,rgba(13,148,136,.1),rgba(124,58,237,.1));color:var(--teal-deep);border:1px solid rgba(13,148,136,.28)}
+@keyframes goldShift{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
+
+/* — ⚡ Dynamic animation effects (v11.37) — */
+@keyframes springIn{
+  0%{opacity:0;transform:scale(.7) translateY(8px)}
+  60%{opacity:1;transform:scale(1.06) translateY(-2px)}
+  100%{opacity:1;transform:scale(1) translateY(0)}
+}
+/* Springy entrance with overshoot on key cards */
+.stat-modern,.goal-card,.top-card,.dec-card,.vo-card{animation:springIn .55s cubic-bezier(.34,1.56,.64,1) both}
+.stat-modern:nth-child(2),.goal-card:nth-child(2),.dec-card:nth-child(2),.vo-card:nth-child(2){animation-delay:.07s}
+.stat-modern:nth-child(3),.goal-card:nth-child(3){animation-delay:.14s}
+.stat-modern:nth-child(4),.goal-card:nth-child(4){animation-delay:.21s}
+.stat-modern:nth-child(5){animation-delay:.28s}
+/* Shimmer sweep on goal progress bars */
+.goal-fill{position:relative;overflow:hidden}
+.goal-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:translateX(-100%);animation:goalSweep 2.6s ease infinite}
+@keyframes goalSweep{0%{transform:translateX(-100%)}55%,100%{transform:translateX(220%)}}
+/* Living gradient on the urgent hero + ai badges */
+.urgent-hero.danger{background-size:180% 180%;animation:cardPop .45s cubic-bezier(.16,1,.3,1) both,dangerShift 4s ease infinite}
+@keyframes dangerShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.ai-badge{background-size:180% 100% !important;animation:goldShift 3.5s ease infinite}
+/* Mes Saisies rows: staggered slide-in */
+.me-rows-pool .me-row{animation:fadeInUp .4s cubic-bezier(.16,1,.3,1) both}
+.me-rows-pool .me-row:nth-child(1){animation-delay:.02s}
+.me-rows-pool .me-row:nth-child(2){animation-delay:.05s}
+.me-rows-pool .me-row:nth-child(3){animation-delay:.08s}
+.me-rows-pool .me-row:nth-child(4){animation-delay:.11s}
+.me-rows-pool .me-row:nth-child(5){animation-delay:.14s}
+.me-rows-pool .me-row:nth-child(n+6){animation-delay:.17s}
+/* Value pop on hover for stat values */
+.stat-modern:hover .stat-val,.goal-card:hover .goal-val{transform:scale(1.05);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.stat-modern .stat-val,.goal-card .goal-val{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
 
 @media(max-width:600px){
   .goals-grid{grid-template-columns:1fr 1fr}
@@ -9908,6 +9955,45 @@ function getWorkspaceFollowupsForUser(expertName) {
   }));
 }
 
+// === 👑 School ownership (paternité) ===
+// The expert who DISCOVERED the school (earliest raw prospection entry) owns it.
+// Fallback for schools created via followup only: earliest followup author.
+function getSchoolOwnerMap(){
+  var hit = _cacheGet('schoolOwnerMap','_');
+  if (hit) return hit;
+  var map = {}, tmap = {};
+  var FAR = 8640000000000000;
+  getAllRawRows().forEach(function(r){
+    var k = schoolKey(r.n); if (!k || !r.e) return;
+    var t = new Date(r.t||'').getTime(); if (isNaN(t)) t = FAR;
+    if (!(k in map) || t < tmap[k]){ map[k] = canonicalPersonName(r.e); tmap[k] = t; }
+  });
+  // Schools with no raw entry: owner = earliest followup author
+  var fmap = {}, ftmap = {};
+  getAllFollowups().forEach(function(f){
+    var k = schoolKey(f.SchoolName); if (!k || !f.Expert || (k in map)) return;
+    var t = new Date(f.Timestamp||'').getTime(); if (isNaN(t)) t = FAR;
+    if (!(k in fmap) || t < ftmap[k]){ fmap[k] = canonicalPersonName(f.Expert); ftmap[k] = t; }
+  });
+  Object.keys(fmap).forEach(function(k){ map[k] = fmap[k]; });
+  return _cachePut('schoolOwnerMap','_', map);
+}
+function getSchoolOwnerName(schoolName){
+  var k = schoolKey(schoolName);
+  if (!k) return '';
+  return getSchoolOwnerMap()[k] || '';
+}
+// Badge shown next to every follow-up: 👑 when the author IS the discoverer,
+// 🤝 "École de <owner>" when someone else did the follow-up.
+function ownershipBadge(authorName, schoolName){
+  var owner = getSchoolOwnerName(schoolName);
+  if (!owner) return '';
+  if (samePerson(authorName, owner)){
+    return '<span class="own-badge own-owner" title="'+attrEsc(owner)+' a découvert cette école — suivi par le propriétaire original">👑 Découvreur</span>';
+  }
+  return '<span class="own-badge own-other" title="École découverte par '+attrEsc(owner)+' — ce suivi a été fait par '+attrEsc(authorName||'?')+'">🤝 École de '+esc(owner)+'</span>';
+}
+
 function getVisibleFollowups() {
   var allFollowups = getAllFollowups();
   if (!currentUser) return [];
@@ -12096,8 +12182,17 @@ function rSuivi() {
     var timesCalledLabel = cleanMetaValue(meta.callTimesCalled || f.CallTimesCalled || '');
     var levelLabel = cleanMetaValue(meta.institutionLevel || (record && record.type) || '');
     var canDelete = canDeleteFollowups(currentUser) && !f.Imported && f.Source !== 'calls-sheet' && f.ID;
+    // Paternité: badge whether this follow-up was made by the school's owner (discoverer) or a colleague
+    var _histOwner = record && record.expert ? record.expert : '';
+    var _histIsOwner = _histOwner && f.Expert && samePerson(f.Expert, _histOwner);
+    var _histPatBadge = _histOwner
+      ? (_histIsOwner
+          ? '<span class="pat-badge pat-owner" title="Suivi fait par le propriétaire (découvreur) de l\'école">👑 Propriétaire</span>'
+          : '<span class="pat-badge pat-helper" title="École découverte par ' + esc(_histOwner) + ' — suivi fait par ' + esc(f.Expert || '?') + '">🤝 Appui · école de ' + esc(_histOwner) + '</span>')
+      : '';
     h += '<div class="fu-item type-' + esc(f.FollowupType || 'CALL') + '"><div class="fu-head"><span class="fu-school">' + esc(f.SchoolName) + '</span>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
+    h += _histPatBadge;
     if (isSuper) h += '<span style="display:inline-flex;align-items:center;gap:4px;font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:700;background:var(--teal-soft);color:var(--teal-deep);padding:3px 9px;border-radius:8px;border:1px solid rgba(13,148,136,.2)">👤 ' + esc(f.Expert) + '</span>';
     h += '<span class="fu-type ' + esc(f.FollowupType || 'CALL') + '">' + esc(fuTypeIcon(f.FollowupType)) + '</span>';
     h += '<span class="impact-pill steady">' + esc(stageMeta.label) + '</span>';
@@ -12751,6 +12846,16 @@ function showMyEntries(expertFilter){
     var _sk = schoolKey(f.SchoolName);
     var _rec = (_sk && recByKey[_sk]) || {};
     var _fuDays = f.Timestamp ? Math.floor((Date.now() - new Date(f.Timestamp).getTime()) / 86400000) : 9999;
+    // Paternité: the school's owner is the discoverer (_rec.expert, from the first
+    // raw prospection). Badge each follow-up: owner acting on their own school vs
+    // a colleague following up on someone else's school.
+    var _ownerName = _rec.expert || '';
+    var _isOwner = _ownerName && f.Expert && samePerson(f.Expert, _ownerName);
+    var paternityBadge = _ownerName
+      ? (_isOwner
+          ? '<span class="pat-badge pat-owner" title="Suivi fait par le propriétaire de l\'école (découvreur)">👑 Propriétaire</span>'
+          : '<span class="pat-badge pat-helper" title="École découverte par '+esc(_ownerName)+' — suivi fait par '+esc(f.Expert||'?')+'">🤝 Appui · école de '+esc(_ownerName)+'</span>')
+      : '';
     var fuDataAttrs = ' data-stage="'+esc(_rec.stage||'')+'"'+
       ' data-name="'+esc(String(f.SchoolName||'').toLowerCase())+'"'+
       ' data-city="'+esc(String(f.City || _rec.city || '').toLowerCase())+'"'+
@@ -12763,7 +12868,7 @@ function showMyEntries(expertFilter){
     return '<div class="me-row" data-entry="'+esc(entryId)+'"'+fuDataAttrs+'>'+
       '<div class="me-row-head" onclick="this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
-          '<div class="me-row-title">'+typeIcon+' '+esc(f.FollowupType||'—')+' · '+esc(f.SchoolName||'—')+'</div>'+
+          '<div class="me-row-title">'+typeIcon+' '+esc(f.FollowupType||'—')+' · '+esc(f.SchoolName||'—')+' '+paternityBadge+'</div>'+
           '<div class="me-row-sub">'+(seeAll&&f.Expert?'<b style="color:var(--teal-deep)">👤 '+esc(f.Expert)+'</b> · ':'')+_myEntriesFmtDate(f.Timestamp)+(f.Outcome?' · '+esc(f.Outcome):'')+(f.NextAction?' → '+esc(f.NextAction):'')+'</div>'+
         '</div>'+
         '<div class="me-row-meta">'+
