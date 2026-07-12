@@ -3925,6 +3925,7 @@ function buildSchoolRecords(rawRows, followups){
         appMode:'',
         currentSystem:'',
         decisionReach:'',
+        deciderReached:false,
         decisionMaker:'',
         internetQuality:'',
         powerQuality:'',
@@ -3970,6 +3971,12 @@ function buildSchoolRecords(rawRows, followups){
     rec.type=r.ty||rec.type;
     rec.contactRole=r.rp||rec.contactRole;
     rec.location=r.lo||rec.location;
+    // Field prospection: meeting a decision-maker role in person = décideur joint.
+    // Covers Ida/Guy whose data is mostly descentes terrain (rp = poste rencontré).
+    var _roleTxt=normalizeText([r.rp||'', r.rn||''].join(' '));
+    if(/directeur|directrice|principal|proviseur|fondateur|fondatrice|promoteur|promotrice|pca|censeur|surveillant general|chef d etablissement/.test(_roleTxt)){
+      rec.deciderReached=true;
+    }
     if(r.e){var normE=canonicalPersonName(r.e);rec.expert=rec.expert||normE;rec._experts.add(normE);}
     if(r.rn){rec.contactName=rec.contactName||r.rn;rec._contacts.add(r.rn);}
     [r.pw,r.pn].forEach(function(phone){
@@ -4057,6 +4064,14 @@ function buildSchoolRecords(rawRows, followups){
       if(meta.campusCount)rec.campusCount=meta.campusCount;
     }
     const note=normalizeText([item.Outcome,item.Status,cleanNotes,item.NextAction].join(' '));
+    // Derive "décideur joint" from ANY follow-up on this school:
+    //  1) platform questionnaire meta explicitly says "décideur joint"
+    //  2) imported/manual call outcome "Contact établi (personne concernée jointe)"
+    //     — "personne concernée" is the decision maker for that establishment
+    if(/d[ée]cideur\s*joint/.test(normalizeText(meta.decisionReach||'')) ||
+       /personne\s*concern[ée]e\s*jointe/.test(note)){
+      rec.deciderReached=true;
+    }
     if(/\bclos\b|closed|converti|gagne|a signe|contrat signe|deal signe|signed|paid|paye/.test(note)){
       rec.won=true;
       if(dt && (!rec.closedAt || dt>rec.closedAt))rec.closedAt=dt;
@@ -4141,7 +4156,7 @@ function buildStageTotals(records){
   return DASHBOARD_STAGES.map(function(stage){
     const schools=records.filter(function(record){ return record.stage===stage.key; });
     const amount=schools.reduce(function(sum,record){ return sum+(record.amount||0); },0);
-    var deciderReached=schools.filter(function(r){ return /d[ée]cideur\s*joint/i.test(r.decisionReach||''); }).length;
+    var deciderReached=schools.filter(function(r){ return hasDecideurReached(r); }).length;
     var deciderPct=schools.length ? Math.round(deciderReached/schools.length*100) : 0;
     return Object.assign({},stage,{
       schools,
@@ -6150,7 +6165,12 @@ function bucketLabel(key, period){
   if (period === 'month'){ var p=key.split('-'); var months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']; return (months[parseInt(p[1])-1]||p[1])+' '+p[0].slice(2); }
   return key.replace('-S',' S');
 }
-function hasDecideurReached(r){ return /d[ée]cideur\s*joint/i.test(String(r && r.decisionReach || '')); }
+function hasDecideurReached(r){
+  if (!r) return false;
+  // Prefer the derived flag (covers imported calls + platform meta); fall back to the raw field.
+  if (r.deciderReached === true) return true;
+  return /d[ée]cideur\s*joint/i.test(String(r.decisionReach || ''));
+}
 function buildRevenueBuckets(records, period, windowSize){
   function emptyBucket(k){ return { key:k, gagne:0, gagneNet:0, ambEarned:0, chaud:0, tiede:0, ambPotentialHot:0, ambPotentialWarm:0, count:{gagne:0,chaud:0,tiede:0}, decider:{gagne:0,chaud:0,tiede:0,total:0}, schools:{gagne:[],chaud:[],tiede:[]} }; }
   var map = {};
@@ -7810,7 +7830,7 @@ function rTeam(){
   const dead=deadArr.length;
   const noEval=noEvalArr.length;
   function deciderStats(arr) {
-    var reached = arr.filter(function(r) { return /d[ée]cideur\s*joint/i.test(r.decisionReach || ''); }).length;
+    var reached = arr.filter(function(r) { return hasDecideurReached(r); }).length;
     var pct = arr.length ? Math.round(reached / arr.length * 100) : 0;
     return { reached: reached, total: arr.length, pct: pct };
   }
