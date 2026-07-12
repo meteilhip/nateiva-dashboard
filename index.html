@@ -3192,6 +3192,13 @@ button,select,input,textarea{outline:none}
 }
 .uh-pill.uh-overdue{background:rgba(220,38,38,.12);color:var(--red);border-color:rgba(220,38,38,.2)}
 .uh-pill.uh-urgent {background:rgba(245,158,11,.14);color:var(--saffron-deep);border-color:rgba(245,158,11,.25)}
+/* Clickable reminder pills/stats — signal they open a drill-down */
+.clickable-pill{cursor:pointer;transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease}
+.clickable-pill:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.clickable-pill::after{content:' ›';font-weight:800;opacity:.55}
+.clickable-stat{cursor:pointer;transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease;position:relative}
+.clickable-stat:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.clickable-stat::after{content:'›';position:absolute;top:8px;right:10px;font-weight:800;opacity:.4;font-size:16px}
 .uh-pill.uh-two    {background:rgba(13,148,136,.12);color:var(--teal-deep);border-color:rgba(13,148,136,.2)}
 .uh-pill.uh-total  {background:var(--g100);color:var(--g700);border-color:var(--g200)}
 .uh-cta{
@@ -5059,6 +5066,52 @@ function drillDownRevenueBucket(periodKey, bucketIdx, focusStage){
 function closeDdRev(){ var o=document.getElementById('ddrev-overlay'); if(o){o.remove(); document.body.style.overflow='';} }
 
 // Drill-down: 🔁 Écoles à 1 seul contact — the follow-up discipline list
+// Reusable drill-down for reminder buckets — mode: 'overdue' | 'urgent' | 'both'
+// source: 'ws' (history/planner scope, default) | 'hero' (personal-scope urgent hero)
+function drillDownReminders(mode, source){
+  var planner = source === 'hero' ? window.__heroPlanner : window.__wsPlanner;
+  if (!planner) planner = window.__wsPlanner || window.__heroPlanner;
+  if (!planner){ showToast('Ouvrez d\'abord le Workspace', true); return; }
+  var items;
+  if (mode === 'overdue') items = planner.overdue || [];
+  else if (mode === 'urgent') items = planner.urgent || [];
+  else items = (planner.overdue || []).concat(planner.urgent || []);
+  if (!items.length){ showToast(mode==='overdue'?'Aucune relance en retard 🎉':mode==='urgent'?'Aucune urgence cette semaine 🎉':'Rien à traiter 🎉'); return; }
+  // sort by days ascending (most overdue first)
+  items = items.slice().sort(function(a,b){return (a.reminder.days||0)-(b.reminder.days||0);});
+  var title = mode==='overdue' ? '⏳ Relances EN RETARD — '+items.length
+            : mode==='urgent' ? '📍 Relances urgentes (≤72h) — '+items.length
+            : '⏰ À traiter — '+items.length+' relance'+(items.length>1?'s':'');
+  var recMap = (typeof _ddDashboard!=='undefined' && _ddDashboard && _ddDashboard.records)
+    ? (function(){var m={};_ddDashboard.records.forEach(function(r){m[r.key]=r;});return m;})() : {};
+  var body = '<div class="note '+(mode==='overdue'?'red':'saffron')+'" style="margin-bottom:12px"><b>'+
+    (mode==='overdue'?'Ces écoles ont dépassé leur date de relance.':'Ces écoles doivent être relancées dans les 72h.')+
+    '</b> Cliquez « → Nouveau suivi » pour agir immédiatement (appel, WhatsApp ou visite).</div>';
+  body += '<div class="amb-drill-list">';
+  items.slice(0,80).forEach(function(it){
+    var f = it.followup, rm = it.reminder;
+    var rec = recMap[schoolKey(f.SchoolName)] || {};
+    var overdueCls = rm.days < 0 ? 'var(--red)' : 'var(--saffron)';
+    var daysLbl = rm.days < 0 ? Math.abs(rm.days)+'j de retard' : (rm.days===0?'aujourd\'hui':'dans '+rm.days+'j');
+    body += '<div class="amb-drill-row" style="border-left-color:'+overdueCls+'">'+
+      '<div class="adr-head"><div class="adr-school">'+esc(f.SchoolName||'—')+'</div>'+
+        '<div class="adr-amount" style="color:'+overdueCls+';font-size:12px">'+esc(rm.label||'')+' · '+daysLbl+'</div></div>'+
+      '<div class="adr-meta">'+
+        (rec.stage?'<span>'+(rec.stage==='chaud'?'🔥 Chaud':rec.stage==='tiede'?'🟠 Tiède':rec.stage==='froid'?'🔵 Froid':rec.stage==='gagne'?'🏆 Gagné':rec.stage==='perdu'?'⛔ Perdu':'🆕 Nouveau')+'</span>':'')+
+        (rec.rate?'<span>📊 '+rec.rate+'%</span>':'')+
+        (f.City||rec.city?'<span>📍 '+esc(f.City||rec.city)+'</span>':'')+
+        '<span>👤 '+esc(f.Expert||rec.expert||'—')+'</span>'+
+        (f.ContactPhone||rec.phone?'<span>📞 '+esc(f.ContactPhone||rec.phone)+' '+(typeof phoneActionLinks==='function'?phoneActionLinks(f.ContactPhone||rec.phone):'')+'</span>':'')+
+      '</div>'+
+      '<div class="adr-note"><b>⏰ Action prévue :</b> '+esc(f.NextAction||f.Outcome||'Relance à préparer')+'</div>'+
+      '<div class="me-edit-cta" style="margin-top:8px"><span>Relancer cette école maintenant.</span><button onclick="closeDrillDown();showFollowupFromSchool(\''+esc(f.SchoolName||'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi</button></div>'+
+    '</div>';
+  });
+  body += '</div>';
+  if (items.length>80) body += '<div style="text-align:center;padding:10px;color:var(--g400)">… et '+(items.length-80)+' autres</div>';
+  showDrillDown(title, body);
+}
+
 function drillDownOneTouch(){
   var schools = window.__oneTouchSchools || [];
   if (!schools.length) { showToast('Aucune école à 1 seul contact 🎉'); return; }
@@ -11600,6 +11653,7 @@ function rSuivi() {
   var lastImpact = currentUser ? getEntryImpactForUser(currentUser.username) : null;
   var impactReminder = lastImpact ? getReminderMeta(lastImpact.nextDate) : null;
   var planner = buildPlannerModel(myFollowups);
+  window.__wsPlanner = planner; // exposed so drillDownReminders() can read overdue/urgent lists
   var schoolRecordMap = getHistorySchoolRecordMap(workspaceRaw, workspaceFollowups);
   var qualRaw = isSuper ? getVisibleRaw() : (canSeeTeamData(currentUser) ? getVisibleRaw() : workspaceRaw);
   var qualFu = isSuper ? getVisibleFollowups() : (canSeeTeamData(currentUser) ? getVisibleFollowups() : workspaceFollowups);
@@ -11633,6 +11687,7 @@ function rSuivi() {
   (function(){
     var personalFu = getWorkspaceFollowupsForUser(me).slice().sort(function(a,b){return new Date(b.Timestamp)-new Date(a.Timestamp);});
     var planner = buildPlannerModel(personalFu);
+    window.__heroPlanner = planner; // personal-scope planner for the urgent-hero pill drill-downs
     var overdue = planner.overdue.length;
     var urgent = planner.urgent.length;
     var twoWeek = (planner.days||[]).reduce(function(s,d){return s + (d.items?d.items.length:0);},0);
@@ -11665,9 +11720,9 @@ function rSuivi() {
         '<div class="uh-title">'+headline+scopeNote+'</div>'+
         '<div class="uh-sub">'+sub+'</div>'+
         '<div class="uh-pills">'+
-          '<span class="uh-pill uh-overdue">⏳ '+overdue+' en retard</span>'+
-          '<span class="uh-pill uh-urgent">📍 '+urgent+' urgentes</span>'+
-          '<span class="uh-pill uh-two">📅 '+twoWeek+' sur 2 sem.</span>'+
+          '<span class="uh-pill uh-overdue clickable-pill" onclick="event.stopPropagation();drillDownReminders(\'overdue\',\'hero\')" title="Voir les relances en retard">⏳ '+overdue+' en retard</span>'+
+          '<span class="uh-pill uh-urgent clickable-pill" onclick="event.stopPropagation();drillDownReminders(\'urgent\',\'hero\')" title="Voir les relances urgentes">📍 '+urgent+' urgentes</span>'+
+          '<span class="uh-pill uh-two clickable-pill" onclick="event.stopPropagation();activateSuiviPanel(\'planner\',{scroll:true})" title="Voir le calendrier 2 semaines">📅 '+twoWeek+' sur 2 sem.</span>'+
           '<span class="uh-pill uh-total">📊 '+personalFu.length+' suivi'+(personalFu.length>1?'s':'')+' à moi</span>'+
         '</div>'+
       '</div>'+
@@ -11882,7 +11937,7 @@ function rSuivi() {
   h += '</div>';
   h += '<div class="workspace-action-note">';
   h += '<span class="timeline-pill">🧭 Process map · saisie → historique → rappel → funnel</span>';
-  h += '<span class="timeline-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '">⏰ ' + planner.urgent.length + ' rappels proches</span>';
+  h += '<span class="timeline-pill clickable-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '" onclick="drillDownReminders(\'urgent\')" title="Voir les rappels proches">⏰ ' + planner.urgent.length + ' rappels proches</span>';
   h += '<span class="timeline-pill">🗂️ ' + myFollowups.length + ' entrées visibles</span>';
   h += '</div></div>';
 
@@ -12104,8 +12159,8 @@ function rSuivi() {
   h += '<p style="font-size:13px;color:var(--g500);margin-bottom:18px">Votre agenda couvre maintenant <b>2 semaines glissantes</b> et un <b>calendrier complet</b> pour voir, modifier et préparer chaque relance. Les urgences proches clignotent pour éviter les oublis.</p>';
   h += '<div class="planner-shell"><div class="planner-summary">';
   h += '<div class="planner-alerts">';
-  h += '<div class="planner-stat"><strong>' + planner.overdue.length + '</strong><span>en retard</span></div>';
-  h += '<div class="planner-stat"><strong>' + planner.urgent.length + '</strong><span>à traiter sous 72h</span></div>';
+  h += '<div class="planner-stat clickable-stat" onclick="drillDownReminders(\'overdue\')" title="Voir les relances en retard"><strong>' + planner.overdue.length + '</strong><span>en retard</span></div>';
+  h += '<div class="planner-stat clickable-stat" onclick="drillDownReminders(\'urgent\')" title="Voir les relances à traiter sous 72h"><strong>' + planner.urgent.length + '</strong><span>à traiter sous 72h</span></div>';
   h += '<div class="planner-stat"><strong>' + planner.upcoming.length + '</strong><span>dans les 14 jours</span></div>';
   h += '<div class="planner-stat"><strong>' + planner.undated.length + '</strong><span>sans date fixée</span></div>';
   h += '</div>';
@@ -12162,8 +12217,8 @@ function rSuivi() {
   h += '<div class="suivi-panel" id="stab-history"><div class="form-card"><h3>Historique de votre <span class="it">portefeuille</span></h3>';
   h += '<div class="history-tools">';
   h += '<span class="timeline-pill">🗂️ ' + myFollowups.length + ' entrées visibles</span>';
-  h += '<span class="timeline-pill' + (planner.overdue.length ? ' overdue reminder-blink' : '') + '">⏳ ' + planner.overdue.length + ' en retard</span>';
-  h += '<span class="timeline-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '">📍 ' + planner.urgent.length + ' urgentes</span>';
+  h += '<span class="timeline-pill clickable-pill' + (planner.overdue.length ? ' overdue reminder-blink' : '') + '" onclick="drillDownReminders(\'overdue\')" title="Voir les relances en retard">⏳ ' + planner.overdue.length + ' en retard</span>';
+  h += '<span class="timeline-pill clickable-pill' + (planner.urgent.length ? ' urgent reminder-blink' : '') + '" onclick="drillDownReminders(\'urgent\')" title="Voir les relances urgentes">📍 ' + planner.urgent.length + ' urgentes</span>';
   h += '<span class="timeline-pill">🧱 Suppression ' + (canDeleteFollowups(currentUser) ? 'autorisée pour Noah' : 'verrouillée') + '</span>';
   h += '</div>';
   var historyFollowups = canSeeLetterEmail(currentUser) ? myFollowups : myFollowups.filter(function(f) { return f.FollowupType !== 'EMAIL' && f.FollowupType !== 'LETTER'; });
