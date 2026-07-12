@@ -6167,9 +6167,12 @@ function bucketLabel(key, period){
 }
 function hasDecideurReached(r){
   if (!r) return false;
-  // Prefer the derived flag (covers imported calls + platform meta); fall back to the raw field.
-  if (r.deciderReached === true) return true;
-  return /d[ée]cideur\s*joint/i.test(String(r.decisionReach || ''));
+  // The explicit "Décideur atteint" field is authoritative when the user filled it:
+  //   "Décideur joint" = true · "Relais joint" / "Aucun contact" = false.
+  var field = String(r.decisionReach || '').trim();
+  if (field) return /d[ée]cideur\s*joint/i.test(field);
+  // Legacy fallback (imported calls / old field prospection with no "Décideur atteint" saisi):
+  return r.deciderReached === true;
 }
 function buildRevenueBuckets(records, period, windowSize){
   function emptyBucket(k){ return { key:k, gagne:0, gagneNet:0, ambEarned:0, chaud:0, tiede:0, ambPotentialHot:0, ambPotentialWarm:0, count:{gagne:0,chaud:0,tiede:0}, decider:{gagne:0,chaud:0,tiede:0,total:0}, schools:{gagne:[],chaud:[],tiede:[]} }; }
