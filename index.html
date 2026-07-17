@@ -3080,6 +3080,22 @@ button,select,input,textarea{outline:none}
 .pa-btn.pa-wa:hover{background:#25D366;transform:scale(1.15)}
 
 /* — 🎯 Objectifs du mois — */
+/* — 📊 Usage analytics strip (super admin) — */
+.usage-strip{background:linear-gradient(135deg,rgba(124,58,237,.05),rgba(13,148,136,.04));border:1px solid var(--g100);border-radius:16px;padding:16px 18px;margin-bottom:14px;animation:springIn .55s cubic-bezier(.34,1.56,.64,1) both;box-shadow:var(--shadow-sm)}
+.usage-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.usage-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--ink)}
+.usage-name{font-size:12px;background:var(--purple);color:#fff;padding:2px 10px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-weight:700;vertical-align:middle;margin-left:4px}
+.usage-note{font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace}
+.usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.usage-card{background:var(--paper);border:1px solid var(--g100);border-top:3px solid var(--purple);border-radius:12px;padding:12px 14px;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.usage-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.usage-card-top{margin-bottom:8px}
+.usage-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;font-size:18px}
+.usage-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:var(--ink);line-height:1.05}
+.usage-lbl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--g600);margin-top:4px}
+.usage-sub{font-size:10.5px;color:var(--g500);margin-top:4px;font-family:'JetBrains Mono',monospace;line-height:1.4}
+@media(max-width:600px){.usage-grid{grid-template-columns:1fr 1fr}.usage-val{font-size:18px}}
+
 .goals-strip{background:var(--paper);border:1px solid var(--g100);border-radius:16px;padding:16px 18px;margin-bottom:14px;animation:cardPop .45s cubic-bezier(.16,1,.3,1) both;box-shadow:var(--shadow-sm)}
 .goals-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .goals-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--ink);text-transform:capitalize}
@@ -4679,12 +4695,98 @@ var _ddDashboard=null;
 function closeDrillDown(){var el=document.getElementById('dd-overlay');if(el)el.remove();}
 function showDrillDown(title,bodyHtml){
   closeDrillDown();
+  if (typeof trackAnalysisEvent === 'function') trackAnalysisEvent();
   var overlay=document.createElement('div');
   overlay.id='dd-overlay';
   overlay.className='dd-overlay';
   overlay.onclick=function(e){if(e.target===overlay)closeDrillDown();};
   overlay.innerHTML='<div class="dd-modal"><div class="dd-header"><h3>'+title+'</h3><button class="dd-close" onclick="closeDrillDown()">&times;</button></div><div class="dd-body">'+bodyHtml+'</div></div>';
   document.body.appendChild(overlay);
+}
+
+// ============================================
+// 📊 USAGE TRACKER — logins + analysis actions per user (localStorage)
+// ============================================
+function _usageKey(username){ return 'nateiva_usage_' + (username || 'anon'); }
+function _getUsage(username){
+  try { return JSON.parse(localStorage.getItem(_usageKey(username)) || '{}'); }
+  catch(e){ return {}; }
+}
+function _saveUsage(username, u){
+  try { localStorage.setItem(_usageKey(username), JSON.stringify(u)); } catch(e){}
+}
+function _todayKeyStr(d){ d = d || new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function trackLoginEvent(username){
+  if (!username) return;
+  var u = _getUsage(username);
+  var nowIso = new Date().toISOString();
+  u.previousLogin = u.lastLogin || null;          // keep the prior login before overwriting
+  u.lastLogin = nowIso;
+  u.totalLogins = (u.totalLogins || 0) + 1;
+  u.firstSeen = u.firstSeen || nowIso;
+  u.byDay = u.byDay || {};
+  var tk = _todayKeyStr();
+  u.byDay[tk] = (u.byDay[tk] || 0) + 1;
+  // prune to last 60 days to keep it light
+  var keys = Object.keys(u.byDay).sort();
+  while (keys.length > 60) { delete u.byDay[keys.shift()]; }
+  _saveUsage(username, u);
+}
+function trackAnalysisEvent(){
+  if (!currentUser || !currentUser.username) return;
+  var username = currentUser.username;
+  var u = _getUsage(username);
+  u.totalAnalyses = (u.totalAnalyses || 0) + 1;
+  u.analysesByDay = u.analysesByDay || {};
+  var tk = _todayKeyStr();
+  u.analysesByDay[tk] = (u.analysesByDay[tk] || 0) + 1;
+  u.lastAnalysis = new Date().toISOString();
+  var keys = Object.keys(u.analysesByDay).sort();
+  while (keys.length > 60) { delete u.analysesByDay[keys.shift()]; }
+  _saveUsage(username, u);
+}
+function _relTimeFrom(iso){
+  if (!iso) return 'jamais';
+  var d = new Date(iso); if (isNaN(d.getTime())) return '—';
+  var diff = Math.floor((Date.now() - d.getTime())/60000);
+  if (diff < 1) return "à l'instant";
+  if (diff < 60) return 'il y a '+diff+' min';
+  if (diff < 1440) return 'il y a '+Math.floor(diff/60)+'h';
+  return 'il y a '+Math.floor(diff/1440)+'j';
+}
+function _fmtDateTime(iso){
+  if (!iso) return '—';
+  var d = new Date(iso); if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'})+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+// Build the super-admin usage/analytics panel HTML
+function buildUsageAnalyticsStrip(){
+  if (!currentUser || !currentUser.username) return '';
+  var u = _getUsage(currentUser.username);
+  var tk = _todayKeyStr();
+  var loginsToday = (u.byDay && u.byDay[tk]) || 0;
+  var analysesToday = (u.analysesByDay && u.analysesByDay[tk]) || 0;
+  var activeDays = u.byDay ? Object.keys(u.byDay).length : 0;
+  var cards = [
+    { icon:'🕐', lbl:'Dernière connexion', val:_relTimeFrom(u.lastLogin||u.previousLogin), sub:_fmtDateTime(u.lastLogin||u.previousLogin), color:'var(--teal)' },
+    { icon:'📅', lbl:'Connexions aujourd\'hui', val:String(loginsToday), sub:activeDays+' jour'+(activeDays>1?'s':'')+' actifs', color:'var(--saffron)' },
+    { icon:'🔑', lbl:'Connexions totales', val:String(u.totalLogins||0), sub:'depuis '+_fmtDateTime(u.firstSeen).split(' à ')[0], color:'var(--purple)' },
+    { icon:'📊', lbl:'Analyses lancées', val:String(u.totalAnalyses||0), sub:analysesToday+' aujourd\'hui · drill-downs & rapports', color:'var(--red)' }
+  ];
+  return '<div class="usage-strip">'+
+    '<div class="usage-head"><span class="usage-title">📊 Mon activité <span class="usage-name">'+esc(currentUser.fullName||currentUser.username)+'</span></span>'+
+      '<span class="usage-note">Suivi local de vos connexions et analyses</span></div>'+
+    '<div class="usage-grid">'+
+      cards.map(function(c){
+        return '<div class="usage-card" style="border-top-color:'+c.color+'">'+
+          '<div class="usage-card-top"><span class="usage-icon" style="background:'+c.color+'1a;color:'+c.color+'">'+c.icon+'</span></div>'+
+          '<div class="usage-val">'+c.val+'</div>'+
+          '<div class="usage-lbl">'+c.lbl+'</div>'+
+          '<div class="usage-sub">'+c.sub+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+  '</div>';
 }
 function ddSchoolItem(rec){
   var stageMeta=DASHBOARD_STAGES.find(function(s){return s.key===rec.stage;})||{label:'?',color:'dark'};
@@ -6516,13 +6618,10 @@ function rHome(){
   var _conversionRate=uniqueSchools>0 ? Math.round((wonStage.count/uniqueSchools)*100) : 0;
 
   let h=`
-  <!-- 📌 NATEIVA SALES ANALYTIC — page-intro at the very top -->
+  <!-- 📌 NATEIVA SALES ANALYTIC — page-intro at the very top (numeric summary tags removed) -->
   <div class="page-intro page-intro-hero" data-num="01">
     <h2>Nateiva <span class="it">Sales Analytic</span></h2>
     <div class="quick-links">${quickLinks}</div>
-    <div class="summary-tags">
-      ${summaryTags.map(function(tag){ return '<span>' + tag + '</span>'; }).join('')}
-    </div>
   </div>
 
   <!-- LIVE PULSE STRIP (admin instant overview) -->
@@ -10463,6 +10562,7 @@ async function doLogin() {
     if (res.token) setApiToken(res.token);
     currentUser = res.user;
     localStorage.setItem('nateiva_user', JSON.stringify(currentUser));
+    if (typeof trackLoginEvent === 'function') { trackLoginEvent(currentUser.username); try { sessionStorage.setItem('nateiva_session_counted','1'); } catch(e){} }
     if (isBackendConfigured() && nateivaApiToken) {
       var syncRes = await syncBrowserStateAfterLogin();
       if (syncRes && syncRes.success) {
@@ -11821,6 +11921,11 @@ function rSuivi() {
       '<span class="stale-cta">Relancer →</span>'+
     '</div>';
   })();
+
+  // 📊 Usage analytics (super admin only) — logins + analyses activity
+  if (isSuper && typeof buildUsageAnalyticsStrip === 'function') {
+    h += buildUsageAnalyticsStrip();
+  }
 
   // 🏅 Top performers strip — right below the account owner header
   if (isSuper) {
@@ -13943,6 +14048,11 @@ async function initializeNateivaSaleAnalyticSession() {
     }
   }
   if (!currentUser) showLogin();
+  // Count a login when a persisted session is restored — once per browser tab session
+  else if (typeof trackLoginEvent === 'function' && !sessionStorage.getItem('nateiva_session_counted')) {
+    try { sessionStorage.setItem('nateiva_session_counted','1'); } catch(e){}
+    trackLoginEvent(currentUser.username);
+  }
   updateVercelToolbarVisibility();
 }
 initializeNateivaSaleAnalyticSession();
