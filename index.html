@@ -12900,6 +12900,16 @@ function showMyEntries(expertFilter){
   }
   var nonContactedSchools = allRecords.filter(function(r){ return !_schoolHasContact(r); });
 
+  // "Sans relance" — the first contact (visit/call/letter) was made, but NO follow-up after.
+  // = a real contact happened AND the school has exactly ONE total touch (the first one).
+  // These are still in play (not gagné / not perdu) and need a follow-up call.
+  function _totalTouches(r){ return (r.rawCount||0) + (r.followupCount||0); }
+  var noFollowupSchools = allRecords.filter(function(r){
+    return r.stage!=='gagne' && r.stage!=='perdu'
+      && _schoolHasContact(r)
+      && _totalTouches(r) === 1;
+  }).sort(function(a,b){ return (b.rate||0)-(a.rate||0); });
+
   // Render a school row with stats + highlight controls (used by both Mes écoles and Non contactées tabs)
   function _renderSchoolRow(r){
     var notes = getMyEntryNotes('school:'+r.key);
@@ -13044,6 +13054,13 @@ function showMyEntries(expertFilter){
     : '<div class="me-empty">🎉 Toutes vos écoles ont au moins un contact enregistré.</div>';
   var nonContactedHtml = '<div class="me-banner" style="background:linear-gradient(135deg,var(--red-soft),var(--paper));border-color:var(--red)">🚫 <b>'+nonContactedSchools.length+' école'+(nonContactedSchools.length>1?'s':'')+' sans aucun contact</b> — priorisez ces fiches pour ouvrir le pipeline. Cliquez « → Nouveau suivi » pour démarrer.</div>'+
     _buildStageChips(true) + '<div class="me-rows-pool" id="me-noncontact-rows">' + nonContactedRowsHtml + '</div>';
+
+  // "Sans relance" pool — first contact made, no follow-up after
+  var noFollowupRowsHtml = noFollowupSchools.length
+    ? noFollowupSchools.map(_renderSchoolRow).join('')
+    : '<div class="me-empty">🎉 Toutes vos écoles contactées ont reçu au moins une relance.</div>';
+  var noFollowupHtml = '<div class="me-banner" style="background:linear-gradient(135deg,var(--saffron-soft),var(--paper));border-color:var(--saffron)">⏳ <b>'+noFollowupSchools.length+' école'+(noFollowupSchools.length>1?'s':'')+' sans relance</b> — le 1er contact (visite / appel / courrier) a été fait mais <b>aucun suivi n\'a suivi</b>. La plupart des deals se signent après plusieurs relances : recontactez-les.</div>'+
+    _buildStageChips(true) + '<div class="me-rows-pool" id="me-nofollowup-rows">' + noFollowupRowsHtml + '</div>';
   // Build followup rows — reused by both Mes Suivis and Courriers/Emails tabs
   function _renderFuRow(f){
     var entryId = 'fu:'+(f.ID||(f.Timestamp+'|'+f.SchoolName));
@@ -13148,12 +13165,14 @@ function showMyEntries(expertFilter){
         '<div class="me-tabs">'+
           '<button class="me-tab act" onclick="setMyEntriesTab(this,\'schools\')">🏫 Pipeline actif ('+activeRecords.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'noncontact\')">🚫 Non contactées ('+nonContactedSchools.length+')</button>'+
+          '<button class="me-tab" onclick="setMyEntriesTab(this,\'nofollowup\')">⏳ Sans relance ('+noFollowupSchools.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'fu\')">📞 Mes suivis ('+standardFu.length+')</button>'+
           '<button class="me-tab" onclick="setMyEntriesTab(this,\'mail\')">📨 Courriers & Emails ('+mailFu.length+')</button>'+
           '<button class="me-tab me-tab-lost" onclick="setMyEntriesTab(this,\'lost\')">⛔ Perdues ('+lostRecords.length+')</button>'+
         '</div>'+
         '<div id="me-tab-schools" class="me-tab-panel act">'+schoolsHtml+'</div>'+
         '<div id="me-tab-noncontact" class="me-tab-panel">'+nonContactedHtml+'</div>'+
+        '<div id="me-tab-nofollowup" class="me-tab-panel">'+noFollowupHtml+'</div>'+
         '<div id="me-tab-fu" class="me-tab-panel">'+fuHtml+'</div>'+
         '<div id="me-tab-mail" class="me-tab-panel">'+mailHtml+'</div>'+
         '<div id="me-tab-lost" class="me-tab-panel">'+lostHtml+'</div>'+
