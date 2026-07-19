@@ -9556,7 +9556,9 @@ function getDefaultPermissions(user) {
   var globalData = isSuperAdmin(user) || isSubAdmin(user);
   return {
     panes: (elevated || expert) ? allPaneKeys() : ['home', 'playbook', 'suivi', 'glossary'],
-    dataScope: globalData ? 'all' : (expert ? 'team' : 'own'),
+    // Only SuperAdmin + SubAdmin see team-wide ('all'). Experts (and everyone else)
+    // are strictly scoped to their OWN data — no team totals or overall numbers.
+    dataScope: globalData ? 'all' : 'own',
     manageUsers: isSuperAdmin(user)
   };
 }
@@ -12855,11 +12857,11 @@ function showMyEntries(expertFilter){
   window.__meExportRecords = allRecords; // used by exportMyEntriesCSV
   // Existing modal cleanup
   var prev=document.getElementById('me-overlay'); if (prev) prev.remove();
-  // Per-school stats from followups (call count, visit count, last contact date)
+  // Per-school stats from followups (call count, visit count, last contact date, reached-count)
   var statsBySchool = {};
   myFu.forEach(function(f){
     var k = schoolKey(f.SchoolName); if (!k) return;
-    if (!statsBySchool[k]) statsBySchool[k] = {calls:0, visits:0, whatsapp:0, sms:0, emails:0, letters:0, total:0, lastContact:null, lastType:''};
+    if (!statsBySchool[k]) statsBySchool[k] = {calls:0, visits:0, whatsapp:0, sms:0, emails:0, letters:0, total:0, reached:0, lastContact:null, lastType:''};
     var s = statsBySchool[k]; s.total++;
     var t = String(f.FollowupType||'').toUpperCase();
     if (t==='CALL') s.calls++;
@@ -12868,6 +12870,11 @@ function showMyEntries(expertFilter){
     else if (t==='SMS') s.sms++;
     else if (t==='EMAIL') s.emails++;
     else if (t==='LETTER') s.letters++;
+    // "reached" = a real contact was made: any proactive channel (visit / WhatsApp / SMS /
+    // email / letter) OR a call that actually connected (person joined or message left).
+    // A pure "aucune réponse / injoignable" call does NOT count as a contact.
+    if (t==='VISIT' || t==='WHATSAPP' || t==='SMS' || t==='EMAIL' || t==='LETTER') s.reached++;
+    else if (t==='CALL' && /personne\s*concern[ée]e\s*jointe|contact\s*[ée]tabli|message\s*laiss|autre\s*personne|jointe/i.test(String(f.Outcome||'')+' '+String(f.Status||''))) s.reached++;
     var ts = f.Timestamp ? new Date(f.Timestamp) : null;
     if (ts && !isNaN(ts.getTime()) && (!s.lastContact || ts > s.lastContact)) { s.lastContact = ts; s.lastType = t; }
   });
@@ -12878,8 +12885,20 @@ function showMyEntries(expertFilter){
   function _highlightKey(schoolKey){ return 'highlight:'+(currentUser?currentUser.username:'anon')+':'+schoolKey; }
   function _getHighlight(k){ return localStorage.getItem(_highlightKey(k)) || ''; }
 
-  // Build "Non contactées" pool (schools with 0 followups)
-  var nonContactedSchools = allRecords.filter(function(r){ return !statsBySchool[r.key] || statsBySchool[r.key].total === 0; });
+  // Build "Non contactées" pool — a school is CONTACTED when there is evidence of a
+  // real interaction with a person, from EITHER source:
+  //   • a follow-up that reached someone (statsBySchool.reached > 0), OR
+  //   • a field prospection (raw descente) where a contact person was met or the décideur
+  //     was reached (rec.contactName set, or rec.deciderReached true).
+  // Otherwise (only failed call attempts / drive-by listings) it is "non contactée".
+  function _schoolHasContact(r){
+    var s = statsBySchool[r.key];
+    if (s && s.reached > 0) return true;
+    if (r.contactName && String(r.contactName).trim()) return true;
+    if (r.deciderReached === true || /d[ée]cideur\s*joint/i.test(String(r.decisionReach||''))) return true;
+    return false;
+  }
+  var nonContactedSchools = allRecords.filter(function(r){ return !_schoolHasContact(r); });
 
   // Render a school row with stats + highlight controls (used by both Mes écoles and Non contactées tabs)
   function _renderSchoolRow(r){
@@ -12888,9 +12907,12 @@ function showMyEntries(expertFilter){
     var hi = _getHighlight(r.key);
     var hiClass = hi ? ' me-hi me-hi-'+hi : '';
     var daysAgo = _daysSince(stats.lastContact);
+    var hasContact = _schoolHasContact(r);
     var contactedLabel = stats.lastContact
       ? '📅 Dernier contact: '+_myEntriesFmtDate(stats.lastContact) + (daysAgo!==null ? ' <b>('+(daysAgo===0?'aujourd\'hui':'il y a '+daysAgo+'j')+')</b>' : '')
-      : '🚫 <b style="color:var(--red)">Jamais contactée</b>';
+      : (hasContact
+          ? '🚶 <b style="color:var(--teal-deep)">Contactée sur le terrain</b>' + (r.lastTouch ? ' · '+_myEntriesFmtDate(r.lastTouch) : '')
+          : '🚫 <b style="color:var(--red)">Jamais contactée</b>');
     var statsLine = stats.total > 0
       ? '<div class="me-stats">📊 '+stats.total+' suivi'+(stats.total>1?'s':'')+' · '+
           (stats.calls?'📞 '+stats.calls+' · ':'')+
@@ -12919,7 +12941,9 @@ function showMyEntries(expertFilter){
       ' data-appmode="'+esc(String(r.appMode||'').toLowerCase())+'"'+
       ' data-rate="'+(r.rate||0)+'"'+
       ' data-contacts="'+stats.total+'"'+
-      ' data-lastdays="'+(daysAgo==null?'9999':daysAgo)+'"';
+      // last-contact days: prefer the last dated follow-up; else the field-visit date if the
+      // school was contacted on the terrain; else 9999 (truly never contacted).
+      ' data-lastdays="'+(daysAgo!=null ? daysAgo : (hasContact && r.lastTouch ? Math.max(0,_daysSince(r.lastTouch)) : 9999))+'"';
     return '<div class="me-row'+hiClass+'" data-entry="school:'+esc(r.key)+'" data-stage="'+esc(r.stage||'')+'"'+dataAttrs+'>'+
       '<div class="me-row-head" onclick="if(!event.target.closest(\'.me-hl-btn,.me-blink-toggle,input,label\'))this.parentNode.classList.toggle(\'open\')">'+
         '<div class="me-row-main">'+
