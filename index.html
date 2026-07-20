@@ -12942,9 +12942,11 @@ function showMyEntries(expertFilter){
   //     was reached (rec.contactName set, or rec.deciderReached true).
   // Otherwise (only failed call attempts / drive-by listings) it is "non contactée".
   function _schoolHasContact(r){
-    var s = statsBySchool[r.key];
     // Any saved follow-up (suivi) means a contact + follow-up was established for this school —
     // it must never appear under "Non contactées", regardless of the call outcome text.
+    // Match by record key AND by the record's normalized school name, so a school is caught
+    // even if its internal key differs from normalizeText(schoolName).
+    var s = statsBySchool[r.key] || statsBySchool[schoolKey(r.schoolName)];
     if (s && s.total > 0) return true;
     if (r.followupCount > 0) return true;
     if (r.contactName && String(r.contactName).trim()) return true;
