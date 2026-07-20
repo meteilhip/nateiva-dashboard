@@ -12943,7 +12943,10 @@ function showMyEntries(expertFilter){
   // Otherwise (only failed call attempts / drive-by listings) it is "non contactée".
   function _schoolHasContact(r){
     var s = statsBySchool[r.key];
-    if (s && s.reached > 0) return true;
+    // Any saved follow-up (suivi) means a contact + follow-up was established for this school —
+    // it must never appear under "Non contactées", regardless of the call outcome text.
+    if (s && s.total > 0) return true;
+    if (r.followupCount > 0) return true;
     if (r.contactName && String(r.contactName).trim()) return true;
     if (r.deciderReached === true) return true;
     // Any "joint" reach — Fondateur, Décideur or Non-décideur — means a real person was reached.
@@ -13647,6 +13650,17 @@ async function submitFollowup() {
       : (cleanMetaValue(existingMeta && existingMeta.entryOrigin) || ''),
     firstContactChannel: cleanMetaValue(existingMeta && existingMeta.firstContactChannel) || document.getElementById('fuType').value
   };
+  // Preserve past info: when editing an existing entry (e.g. re-opened from a rappel), never blank
+  // out a field that was previously saved. If a form field comes back empty, keep the stored value.
+  if (editableExisting && existingMeta) {
+    Object.keys(questionnaireMeta).forEach(function(k){
+      var v = questionnaireMeta[k];
+      var prev = existingMeta[k];
+      if ((v == null || String(v).trim() === '') && prev != null && String(prev).trim() !== '') {
+        questionnaireMeta[k] = prev;
+      }
+    });
+  }
   var _effectiveCityFu = document.getElementById('fuCity').value;
   var _effectiveTsFu = editableExisting ? (editableExisting.Timestamp || entryTimestamp) : entryTimestamp;
   var _effectiveExpertFu = (typeof resolveSubmitExpertName === 'function')
@@ -13659,7 +13673,7 @@ async function submitFollowup() {
     contactName: document.getElementById('fuContact').value.trim(),
     contactPhone: document.getElementById('fuPhone').value.trim(),
     followupType: document.getElementById('fuType').value,
-    notes: buildFollowupNotes(document.getElementById('fuNotes').value.trim(), questionnaireMeta),
+    notes: buildFollowupNotes((document.getElementById('fuNotes').value.trim() || (editableExisting ? (getFollowupPlainNotes(editableExisting) || '') : '')), questionnaireMeta),
     outcome: document.getElementById('fuOutcome').value,
     nextAction: document.getElementById('fuNextAction').value.trim(),
     nextDate: document.getElementById('fuNextDate').value,
