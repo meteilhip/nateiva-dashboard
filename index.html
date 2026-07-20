@@ -2779,8 +2779,12 @@ button,select,input,textarea{outline:none}
 .dec-topcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 16px}
 .dec-card{display:flex;gap:14px;padding:14px;border-radius:14px;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);border:1px solid var(--g100);background:var(--paper);animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
 .dec-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.dec-card.dec-founder{border-left:5px solid var(--purple);background:linear-gradient(135deg,var(--purple-soft),var(--paper))}
 .dec-card.dec-yes{border-left:5px solid var(--green);background:linear-gradient(135deg,var(--green-soft),var(--paper))}
 .dec-card.dec-no{border-left:5px solid var(--red);background:linear-gradient(135deg,var(--red-soft),var(--paper))}
+/* 3-tier grid: Fondateur · Décideur · Non-décideur + insight spanning full width */
+.dec-topcards-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:760px){.dec-topcards-3{grid-template-columns:1fr}}
 .dec-card .dec-icon{font-size:32px;flex-shrink:0;width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:var(--paper);border-radius:14px;box-shadow:var(--shadow-sm)}
 .dec-card .dec-body{flex:1;min-width:0}
 .dec-card .dec-lbl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);margin-bottom:4px}
@@ -2794,6 +2798,7 @@ button,select,input,textarea{outline:none}
 .dec-chart{background:var(--paper);border:1px solid var(--g100);border-radius:14px;padding:14px}
 .dec-chart-legend{display:flex;gap:18px;justify-content:flex-end;margin-bottom:12px;font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;letter-spacing:.06em}
 .dec-chart-legend .dl{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.dec-chart-legend .dl-founder{background:var(--purple)}
 .dec-chart-legend .dl-yes{background:var(--green)}
 .dec-chart-legend .dl-no{background:var(--red)}
 .dec-chart-bars{display:flex;flex-direction:column;gap:8px}
@@ -2805,6 +2810,7 @@ button,select,input,textarea{outline:none}
 .dec-bar-label{flex:0 0 100px;font-weight:700;font-size:12px}
 .dec-bar-track{flex:1;display:flex;gap:0;height:28px;background:var(--g50);border-radius:8px;overflow:hidden;border:1px solid var(--g100)}
 .dec-bar{display:flex;align-items:center;justify-content:center;height:100%;transition:width .55s cubic-bezier(.16,1,.3,1);animation:barRise .55s cubic-bezier(.16,1,.3,1) both;min-width:24px}
+.dec-bar.dec-bar-founder{background:linear-gradient(135deg,#a06cf2,var(--purple))}
 .dec-bar.dec-bar-yes{background:linear-gradient(135deg,var(--green-bright),var(--green))}
 .dec-bar.dec-bar-no{background:linear-gradient(135deg,var(--red-bright),var(--red))}
 .dec-bar-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff}
@@ -2877,9 +2883,15 @@ button,select,input,textarea{outline:none}
   background:radial-gradient(ellipse at center,currentColor,transparent 65%);
   opacity:0;transition:opacity .4s ease;pointer-events:none;
 }
+.dec-card.dec-founder::after{color:var(--purple)}
 .dec-card.dec-yes::after{color:var(--green)}
 .dec-card.dec-no::after{color:var(--red)}
 .dec-card:hover::after{opacity:.06}
+/* Fondateur card — subtle one-time flash to draw the eye to the top decision tier */
+.dec-card.dec-founder{animation:cardPop .45s cubic-bezier(.16,1,.3,1) both, decFounderFlash 1.7s ease-out .25s 1}
+.dec-card.dec-founder .dec-val{color:var(--purple)}
+@keyframes decFounderFlash{0%{box-shadow:0 0 0 0 rgba(124,58,237,.0)}25%{box-shadow:0 0 0 4px rgba(124,58,237,.18)}100%{box-shadow:0 0 0 0 rgba(124,58,237,0)}}
+@media (prefers-reduced-motion: reduce){.dec-card.dec-founder{animation:none}}
 .dec-bar{position:relative}
 .dec-bar::after{
   content:'';position:absolute;inset:0;
@@ -4084,7 +4096,9 @@ function buildSchoolRecords(rawRows, followups){
     //  1) platform questionnaire meta explicitly says "décideur joint"
     //  2) imported/manual call outcome "Contact établi (personne concernée jointe)"
     //     — "personne concernée" is the decision maker for that establishment
-    if(/d[ée]cideur\s*joint/.test(normalizeText(meta.decisionReach||'')) ||
+    var _reachN=normalizeText(meta.decisionReach||'');
+    if(/fondat/.test(_reachN) ||
+       (/d[ée]cideur\s*joint/.test(_reachN) && !/non.?d[ée]cideur/.test(_reachN)) ||
        /personne\s*concern[ée]e\s*jointe/.test(note)){
       rec.deciderReached=true;
     }
@@ -5451,6 +5465,9 @@ function drillDownDeciderStage(stageKey, decMode){
   var sm = stageMeta[stageKey] || {l:stageKey,c:'var(--ink)'};
   var schools = recs.filter(function(r){
     if (r.stage !== stageKey) return false;
+    if (decMode === 'founder') return decideurTier(r)==='founder';
+    if (decMode === 'decideur') return decideurTier(r)==='decideur';
+    if (decMode === 'nondecideur') return decideurTier(r)==='nondecideur';
     if (decMode === 'yes') return hasDecideurReached(r);
     if (decMode === 'no') return !hasDecideurReached(r);
     return true;
@@ -5499,10 +5516,15 @@ function drillDownDeciderStage(stageKey, decMode){
 function drillDownDecider(mode){
   if (!_ddDashboard) return;
   var allRecs = _ddDashboard.records || [];
-  var filter = mode === 'yes' ? hasDecideurReached : function(r){return !hasDecideurReached(r);};
+  var filter, titlePrefix;
+  if (mode === 'founder'){ filter = function(r){return decideurTier(r)==='founder';}; titlePrefix = '🏛️ Fondateur / Fondation joint'; }
+  else if (mode === 'decideur'){ filter = function(r){return decideurTier(r)==='decideur';}; titlePrefix = '🎯 Décideur · lien direct'; }
+  else if (mode === 'nondecideur'){ filter = function(r){return decideurTier(r)==='nondecideur';}; titlePrefix = '🚪 Non-décideur'; }
+  else if (mode === 'yes'){ filter = hasDecideurReached; titlePrefix = '👔 Décideur joint'; }
+  else { filter = function(r){return !hasDecideurReached(r);}; titlePrefix = '🚪 Décideur PAS joint'; }
   var schools = allRecs.filter(filter).slice().sort(function(a,b){return (b.amount||0)-(a.amount||0);});
   var totalRev = schools.reduce(function(s,r){return s+(r.amount||0);},0);
-  var title = (mode === 'yes' ? '👔 Décideur joint' : '🚪 Décideur PAS joint') + ' — ' + schools.length + ' école' + (schools.length>1?'s':'');
+  var title = titlePrefix + ' — ' + schools.length + ' école' + (schools.length>1?'s':'');
   var body = '<div class="dd-stat-row"><span class="dd-stat-label">Revenu pondéré total</span><span class="dd-stat-value">'+moneyCompact(totalRev)+'</span></div>';
   body += '<h4 style="margin:14px 0 8px;font-size:14px">Liste des écoles (triées par revenu)</h4><div class="dd-school-list">';
   schools.slice(0,80).forEach(function(r){
@@ -6267,14 +6289,31 @@ function bucketLabel(key, period){
   if (period === 'month'){ var p=key.split('-'); var months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']; return (months[parseInt(p[1])-1]||p[1])+' '+p[0].slice(2); }
   return key.replace('-S',' S');
 }
-function hasDecideurReached(r){
-  if (!r) return false;
-  // The explicit "Décideur atteint" field is authoritative when the user filled it:
-  //   "Décideur joint" = true · "Relais joint" / "Aucun contact" = false.
+// 3-tier access taxonomy:
+//   founder      = Fondateur / Fondation — la ou les personnes qui décident réellement
+//   decideur     = lien DIRECT avec le fondateur (Directeur, Proviseur, Principal, DG…)
+//   nondecideur  = tout le reste (relais, secrétariat, aucun contact)
+// The explicit "Décideur atteint" field is authoritative when the user filled it.
+function decideurTier(r){
+  if (!r) return 'nondecideur';
   var field = String(r.decisionReach || '').trim();
-  if (field) return /d[ée]cideur\s*joint/i.test(field);
-  // Legacy fallback (imported calls / old field prospection with no "Décideur atteint" saisi):
-  return r.deciderReached === true;
+  if (field){
+    if (/fondat/i.test(field)) return 'founder';                       // "Fondateur / Fondation joint"
+    if (/non.?d[ée]cideur|relais|aucun/i.test(field)) return 'nondecideur'; // Relais joint · Non-décideur · Aucun contact
+    if (/d[ée]cideur\s*joint/i.test(field)) return 'decideur';         // "Décideur joint"
+    return 'nondecideur';
+  }
+  // NLP fallback on the named decision-maker / notes when the field wasn't saisi:
+  var blob = String((r.decisionMaker||'')+' '+(r.co||'')+' '+(r.re||'')+' '+(r.note||'')).toLowerCase();
+  if (/fondateur|fondatrice|fondation|promoteur|promotrice|propri[ée]taire|pdg|patron/.test(blob)) return 'founder';
+  if (r.deciderReached === true) return 'decideur';                    // legacy imported "reached" flag
+  if (/directeur|directrice|proviseur|principale?|pr[ée]fet|censeur|rectorat|recteur|\bdg\b/.test(blob)) return 'decideur';
+  return 'nondecideur';
+}
+// Founder + Décideur both hold decision power → count as "décideur atteint" for existing binary metrics.
+function hasDecideurReached(r){
+  var t = decideurTier(r);
+  return t === 'founder' || t === 'decideur';
 }
 function buildRevenueBuckets(records, period, windowSize){
   function emptyBucket(k){ return { key:k, gagne:0, gagneNet:0, ambEarned:0, chaud:0, tiede:0, ambPotentialHot:0, ambPotentialWarm:0, count:{gagne:0,chaud:0,tiede:0}, decider:{gagne:0,chaud:0,tiede:0,total:0}, schools:{gagne:[],chaud:[],tiede:[]} }; }
@@ -6682,12 +6721,9 @@ function rHome(){
 
   <!-- 👔 DÉCIDEUR vs NON-DÉCIDEUR — repositioned above Revenue Tracker -->
   ${(function(){
-    var withD = [];
-    var withoutD = [];
-    dashboard.records.forEach(function(r){
-      if (hasDecideurReached(r)) withD.push(r); else withoutD.push(r);
-    });
-    function _sum(arr, key){ return arr.reduce(function(s,r){return s+(r[key]||0);},0); }
+    var tiers = {founder:[], decideur:[], nondecideur:[]};
+    dashboard.records.forEach(function(r){ tiers[decideurTier(r)].push(r); });
+    function _sum(arr){ return arr.reduce(function(s,r){return s+(r.amount||0);},0); }
     function _byStage(arr){
       var m = {gagne:0,chaud:0,tiede:0,froid:0,nouveau:0,perdu:0};
       arr.forEach(function(r){ if (r.stage in m) m[r.stage]++; });
@@ -6698,12 +6734,15 @@ function rHome(){
       arr.forEach(function(r){ if (r.stage in m) m[r.stage]+=(r.amount||0); });
       return m;
     }
-    var withRev = _sum(withD,'amount');
-    var withoutRev = _sum(withoutD,'amount');
-    var totalSchools = withD.length + withoutD.length;
-    var pctReached = totalSchools ? Math.round((withD.length/totalSchools)*100) : 0;
-    var withByStage = _byStage(withD), withoutByStage = _byStage(withoutD);
-    var withRevByStage = _revByStage(withD), withoutRevByStage = _revByStage(withoutD);
+    var fN = tiers.founder.length, dN = tiers.decideur.length, nN = tiers.nondecideur.length;
+    var totalSchools = fN + dN + nN;
+    var reachedN = fN + dN;
+    var pctReached = totalSchools ? Math.round((reachedN/totalSchools)*100) : 0;
+    var pctFounder = totalSchools ? Math.round((fN/totalSchools)*100) : 0;
+    var pctNon = totalSchools ? Math.round((nN/totalSchools)*100) : 0;
+    var fRev = _sum(tiers.founder), dRev = _sum(tiers.decideur), nRev = _sum(tiers.nondecideur);
+    var byStage = {founder:_byStage(tiers.founder), decideur:_byStage(tiers.decideur), nondecideur:_byStage(tiers.nondecideur)};
+    var revByStage = {founder:_revByStage(tiers.founder), decideur:_revByStage(tiers.decideur), nondecideur:_revByStage(tiers.nondecideur)};
     var STAGES = [
       {key:'gagne', label:'🏆 Gagné',  color:'var(--green)'},
       {key:'chaud', label:'🔥 Chaud',  color:'var(--red)'},
@@ -6712,38 +6751,40 @@ function rHome(){
       {key:'nouveau',label:'🆕 Nouveau', color:'var(--g500)'},
       {key:'perdu', label:'⛔ Perdu',  color:'var(--g700)'}
     ];
-    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, withByStage[s.key]+withoutByStage[s.key]);},0));
+    var maxStage = Math.max(1, STAGES.reduce(function(m,s){return Math.max(m, byStage.founder[s.key]+byStage.decideur[s.key]+byStage.nondecideur[s.key]);},0));
     return '<div class="section dec-split"><div class="sec-head">'+
-      '<h2>👔 Décideur <span class="it">vs Non-décideur</span></h2>'+
-      '<span class="anno">Où concentrer l\'effort : les écoles où on a joint le décideur convertissent bien mieux</span>'+
+      '<h2>👔 Fondateur · Décideur <span class="it">vs Non-décideur</span></h2>'+
+      '<span class="anno">Fondateur/Fondation = le vrai décideur · Décideur = lien direct (Directeur, Proviseur…) · Non-décideur = tout le reste</span>'+
     '</div>'+
-    '<div class="dec-topcards">'+
-      '<div class="dec-card dec-yes" onclick="drillDownDecider(\'yes\')"><div class="dec-icon">👔</div><div class="dec-body"><div class="dec-lbl">Décideur joint</div><div class="dec-val">'+withD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctReached+'% du portefeuille · '+moneyCompact(withRev)+' de revenu pondéré</div></div></div>'+
-      '<div class="dec-card dec-no" onclick="drillDownDecider(\'no\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Décideur PAS joint</div><div class="dec-val">'+withoutD.length+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+(100-pctReached)+'% du portefeuille · '+moneyCompact(withoutRev)+' de revenu pondéré</div></div></div>'+
+    '<div class="dec-topcards dec-topcards-3">'+
+      '<div class="dec-card dec-founder" onclick="drillDownDecider(\'founder\')"><div class="dec-icon">🏛️</div><div class="dec-body"><div class="dec-lbl">Fondateur / Fondation</div><div class="dec-val">'+fN+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctFounder+'% du portefeuille · '+moneyCompact(fRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-card dec-yes" onclick="drillDownDecider(\'decideur\')"><div class="dec-icon">🎯</div><div class="dec-body"><div class="dec-lbl">Décideur · lien direct</div><div class="dec-val">'+dN+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">Directeur, Proviseur, Principal · '+moneyCompact(dRev)+' de revenu pondéré</div></div></div>'+
+      '<div class="dec-card dec-no" onclick="drillDownDecider(\'nondecideur\')"><div class="dec-icon">🚪</div><div class="dec-body"><div class="dec-lbl">Non-décideur</div><div class="dec-val">'+nN+' <span class="dec-of">/ '+totalSchools+'</span></div><div class="dec-sub">'+pctNon+'% du portefeuille · '+moneyCompact(nRev)+' bloqués tant que la décision n\'est pas atteinte</div></div></div>'+
       '<div class="dec-insight" onclick="drillDownStrategicReading()" role="button" tabindex="0" title="Cliquez pour voir les écoles prioritaires et leurs notes">'+
         '<div class="dec-insight-title">💡 Lecture stratégique <span class="dec-insight-cta">cliquez pour le détail →</span></div>'+
         '<div class="dec-insight-body">'+
-          (withD.length>0?'Les <b>'+withD.length+'</b> écoles avec décideur joint pèsent <b>'+moneyCompact(withRev)+'</b>.':'')+
-          (withoutD.length>0?' Les <b>'+withoutD.length+'</b> écoles sans décideur représentent <b>'+moneyCompact(withoutRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
-          (pctReached>=60?' <b style="color:var(--green)">Taux d\'accès décideur excellent</b> — concentrer sur le closing.':pctReached>=30?' <b style="color:var(--saffron-deep)">Effort terrain à intensifier</b> sur les écoles sans décideur joint.':' <b style="color:var(--red)">Priorité absolue : atteindre les décideurs</b> — la majorité du pipeline est bloqué.')+
+          '<b>'+reachedN+'</b> écoles ('+pctReached+'%) touchent le pouvoir de décision (Fondateur + Décideur), dont <b>'+fN+'</b> directement le Fondateur / la Fondation.'+
+          (nN>0?' Les <b>'+nN+'</b> écoles non-décideur représentent <b>'+moneyCompact(nRev)+'</b> bloqués tant que la hiérarchie n\'est pas atteinte.':'')+
+          (pctReached>=60?' <b style="color:var(--green)">Accès décideur excellent</b> — concentrer sur le closing via le Fondateur.':pctReached>=30?' <b style="color:var(--saffron-deep)">Effort terrain à intensifier</b> pour remonter vers le Fondateur.':' <b style="color:var(--red)">Priorité absolue : atteindre les décideurs et fondateurs</b> — la majorité du pipeline est bloquée.')+
         '</div>'+
       '</div>'+
     '</div>'+
     '<div class="dec-chart">'+
-      '<div class="dec-chart-legend"><span><i class="dl dl-yes"></i> Décideur joint</span><span><i class="dl dl-no"></i> Pas joint</span></div>'+
+      '<div class="dec-chart-legend"><span><i class="dl dl-founder"></i> Fondateur / Fondation</span><span><i class="dl dl-yes"></i> Décideur direct</span><span><i class="dl dl-no"></i> Non-décideur</span></div>'+
       '<div class="dec-chart-bars">'+
         STAGES.map(function(s){
-          var yes = withByStage[s.key]||0, no = withoutByStage[s.key]||0;
-          var total = yes + no;
+          var fv = byStage.founder[s.key]||0, dv = byStage.decideur[s.key]||0, nv = byStage.nondecideur[s.key]||0;
+          var total = fv + dv + nv;
           if (total === 0) return '';
-          var yesPct = (yes/maxStage)*100, noPct = (no/maxStage)*100;
-          var pct = total ? Math.round((yes/total)*100) : 0;
+          var fPct = (fv/maxStage)*100, dPct = (dv/maxStage)*100, nPct = (nv/maxStage)*100;
+          var pct = total ? Math.round(((fv+dv)/total)*100) : 0;
           var sk = s.key;
-          return '<div class="dec-bar-row clickable-row" onclick="drillDownDeciderStage(\''+sk+'\',null)" role="button" tabindex="0" title="'+s.label+' — '+yes+' avec décideur ('+moneyCompact(withRevByStage[s.key])+') · '+no+' sans ('+moneyCompact(withoutRevByStage[s.key])+') · cliquer pour le détail">'+
+          return '<div class="dec-bar-row clickable-row" onclick="drillDownDeciderStage(\''+sk+'\',null)" role="button" tabindex="0" title="'+s.label+' — '+fv+' fondateur · '+dv+' décideur · '+nv+' non-décideur · cliquer pour le détail">'+
             '<div class="dec-bar-label" style="color:'+s.color+'">'+s.label+'</div>'+
             '<div class="dec-bar-track">'+
-              (yes>0?'<div class="dec-bar dec-bar-yes" style="width:'+yesPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'yes\')" title="'+yes+' décideur joint — cliquer"><span class="dec-bar-num">'+yes+'</span></div>':'')+
-              (no>0?'<div class="dec-bar dec-bar-no" style="width:'+noPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'no\')" title="'+no+' sans décideur — cliquer"><span class="dec-bar-num">'+no+'</span></div>':'')+
+              (fv>0?'<div class="dec-bar dec-bar-founder" style="width:'+fPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'founder\')" title="'+fv+' fondateur / fondation — cliquer"><span class="dec-bar-num">'+fv+'</span></div>':'')+
+              (dv>0?'<div class="dec-bar dec-bar-yes" style="width:'+dPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'decideur\')" title="'+dv+' décideur direct — cliquer"><span class="dec-bar-num">'+dv+'</span></div>':'')+
+              (nv>0?'<div class="dec-bar dec-bar-no" style="width:'+nPct+'%" onclick="event.stopPropagation();drillDownDeciderStage(\''+sk+'\',\'nondecideur\')" title="'+nv+' non-décideur — cliquer"><span class="dec-bar-num">'+nv+'</span></div>':'')+
             '</div>'+
             '<div class="dec-bar-pct">'+pct+'%</div>'+
           '</div>';
@@ -11240,6 +11281,15 @@ function setFollowupSelectValue(id, value) {
       return;
     }
   }
+  // Preserve legacy / free-form stored values (e.g. "Relais joint") that are no
+  // longer preset options, so editing an old record never silently drops them.
+  if (target) {
+    var opt = document.createElement('option');
+    opt.value = target;
+    opt.textContent = target;
+    select.appendChild(opt);
+    select.value = target;
+  }
 }
 
 function setFollowupFormMode(mode, entry) {
@@ -12166,7 +12216,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Statut</label><select id="fuStatus"><option value="En cours">🟡 En cours</option><option value="Relance">🔴 Relance</option><option value="Converti">🟢 Converti</option><option value="Terminé">⚫ Terminé</option></select></div>';
   h += '<div class="form-field"><label>Qualité / rating appel</label><input type="number" id="fuCallRating" placeholder="Ex: 3" min="0" max="5"></div>';
   h += '<div class="form-field"><label>Nombre total d\'appels déjà tentés</label><input type="number" id="fuTimesCalled" placeholder="Ex: 1, 5, 9..." min="0"></div>';
-  h += '<div class="form-field"><label>Décideur atteint ?</label><select id="fuDecisionReach"><option value="">-- À préciser --</option><option value="Décideur joint">Décideur joint</option><option value="Relais joint">Relais joint</option><option value="Aucun contact">Aucun contact</option></select></div>';
+  h += '<div class="form-field"><label>Accès décideur — qui a été joint ?</label><select id="fuDecisionReach"><option value="">-- À préciser --</option><option value="Fondateur / Fondation joint">🏛️ Fondateur / Fondation joint (décideur réel)</option><option value="Décideur joint">🎯 Décideur joint (lien direct : Directeur, Proviseur…)</option><option value="Non-décideur joint">👥 Non-décideur joint (secrétariat, relais)</option><option value="Aucun contact">🚫 Aucun contact</option></select></div>';
   h += '<div class="form-field"><label>Décideur final / hiérarchie</label><input type="text" id="fuDecisionMaker" placeholder="Ex: Fondateur, Rectorat, Principal"></div>';
   h += '<div class="form-field"><label>2e appel / rappel prévu</label><select id="fuSecondCall"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
   h += '<div class="form-field"><label>Docs WhatsApp demandés</label><select id="fuWhatsappDocs"><option value="">Non</option><option value="Oui">Oui</option><option value="En cours">En cours</option></select></div>';
@@ -12244,7 +12294,7 @@ function rSuivi() {
   h += '<div class="form-field"><label>Qualité internet</label><select id="nsInternetQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Moyenne">Moyenne</option><option value="Faible">Faible</option><option value="Très faible">Très faible</option></select></div>';
   h += '<div class="form-field"><label>Qualité électricité</label><select id="nsPowerQuality"><option value="">-- À préciser --</option><option value="Stable">Stable</option><option value="Instable">Instable</option><option value="Groupe/backup">Groupe/backup</option><option value="Très instable">Très instable</option></select></div>';
   h += '<div class="form-field"><label>Nombre de campus</label><input type="number" id="nsCampusCount" placeholder="Ex: 1" min="1"></div>';
-  h += '<div class="form-field"><label>Décideur atteint ?</label><select id="nsDecisionReach"><option value="">-- À préciser --</option><option value="Décideur joint">Décideur joint</option><option value="Relais joint">Relais joint</option><option value="Aucun contact">Aucun contact</option></select></div>';
+  h += '<div class="form-field"><label>Accès décideur — qui a été joint ?</label><select id="nsDecisionReach"><option value="">-- À préciser --</option><option value="Fondateur / Fondation joint">🏛️ Fondateur / Fondation joint (décideur réel)</option><option value="Décideur joint">🎯 Décideur joint (lien direct : Directeur, Proviseur…)</option><option value="Non-décideur joint">👥 Non-décideur joint (secrétariat, relais)</option><option value="Aucun contact">🚫 Aucun contact</option></select></div>';
   h += '<div class="form-field"><label>Décideur final / hiérarchie</label><input type="text" id="nsDecisionMaker" placeholder="Ex: Fondateur, Rectorat, Principal"></div>';
   h += '<div class="form-field"><label>Modules demandés</label><input type="text" id="nsRequestedModules" placeholder="Ex: bulletins, Mobile Money, communication parents"></div>';
   h += '<div class="form-field"><label>Support demandé</label><input type="text" id="nsSupportRequest" placeholder="Ex: dossier physique, démo, docs WhatsApp"></div>';
@@ -12895,7 +12945,10 @@ function showMyEntries(expertFilter){
     var s = statsBySchool[r.key];
     if (s && s.reached > 0) return true;
     if (r.contactName && String(r.contactName).trim()) return true;
-    if (r.deciderReached === true || /d[ée]cideur\s*joint/i.test(String(r.decisionReach||''))) return true;
+    if (r.deciderReached === true) return true;
+    // Any "joint" reach — Fondateur, Décideur or Non-décideur — means a real person was reached.
+    var _reach = String(r.decisionReach||'').trim();
+    if (_reach && !/aucun\s*contact/i.test(_reach)) return true;
     return false;
   }
   var nonContactedSchools = allRecords.filter(function(r){ return !_schoolHasContact(r); });
