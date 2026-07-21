@@ -3370,6 +3370,17 @@ button,select,input,textarea{outline:none}
   .nav-main{display:none}
   .fab{display:flex}
 }
+/* — Floating scroll-nav (far right, appears/disappears; up + down) — */
+.scroll-nav{position:fixed;right:16px;bottom:96px;z-index:900;display:flex;flex-direction:column;gap:8px;
+  opacity:0;transform:translateX(22px);pointer-events:none;transition:opacity .35s ease,transform .35s ease}
+.scroll-nav.show{opacity:1;transform:translateX(0);pointer-events:auto}
+.scroll-nav-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--g200);background:var(--paper);
+  color:var(--ink);font-size:15px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.14);transition:background .2s ease,color .2s ease,transform .2s ease,box-shadow .2s ease}
+.scroll-nav-btn:hover{background:var(--red);color:#fff;border-color:var(--red);transform:translateY(-2px);box-shadow:0 10px 24px rgba(220,38,38,.28)}
+.scroll-nav-btn.hidden{display:none}
+@media(max-width:600px){.scroll-nav{right:10px;bottom:78px}.scroll-nav-btn{width:40px;height:40px;font-size:13px}}
+@media (prefers-reduced-motion: reduce){.scroll-nav,.scroll-nav-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -3382,7 +3393,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.1 · KPI Sync</span>
+      <span class="meta-pill red">v11.47 · Accès Fondateur</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -14290,6 +14301,38 @@ setInterval(updateVercelToolbarVisibility, 60000);
   // — Sync initial pane state —
   var activePane = document.querySelector('.nav-btn.act');
   if (activePane) syncBottomNav(activePane.dataset.pane);
+})();
+</script>
+
+<!-- Floating scroll-nav: far right, appears when the page is scrollable; up + down -->
+<div id="scrollNav" class="scroll-nav" aria-hidden="true">
+  <button type="button" class="scroll-nav-btn hidden" data-dir="up" title="Aller en haut" aria-label="Aller en haut">▲</button>
+  <button type="button" class="scroll-nav-btn" data-dir="down" title="Aller en bas" aria-label="Aller en bas">▼</button>
+</div>
+<script>
+(function(){
+  var nav=document.getElementById('scrollNav'); if(!nav) return;
+  var up=nav.querySelector('[data-dir="up"]'), down=nav.querySelector('[data-dir="down"]');
+  function el(){ return document.scrollingElement || document.documentElement; }
+  up.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+  down.addEventListener('click', function(){ window.scrollTo({top:el().scrollHeight, behavior:'smooth'}); });
+  var ticking=false;
+  function update(){
+    ticking=false;
+    var e=el();
+    var y=e.scrollTop||window.scrollY||0;
+    var max=(e.scrollHeight - e.clientHeight);
+    var scrollable = max > 140;
+    nav.classList.toggle('show', scrollable);
+    nav.setAttribute('aria-hidden', scrollable ? 'false' : 'true');
+    up.classList.toggle('hidden', y < 120);
+    down.classList.toggle('hidden', y > max - 120);
+  }
+  function onScroll(){ if(!ticking){ ticking=true; requestAnimationFrame(update); } }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll, {passive:true});
+  setInterval(update, 1000); // re-evaluate after SPA pane swaps change page height
+  update();
 })();
 </script>
 </body>
