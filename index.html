@@ -3384,7 +3384,8 @@ button,select,input,textarea{outline:none}
 /* — Effort terrain & closing — */
 .fe-section{padding:18px;background:linear-gradient(180deg,rgba(124,58,237,.03),transparent);border:1px solid var(--g100);border-radius:18px;animation:cardPop .5s cubic-bezier(.16,1,.3,1) both}
 .fe-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
-.fe-tiles-cost{margin-top:12px}
+.fe-tiles-cost{margin-top:6px}
+.fe-cost-label{margin-top:14px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--purple);display:inline-block;background:var(--purple-soft);padding:5px 12px;border-radius:20px}
 .fe-tile{background:var(--paper);border:1px solid var(--g100);border-left:4px solid var(--fe,var(--g300));border-radius:14px;padding:16px 18px;animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
 .fe-tile-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .fe-tile-ic{font-size:15px}
@@ -3415,7 +3416,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.49 · Effort terrain</span>
+      <span class="meta-pill red">v11.50 · Effort signataires</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3806,11 +3807,29 @@ function buildFieldEffortAnalytics(rawRows, followups, records){
     t.followupCalls+=r.followupCalls; t.totalFollowups+=r.totalFollowups; t.signed+=r.signed;
     return t;
   }, {terrainDays:0,callDays:0,activeDays:0,rawDescentes:0,followupVisits:0,demoVisits:0,followupCalls:0,totalFollowups:0,signed:0});
-  team.fieldDaysPerSign = team.signed ? team.terrainDays/team.signed : null;
-  team.activeDaysPerSign = team.signed ? team.activeDays/team.signed : null;
-  team.followupsPerSign = team.signed ? team.totalFollowups/team.signed : null;
-  team.callsPerSign = team.signed ? team.followupCalls/team.signed : null;
-  team.visitsPerSign = team.signed ? team.followupVisits/team.signed : null;
+  // "Effort → signature" must reflect ONLY the people who actually signed — their own effort
+  // divided by their own signatures. One signer with 3 écoles → HER days/3. When others sign,
+  // it becomes the average across the signers (weighted by signatures). Non-signers' effort is
+  // NOT diluted into this ratio.
+  var signers = rows.filter(function(r){ return r.signed > 0; });
+  var sig = signers.reduce(function(a,r){
+    a.terrainDays+=r.terrainDays; a.callDays+=r.callDays; a.activeDays+=r.activeDays;
+    a.followupVisits+=r.followupVisits; a.followupCalls+=r.followupCalls;
+    a.totalFollowups+=r.totalFollowups; a.signed+=r.signed;
+    return a;
+  }, {terrainDays:0,callDays:0,activeDays:0,followupVisits:0,followupCalls:0,totalFollowups:0,signed:0});
+  team.signerCount = signers.length;
+  team.signerTerrainDays = sig.terrainDays;
+  team.signerCallDays = sig.callDays;
+  team.signerActiveDays = sig.activeDays;
+  team.signerFollowups = sig.totalFollowups;
+  team.signerCalls = sig.followupCalls;
+  team.signerVisits = sig.followupVisits;
+  team.fieldDaysPerSign = sig.signed ? sig.terrainDays/sig.signed : null;
+  team.activeDaysPerSign = sig.signed ? sig.activeDays/sig.signed : null;
+  team.followupsPerSign = sig.signed ? sig.totalFollowups/sig.signed : null;
+  team.callsPerSign = sig.signed ? sig.followupCalls/sig.signed : null;
+  team.visitsPerSign = sig.signed ? sig.followupVisits/sig.signed : null;
   return { rows:rows, team:team };
 }
 
@@ -3836,9 +3855,10 @@ function renderFieldEffort(fe){
     tile('📅→✅','Jours actifs / signature', n1(t.activeDaysPerSign), 'jours actifs par école signée','var(--purple)')+
     tile('🔁→✅','Suivis / signature', n1(t.followupsPerSign), 'suivis totaux par école signée','var(--red)')+
     tile('📞→✅','Appels suivi / signature', n1(t.callsPerSign), 'appels de suivi par école signée','var(--teal)');
+  var who = (t.signerCount===1) ? 'la personne ayant signé a' : 'les '+t.signerCount+' personnes ayant signé ont';
   var insight = t.signed>0
-    ? 'En moyenne, il faut <b>'+n1(t.fieldDaysPerSign)+' jours terrain</b> et <b>'+n1(t.followupsPerSign)+' suivis</b> (dont <b>'+n1(t.callsPerSign)+' appels</b> et <b>'+n1(t.visitsPerSign)+' visites/démo</b>) pour signer une école — moyenne sur <b>'+t.signed+'</b> école'+(t.signed>1?'s':'')+' signée'+(t.signed>1?'s':'')+' ('+t.terrainDays+' jours terrain + '+t.callDays+' jours d\'appels au total).'
-    : 'Aucune école signée sur la période visible : dès la première signature, la moyenne « effort → signature » s\'affiche ici.';
+    ? 'En moyenne, '+who+' investi <b>'+n1(t.fieldDaysPerSign)+' jours terrain</b> et <b>'+n1(t.followupsPerSign)+' suivis</b> (dont <b>'+n1(t.callsPerSign)+' appels</b> et <b>'+n1(t.visitsPerSign)+' visites/démo</b>) par école signée — sur <b>'+t.signed+'</b> école'+(t.signed>1?'s':'')+' signée'+(t.signed>1?'s':'')+' par <b>'+t.signerCount+'</b> personne'+(t.signerCount>1?'s':'')+' ('+t.signerTerrainDays+' jours terrain + '+t.signerCallDays+' jours d\'appels des signataires). L\'effort des personnes n\'ayant pas encore signé n\'entre PAS dans cette moyenne.'
+    : 'Aucune école signée sur la période visible : dès la première signature, la moyenne « effort → signature » (basée uniquement sur les signataires) s\'affiche ici.';
   var head = '<tr><th>Personne</th><th class="num">Jours terrain</th><th class="num">Jours appels</th><th class="num">Jours actifs</th><th class="num">Descentes</th><th class="num">Visites suivi</th><th class="num">Appels suivi</th><th class="num">Signées</th><th class="num">J.&nbsp;terrain/sign.</th><th class="num">Suivis/sign.</th></tr>';
   var body = fe.rows.map(function(r){
     return '<tr>'+
@@ -3859,6 +3879,7 @@ function renderFieldEffort(fe){
     '<span class="anno">Jours terrain · jours d\'appels · suivis → écoles signées</span></div>'+
     '<div class="fe-tiles">'+tiles+'</div>'+
     '<div class="fe-insight"><div class="fe-insight-title">🎯 Combien d\'effort pour signer une école ?</div><div class="fe-insight-body">'+insight+'</div></div>'+
+    '<div class="fe-cost-label">📐 Effort → signature — calculé uniquement sur '+(t.signerCount||0)+' signataire'+((t.signerCount||0)>1?'s':'')+' (leur effort ÷ leurs signatures)</div>'+
     '<div class="fe-tiles fe-tiles-cost">'+costTiles+'</div>'+
     '<div class="fe-table-wrap"><table class="tbl fe-table"><thead>'+head+'</thead><tbody>'+
       (body || '<tr><td colspan="10" style="text-align:center;color:var(--g500);padding:20px">Aucune activité visible.</td></tr>')+
