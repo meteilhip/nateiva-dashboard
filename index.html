@@ -3393,7 +3393,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.47 · Accès Fondateur</span>
+      <span class="meta-pill red">v11.48 · Fixes calcul</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -4113,7 +4113,11 @@ function buildSchoolRecords(rawRows, followups){
        /personne\s*concern[ée]e\s*jointe/.test(note)){
       rec.deciderReached=true;
     }
-    if(/\bclos\b|closed|converti|gagne|a signe|contrat signe|deal signe|signed|paid|paye/.test(note)){
+    // A deal is WON only when the action is COMPLETED — never on a future promise.
+    // Word boundaries keep "il a signé / a signe / contrat signé / converti / gagné / payé"
+    // while excluding future forms like "fera signe", "va signer", "gagner", "à convertir",
+    // "va payer" (the auxiliary "a" is only a standalone word in the completed past tense).
+    if(/\bclos\b|closed|\bconverti(?!r)|\bgagne(?!r)|\ba sign[eé]|contrat sign[eé]|deal sign[eé]|\bsigned\b|\bpaid\b|\bpay[eé](?!r)/.test(note)){
       rec.won=true;
       if(dt && (!rec.closedAt || dt>rec.closedAt))rec.closedAt=dt;
       rec.closedBy=canonicalPersonName(item.Expert) || rec.closedBy || rec.expert;
@@ -11436,10 +11440,18 @@ function continueFollowupEntry(id) {
 function renderPlannerActions(followup) {
   if (!followup || !followup.ID) return '';
   var safeId = esc(String(followup.ID || '')).replace(/'/g, "\\'");
+  // Primary action for a rappel: ADD a NEW, dated suivi (append-only). This carries the
+  // school data forward and never overwrites/deletes previous entries — the new suivi shows
+  // up in Mes Saisies with its own date & time.
+  var html = '<div class="planner-actions">';
+  html += '<button class="planner-action-btn continue" onclick="continueFollowupEntry(\'' + safeId + '\')">➕ Enregistrer un suivi</button>';
+  // Secondary: correct THIS entry in place (only when it is editable). Kept separate so a
+  // normal rappel never edits the past by mistake.
   if (canEditStoredFollowup(followup)) {
-    return '<div class="planner-actions"><button class="planner-action-btn edit" onclick="editFollowupEntry(\'' + safeId + '\')">Modifier rappel</button></div>';
+    html += '<button class="planner-action-btn edit" onclick="editFollowupEntry(\'' + safeId + '\')">✏️ Corriger cette saisie</button>';
   }
-  return '<div class="planner-actions"><button class="planner-action-btn continue" onclick="continueFollowupEntry(\'' + safeId + '\')">Préparer la suite</button></div>';
+  html += '</div>';
+  return html;
 }
 
 function getStageMeta(stageKey) {
@@ -13608,8 +13620,12 @@ async function submitFollowup() {
   if (!schoolName) { showToast('Veuillez sélectionner une école', true); return; }
   var fuSchoolTypeVal = document.getElementById('fuSchoolType') ? document.getElementById('fuSchoolType').value : '';
   var fuAppModeVal = document.getElementById('fuAppMode') ? document.getElementById('fuAppMode').value : '';
-  if (!fuSchoolTypeVal) { showToast('⚠️ Veuillez indiquer le type d\'établissement (Primaire/Secondaire/Université)', true); return; }
-  if (!fuAppModeVal) { showToast('⚠️ Veuillez indiquer la version du produit discuté (Online/Offline)', true); return; }
+  // Only force type / version when CREATING a brand-new school. For a rappel / suivi on an
+  // existing school these are already known from earlier entries, so never block the save
+  // (which would silently drop the new suivi) — the values are carried forward automatically.
+  var isNewSchoolEntry = (schoolSel === '__other__');
+  if (isNewSchoolEntry && !fuSchoolTypeVal) { showToast('⚠️ Veuillez indiquer le type d\'établissement (Primaire/Secondaire/Université)', true); return; }
+  if (isNewSchoolEntry && !fuAppModeVal) { showToast('⚠️ Veuillez indiquer la version du produit discuté (Online/Offline)', true); return; }
   var schoolValidation = updateSchoolOwnershipNotice();
   if (schoolValidation && !schoolValidation.ok) {
     showToast(schoolValidation.message, true);
