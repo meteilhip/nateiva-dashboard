@@ -3381,6 +3381,28 @@ button,select,input,textarea{outline:none}
 .scroll-nav-btn.hidden{display:none}
 @media(max-width:600px){.scroll-nav{right:10px;bottom:78px}.scroll-nav-btn{width:40px;height:40px;font-size:13px}}
 @media (prefers-reduced-motion: reduce){.scroll-nav,.scroll-nav-btn{transition:none}}
+/* — Effort terrain & closing — */
+.fe-section{padding:18px;background:linear-gradient(180deg,rgba(124,58,237,.03),transparent);border:1px solid var(--g100);border-radius:18px;animation:cardPop .5s cubic-bezier(.16,1,.3,1) both}
+.fe-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+.fe-tiles-cost{margin-top:12px}
+.fe-tile{background:var(--paper);border:1px solid var(--g100);border-left:4px solid var(--fe,var(--g300));border-radius:14px;padding:16px 18px;animation:cardPop .45s cubic-bezier(.16,1,.3,1) both}
+.fe-tile-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.fe-tile-ic{font-size:15px}
+.fe-tile-lbl{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--g600)}
+.fe-tile-val{font-family:'Fraunces',serif;font-size:30px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.02em}
+.fe-tile-sub{font-size:11.5px;color:var(--g600);margin-top:6px;line-height:1.4}
+.fe-insight{padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,var(--saffron-soft),var(--bg-warm));border:1px solid rgba(245,158,11,.18);margin:6px 0}
+.fe-insight-title{font-weight:800;color:var(--ink);font-size:12px;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase}
+.fe-insight-body{font-size:13.5px;line-height:1.6;color:var(--g700)}
+.fe-insight-body b{color:var(--ink)}
+.fe-table-wrap{overflow-x:auto;margin-top:14px;border:1px solid var(--g100);border-radius:12px}
+.fe-table{width:100%;min-width:720px;border-collapse:collapse}
+.fe-table th,.fe-table td{padding:9px 12px;font-size:12.5px;border-bottom:1px solid var(--g100);white-space:nowrap}
+.fe-table thead th{background:var(--g50);font-weight:800;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--g600);text-align:left;position:sticky;top:0}
+.fe-table .num{text-align:right;font-family:'JetBrains Mono',monospace}
+.fe-table tbody tr:hover{background:var(--bg-warm)}
+.fe-demo{color:var(--saffron-deep);font-size:10px}
+@media(max-width:600px){.fe-tile-val{font-size:24px}}
 </style>
 </head>
 <body>
@@ -3393,7 +3415,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.48 · Fixes calcul</span>
+      <span class="meta-pill red">v11.49 · Effort terrain</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3714,6 +3736,134 @@ function buildActivitySummary(rawRows, followups){
       activeExperts:activeExperts
     }
   };
+}
+
+// =============================================================
+// EFFORT TERRAIN & CLOSING — per-expert field/call days + follow-ups tied to signed schools
+//   terrainDays = distinct days with a field descente (raw) OR a VISIT follow-up
+//   callDays    = distinct days with a CALL follow-up
+//   activeDays  = distinct days with ANY activity (terrain ∪ calls ∪ autres)
+//   signed      = écoles gagnées attribuées à la personne (closedBy / expert)
+// Ratios tell us how many field days + follow-ups it takes, on average, to sign a school.
+// =============================================================
+function buildFieldEffortAnalytics(rawRows, followups, records){
+  var byExpert = {};
+  function ensure(name){
+    var key = canonicalPersonKey(name);
+    if(!key) return null;
+    if(!byExpert[key]) byExpert[key] = {
+      expert: canonicalPersonName(name) || String(name||'').trim(),
+      terrainDaySet:{}, callDaySet:{}, activeDaySet:{},
+      rawDescentes:0, followupVisits:0, followupCalls:0, followupOther:0, demoVisits:0, signed:0
+    };
+    return byExpert[key];
+  }
+  var activityRaw = (typeof getActivityRawRows==='function') ? getActivityRawRows(rawRows||[]) : (rawRows||[]);
+  activityRaw.forEach(function(r){
+    var b = ensure(r && r.e); if(!b) return;
+    var day = activeDayKey(r && r.t);
+    if(day){ b.terrainDaySet[day]=1; b.activeDaySet[day]=1; }
+    b.rawDescentes++;
+  });
+  (followups||[]).forEach(function(f){
+    var b = ensure(f && f.Expert); if(!b) return;
+    var day = activeDayKey(f && f.Timestamp);
+    var type = String(f && f.FollowupType || '').toUpperCase();
+    if(day) b.activeDaySet[day]=1;
+    if(type==='CALL'){ if(day) b.callDaySet[day]=1; b.followupCalls++; }
+    else if(type==='VISIT'){
+      if(day) b.terrainDaySet[day]=1;
+      b.followupVisits++;
+      if(/d[ée]mo|d[ée]monstration|pr[ée]sentation/i.test(String((f.Outcome||'')+' '+(f.Notes||'')+' '+(f.NextAction||'')))) b.demoVisits++;
+    }
+    else { b.followupOther++; }
+  });
+  (records||[]).forEach(function(rec){
+    if(!rec || rec.stage!=='gagne') return;
+    var b = ensure(rec.closedBy || rec.expert); if(!b) return;
+    b.signed++;
+  });
+  var rows = Object.keys(byExpert).map(function(k){
+    var b = byExpert[k];
+    var terrainDays = Object.keys(b.terrainDaySet).length;
+    var callDays = Object.keys(b.callDaySet).length;
+    var activeDays = Object.keys(b.activeDaySet).length;
+    var totalFollowups = b.followupCalls + b.followupVisits + b.followupOther;
+    return {
+      expert:b.expert, terrainDays:terrainDays, callDays:callDays, activeDays:activeDays,
+      rawDescentes:b.rawDescentes, followupVisits:b.followupVisits, demoVisits:b.demoVisits,
+      followupCalls:b.followupCalls, followupOther:b.followupOther, totalFollowups:totalFollowups, signed:b.signed,
+      fieldDaysPerSign: b.signed ? terrainDays/b.signed : null,
+      activeDaysPerSign: b.signed ? activeDays/b.signed : null,
+      followupsPerSign: b.signed ? totalFollowups/b.signed : null,
+      callsPerSign: b.signed ? b.followupCalls/b.signed : null,
+      visitsPerSign: b.signed ? b.followupVisits/b.signed : null
+    };
+  }).sort(function(a,b){ return (b.signed-a.signed) || (b.activeDays-a.activeDays); });
+  var team = rows.reduce(function(t,r){
+    t.terrainDays+=r.terrainDays; t.callDays+=r.callDays; t.activeDays+=r.activeDays;
+    t.rawDescentes+=r.rawDescentes; t.followupVisits+=r.followupVisits; t.demoVisits+=r.demoVisits;
+    t.followupCalls+=r.followupCalls; t.totalFollowups+=r.totalFollowups; t.signed+=r.signed;
+    return t;
+  }, {terrainDays:0,callDays:0,activeDays:0,rawDescentes:0,followupVisits:0,demoVisits:0,followupCalls:0,totalFollowups:0,signed:0});
+  team.fieldDaysPerSign = team.signed ? team.terrainDays/team.signed : null;
+  team.activeDaysPerSign = team.signed ? team.activeDays/team.signed : null;
+  team.followupsPerSign = team.signed ? team.totalFollowups/team.signed : null;
+  team.callsPerSign = team.signed ? team.followupCalls/team.signed : null;
+  team.visitsPerSign = team.signed ? team.followupVisits/team.signed : null;
+  return { rows:rows, team:team };
+}
+
+// Render the "Effort terrain & closing" section (team tiles + averages + per-expert table).
+function renderFieldEffort(fe){
+  if(!fe) return '';
+  var t = fe.team;
+  var n1 = function(x){ return (x==null) ? '—' : (Math.round(x*10)/10).toFixed(1); };
+  function tile(icon,label,val,sub,accent){
+    return '<div class="fe-tile" style="--fe:'+(accent||'var(--g300)')+'">'+
+      '<div class="fe-tile-top"><span class="fe-tile-ic">'+icon+'</span><span class="fe-tile-lbl">'+label+'</span></div>'+
+      '<div class="fe-tile-val">'+val+'</div>'+
+      '<div class="fe-tile-sub">'+sub+'</div>'+
+    '</div>';
+  }
+  var tiles =
+    tile('🚶','Jours terrain', t.terrainDays, t.rawDescentes+' descentes + '+t.followupVisits+' visites suivi','var(--saffron-deep)')+
+    tile('📞','Jours d\'appels', t.callDays, t.followupCalls+' appels de suivi','var(--teal)')+
+    tile('📅','Jours actifs combinés', t.activeDays, 'jours distincts (terrain + appels)','var(--purple)')+
+    tile('✅','Écoles signées', t.signed, 'deals gagnés validés','var(--green)');
+  var costTiles =
+    tile('🚶→✅','Jours terrain / signature', n1(t.fieldDaysPerSign), 'jours sur le terrain par école signée','var(--saffron-deep)')+
+    tile('📅→✅','Jours actifs / signature', n1(t.activeDaysPerSign), 'jours actifs par école signée','var(--purple)')+
+    tile('🔁→✅','Suivis / signature', n1(t.followupsPerSign), 'suivis totaux par école signée','var(--red)')+
+    tile('📞→✅','Appels suivi / signature', n1(t.callsPerSign), 'appels de suivi par école signée','var(--teal)');
+  var insight = t.signed>0
+    ? 'En moyenne, il faut <b>'+n1(t.fieldDaysPerSign)+' jours terrain</b> et <b>'+n1(t.followupsPerSign)+' suivis</b> (dont <b>'+n1(t.callsPerSign)+' appels</b> et <b>'+n1(t.visitsPerSign)+' visites/démo</b>) pour signer une école — moyenne sur <b>'+t.signed+'</b> école'+(t.signed>1?'s':'')+' signée'+(t.signed>1?'s':'')+' ('+t.terrainDays+' jours terrain + '+t.callDays+' jours d\'appels au total).'
+    : 'Aucune école signée sur la période visible : dès la première signature, la moyenne « effort → signature » s\'affiche ici.';
+  var head = '<tr><th>Personne</th><th class="num">Jours terrain</th><th class="num">Jours appels</th><th class="num">Jours actifs</th><th class="num">Descentes</th><th class="num">Visites suivi</th><th class="num">Appels suivi</th><th class="num">Signées</th><th class="num">J.&nbsp;terrain/sign.</th><th class="num">Suivis/sign.</th></tr>';
+  var body = fe.rows.map(function(r){
+    return '<tr>'+
+      '<td><b>'+esc(r.expert)+'</b></td>'+
+      '<td class="num">'+r.terrainDays+'</td>'+
+      '<td class="num">'+r.callDays+'</td>'+
+      '<td class="num">'+r.activeDays+'</td>'+
+      '<td class="num">'+r.rawDescentes+'</td>'+
+      '<td class="num">'+r.followupVisits+(r.demoVisits?' <span class="fe-demo">('+r.demoVisits+' démo)</span>':'')+'</td>'+
+      '<td class="num">'+r.followupCalls+'</td>'+
+      '<td class="num"><b>'+r.signed+'</b></td>'+
+      '<td class="num">'+n1(r.fieldDaysPerSign)+'</td>'+
+      '<td class="num">'+n1(r.followupsPerSign)+'</td>'+
+    '</tr>';
+  }).join('');
+  return '<div class="section fe-section">'+
+    '<div class="sec-head"><h2>⏱️ Effort <span class="it">terrain &amp; closing</span></h2>'+
+    '<span class="anno">Jours terrain · jours d\'appels · suivis → écoles signées</span></div>'+
+    '<div class="fe-tiles">'+tiles+'</div>'+
+    '<div class="fe-insight"><div class="fe-insight-title">🎯 Combien d\'effort pour signer une école ?</div><div class="fe-insight-body">'+insight+'</div></div>'+
+    '<div class="fe-tiles fe-tiles-cost">'+costTiles+'</div>'+
+    '<div class="fe-table-wrap"><table class="tbl fe-table"><thead>'+head+'</thead><tbody>'+
+      (body || '<tr><td colspan="10" style="text-align:center;color:var(--g500);padding:20px">Aucune activité visible.</td></tr>')+
+    '</tbody></table></div>'+
+  '</div>';
 }
 
 function parseCount(value){
@@ -6808,6 +6958,8 @@ function rHome(){
     '</div>'+
     '</div>';
   })()}
+
+  ${renderFieldEffort(buildFieldEffortAnalytics(dashboard.rawRows, getVisibleFollowups(), dashboard.records))}
 
   <!-- 💰 REVENUE TRACKER (visible by everyone) — 3 periods stacked -->
   ${(function(){
