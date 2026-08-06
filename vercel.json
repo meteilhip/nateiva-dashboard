@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/napi/:path*",
+      "destination": "https://nateiva-sale-analytic-api.57.129.133.115.sslip.io/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(index.html)?",

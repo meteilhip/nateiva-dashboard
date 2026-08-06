@@ -3460,7 +3460,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.52 · Analyse KPI + iClan</span>
+      <span class="meta-pill red">v11.53 · Proxy API same-origin</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -9610,6 +9610,10 @@ window.NATEIVA_CONFIG = Object.assign({
   // — URLs / endpoints —
   APPS_SCRIPT_URL: 'YOUR_APPS_SCRIPT_URL_HERE',
   API_URL: 'https://nateiva-sale-analytic-api.57.129.133.115.sslip.io',
+  // Same-origin proxy path. On hosts that support rewrites (Vercel), the app calls
+  // this relative path instead of the raw-IP sslip.io domain — so antivirus / firewalls
+  // (e.g. AVG Web Shield) and cross-origin CORS never block the API. See vercel.json.
+  API_PROXY: '/napi',
 
   // — Storage keys —
   STORAGE: {
@@ -9807,10 +9811,18 @@ if (!nateivaDeviceId) {
 }
 
 function isBackendConfigured() {
-  return /^https?:\/\//.test(String(NATEIVA_SALE_ANALYTIC_API_URL || '').trim());
+  var base = getApiBaseUrl();
+  return /^https?:\/\//.test(base) || base.charAt(0) === '/';
 }
 
 function getApiBaseUrl() {
+  // Prefer the same-origin proxy where the hosting platform can rewrite it (Vercel).
+  // This keeps the browser off the raw-IP sslip.io domain that AVG / firewalls block,
+  // and avoids cross-origin CORS entirely. Other hosts (github.io, localhost, OVH)
+  // fall back to the direct API URL.
+  var proxy = String((window.NATEIVA_CONFIG && window.NATEIVA_CONFIG.API_PROXY) || '').trim();
+  var host = (window.location && window.location.hostname) || '';
+  if (proxy && /\.vercel\.app$/i.test(host)) return proxy.replace(/\/+$/, '');
   return String(NATEIVA_SALE_ANALYTIC_API_URL || '').replace(/\/+$/, '');
 }
 
