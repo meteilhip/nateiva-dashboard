@@ -2427,10 +2427,13 @@ button,select,input,textarea{outline:none}
   padding:8px 4px calc(8px + env(safe-area-inset-bottom)) 4px;
   box-shadow:0 -4px 20px rgba(0,0,0,.05);
 }
-.bottom-nav-inner{display:flex;justify-content:space-around;align-items:center;max-width:560px;margin:0 auto}
+.bottom-nav-inner{display:flex;align-items:center;gap:2px;margin:0 auto;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  scroll-snap-type:x proximity;}
+.bottom-nav-inner::-webkit-scrollbar{display:none}
 .bottom-tab{
-  flex:1;background:none;border:none;padding:6px 4px;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:2px;
+  flex:0 0 auto;min-width:19%;background:none;border:none;padding:6px 4px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;scroll-snap-align:center;
   font-family:inherit;color:var(--g500);
   transition:all .2s ease;border-radius:10px;position:relative;
 }
@@ -3460,7 +3463,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.53 · Proxy API same-origin</span>
+      <span class="meta-pill red">v11.54 · Journal d'activité + nav mobile complet</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3490,6 +3493,11 @@ button,select,input,textarea{outline:none}
     <span class="nav-label">Workspace</span>
     <span class="nav-desc">New Entry · Follow Up</span>
   </button>
+  <button class="nav-btn" data-pane="activity">
+    <span class="nav-icon">🗒️</span>
+    <span class="nav-label">Activité</span>
+    <span class="nav-desc">Journal & Notes</span>
+  </button>
   <button class="nav-btn" data-pane="metrics">
     <span class="nav-icon">📊</span>
     <span class="nav-label">BI & KPI</span>
@@ -3512,14 +3520,18 @@ button,select,input,textarea{outline:none}
   </button>
 </nav>
 
-<!-- BOTTOM TAB BAR (mobile only) -->
+<!-- BOTTOM TAB BAR (mobile only) — ALL tabs, horizontally scrollable -->
 <nav class="bottom-nav" id="bottomNav" aria-label="Navigation mobile">
   <div class="bottom-nav-inner">
     <button class="bottom-tab" data-pane="home"><span class="bt-icon">🏠</span><span class="bt-label">Dashboard</span></button>
     <button class="bottom-tab" data-pane="playbook"><span class="bt-icon">🎯</span><span class="bt-label">Playbook</span></button>
+    <button class="bottom-tab" data-pane="market"><span class="bt-icon">🗺️</span><span class="bt-label">Marché</span></button>
     <button class="bottom-tab act" data-pane="suivi"><span class="bt-icon">📋</span><span class="bt-label">Workspace</span></button>
-    <button class="bottom-tab" data-pane="team"><span class="bt-icon">👥</span><span class="bt-label">Équipe</span></button>
+    <button class="bottom-tab" data-pane="activity"><span class="bt-icon">🗒️</span><span class="bt-label">Activité</span></button>
     <button class="bottom-tab" data-pane="metrics"><span class="bt-icon">📊</span><span class="bt-label">BI</span></button>
+    <button class="bottom-tab" data-pane="team"><span class="bt-icon">👥</span><span class="bt-label">Équipe</span></button>
+    <button class="bottom-tab" data-pane="intel"><span class="bt-icon">🧠</span><span class="bt-label">NLP</span></button>
+    <button class="bottom-tab" data-pane="glossary"><span class="bt-icon">📖</span><span class="bt-label">Glossaire</span></button>
   </div>
 </nav>
 
@@ -3575,6 +3587,7 @@ button,select,input,textarea{outline:none}
 <div class="pane" id="p-intel"></div>
 <div class="pane" id="p-glossary"></div>
 <div class="pane act" id="p-suivi"></div>
+<div class="pane" id="p-activity"></div>
 
 <div id="loginOverlay" class="login-overlay" style="display:none">
   <div class="login-box">
@@ -9460,11 +9473,210 @@ function rGlossary(){
 // MAIN
 // =============================================================
 // Lazy pane rendering — only render the visible pane, mark others dirty
+// =============================================================
+// ACTIVITÉ — unified activity journal (descentes terrain + suivis) with notes.
+// SuperAdmin sees EVERYONE; every other user sees ONLY their own activity.
+// =============================================================
+function _activityKindMeta(type){
+  var t = String(type||'').toUpperCase();
+  if (t==='CALL') return { icon:'📞', label:'Appel', kind:'call' };
+  if (t==='VISIT') return { icon:'🚶', label:'Visite', kind:'visit' };
+  if (t==='WHATSAPP') return { icon:'💬', label:'WhatsApp', kind:'msg' };
+  if (t==='SMS') return { icon:'📱', label:'SMS', kind:'msg' };
+  if (t==='EMAIL') return { icon:'📧', label:'Email', kind:'msg' };
+  if (t==='LETTER') return { icon:'📨', label:'Courrier', kind:'msg' };
+  if (t==='CREATION') return { icon:'🏫', label:'Nouvelle école', kind:'other' };
+  return { icon:'📝', label: t ? (t.charAt(0)+t.slice(1).toLowerCase()) : 'Suivi', kind:'other' };
+}
+function _actDayLabel(ts){
+  if(!ts) return '📅 Date inconnue';
+  try { return new Date(ts).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
+  catch(e){ return '📅 —'; }
+}
+function _actTime(ts){
+  if(!ts) return '';
+  try { return new Date(ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+function buildActivityItems(){
+  var isSuper = isSuperAdmin(currentUser);
+  var me = currentUser ? currentUser.fullName : '';
+  function mine(name){ return isSuper || samePerson(name, me); }
+  var items = [];
+  // 1) Field prospection "descentes" (raw entries) — richest terrain notes (co)
+  (getBaseRawRows()||[]).forEach(function(r){
+    var person = r.e || r.Expert; if(!person || !mine(person)) return;
+    var d = parseEntryDate(r.t || r.Timestamp || '');
+    items.push({
+      t: d ? d.getTime() : 0,
+      person: canonicalPersonName(person),
+      school: r.n || r.SchoolName || '—',
+      city: r.v || r.City || '',
+      kind: 'terrain', icon:'🚶', label:'Descente terrain',
+      contact: r.rn ? (String(r.rn) + (r.rp ? ' · '+r.rp : '')) : '',
+      note: r.co || '',
+      extra: r.tx ? ('Taux estimé '+r.tx) : '',
+      next: ''
+    });
+  });
+  // 2) Follow-ups (calls, visits, messages, letters, platform saisies, imported calls)
+  (getAllFollowups()||[]).forEach(function(f){
+    var person = f.Expert; if(!person || !mine(person)) return;
+    var meta = _activityKindMeta(f.FollowupType);
+    var d = parseEntryDate(f.Timestamp || '');
+    items.push({
+      t: d ? d.getTime() : 0,
+      person: canonicalPersonName(person),
+      school: f.SchoolName || '—',
+      city: f.City || '',
+      kind: meta.kind, icon: meta.icon, label: meta.label,
+      contact: f.ContactName ? (String(f.ContactName) + (f.ContactRole ? ' · '+f.ContactRole : '')) : '',
+      note: (typeof getFollowupPlainNotes==='function' ? getFollowupPlainNotes(f) : (f.Notes||'')) || '',
+      extra: [f.Outcome, f.Status].filter(Boolean).filter(function(v,i,a){ return a.indexOf(v)===i; }).join(' · '),
+      next: f.NextAction ? (String(f.NextAction) + (f.NextActionDate ? ' · '+f.NextActionDate : '')) : ''
+    });
+  });
+  items.sort(function(a,b){ return (b.t||0) - (a.t||0); });
+  return items;
+}
+window.__activityKind = 'all';
+function setActivityKind(k){
+  window.__activityKind = k || 'all';
+  document.querySelectorAll('#p-activity .act-chip').forEach(function(c){
+    c.classList.toggle('act', c.dataset.k === window.__activityKind);
+  });
+  renderActivityList();
+}
+function renderActivityList(){
+  var host = document.getElementById('activity-list');
+  if(!host) return;
+  var items = window.__activityItems || [];
+  var isSuper = isSuperAdmin(currentUser);
+  var pv = (document.getElementById('act-person')||{}).value || '';
+  var kv = window.__activityKind || 'all';
+  var q = (((document.getElementById('act-search')||{}).value)||'').toLowerCase().trim();
+  var filtered = items.filter(function(it){
+    if (pv && canonicalPersonKey(it.person) !== pv) return false;
+    if (kv !== 'all'){
+      if (kv==='notes'){ if(!it.note) return false; }
+      else if (it.kind !== kv) return false;
+    }
+    if (q){
+      var hay = (it.person+' '+it.school+' '+it.city+' '+it.note+' '+it.extra+' '+it.contact+' '+it.label).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  if(!filtered.length){
+    host.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--g500)">🔍 Aucune activité pour ce filtre.</div>';
+    var sc0 = document.getElementById('act-summary'); if(sc0) sc0.textContent = '0 activité';
+    return;
+  }
+  var withNotes = filtered.filter(function(x){ return x.note; }).length;
+  var sc = document.getElementById('act-summary');
+  if (sc) sc.textContent = filtered.length+' activité'+(filtered.length>1?'s':'')+' · '+withNotes+' avec note'+(withNotes>1?'s':'');
+  // Group by day
+  var groups = [], gmap = {};
+  filtered.forEach(function(it){
+    var dayKey = it.t ? new Date(it.t).toISOString().slice(0,10) : 'x';
+    if(!gmap[dayKey]){ gmap[dayKey] = { key:dayKey, t:it.t, label:_actDayLabel(it.t), rows:[] }; groups.push(gmap[dayKey]); }
+    gmap[dayKey].rows.push(it);
+  });
+  var kindColor = { terrain:'var(--teal)', call:'var(--saffron-bright)', visit:'var(--purple)', msg:'var(--green)', other:'var(--g500)' };
+  var html = groups.map(function(g){
+    var rows = g.rows.map(function(it){
+      var col = kindColor[it.kind] || 'var(--g500)';
+      var noteHtml = it.note
+        ? '<div style="margin-top:6px;padding:8px 11px;background:var(--bg-warm);border-left:3px solid '+col+';border-radius:8px;font-size:13px;line-height:1.55;color:var(--ink);white-space:pre-wrap">'+esc(it.note)+'</div>'
+        : '<div style="margin-top:4px;font-size:12px;color:var(--g400);font-style:italic">— pas de note —</div>';
+      var meta = [];
+      if (it.contact) meta.push('👤 '+esc(it.contact));
+      if (it.extra) meta.push('🏷️ '+esc(it.extra));
+      if (it.next) meta.push('⏭️ '+esc(it.next));
+      var metaHtml = meta.length ? '<div style="margin-top:5px;font-size:11.5px;color:var(--g500);display:flex;flex-wrap:wrap;gap:4px 12px">'+meta.join('')+'</div>' : '';
+      return '<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--g100)">'+
+          '<div style="flex:0 0 34px;height:34px;border-radius:9px;background:var(--bg-warm);border:1px solid var(--g200);display:flex;align-items:center;justify-content:center;font-size:17px">'+it.icon+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">'+
+              '<b style="font-size:14px;color:var(--ink)">'+esc(it.school)+'</b>'+
+              (it.city?'<span style="font-size:11px;color:var(--g500)">📍 '+esc(getCityLabel(it.city))+'</span>':'')+
+              '<span style="font-size:11px;font-weight:700;color:'+col+'">'+esc(it.label)+'</span>'+
+              (isSuper?'<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--red);background:var(--red-soft);padding:2px 8px;border-radius:20px">'+esc(it.person)+'</span>':'')+
+              '<span style="font-size:11px;color:var(--g400);'+(isSuper?'':'margin-left:auto')+'">'+_actTime(it.t)+'</span>'+
+            '</div>'+
+            noteHtml + metaHtml +
+          '</div>'+
+        '</div>';
+    }).join('');
+    return '<div style="margin-bottom:18px">'+
+        '<div style="position:sticky;top:0;z-index:2;background:var(--paper);padding:8px 0;font-size:12px;font-weight:800;text-transform:capitalize;color:var(--g600);letter-spacing:.02em;border-bottom:2px solid var(--g200)">'+esc(g.label)+' · '+g.rows.length+'</div>'+
+        rows +
+      '</div>';
+  }).join('');
+  host.innerHTML = html;
+}
+function rActivity(){
+  var el = document.getElementById('p-activity');
+  if(!el) return;
+  var isSuper = isSuperAdmin(currentUser);
+  window.__activityItems = buildActivityItems();
+  var items = window.__activityItems;
+  // Distinct people (super only) for the filter + per-person counts
+  var people = [], pcount = {}, seen = {};
+  items.forEach(function(it){
+    var k = canonicalPersonKey(it.person);
+    if(!k) return;
+    pcount[k] = (pcount[k]||0)+1;
+    if(!seen[k]){ seen[k]=1; people.push({ key:k, name:it.person }); }
+  });
+  people.sort(function(a,b){ return (pcount[b.key]||0)-(pcount[a.key]||0); });
+  var withNotes = items.filter(function(x){ return x.note; }).length;
+
+  var scopeNote = isSuper
+    ? 'Vue Super Admin — activité de toute l\'équipe.'
+    : 'Votre activité personnelle uniquement.';
+
+  var personSelect = '';
+  if (isSuper){
+    personSelect = '<select id="act-person" onchange="renderActivityList()" style="padding:9px 12px;border:1px solid var(--g200);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--paper)">'+
+      '<option value="">👥 Toute l\'équipe ('+items.length+')</option>'+
+      people.map(function(p){ return '<option value="'+attrEsc(p.key)+'">'+esc(p.name)+' ('+(pcount[p.key]||0)+')</option>'; }).join('')+
+    '</select>';
+  }
+
+  var chips = [
+    {k:'all',label:'Tout'},{k:'terrain',label:'🚶 Terrain'},{k:'call',label:'📞 Appels'},
+    {k:'visit',label:'🚶 Visites'},{k:'msg',label:'💬 Messages'},{k:'notes',label:'📝 Avec note'}
+  ].map(function(c){
+    return '<button class="act-chip'+(c.k==='all'?' act':'')+'" data-k="'+c.k+'" onclick="setActivityKind(\''+c.k+'\')" '+
+      'style="padding:7px 13px;border:1px solid var(--g200);border-radius:20px;background:var(--paper);font-family:inherit;font-size:12.5px;font-weight:700;color:var(--g600);cursor:pointer;white-space:nowrap">'+c.label+'</button>';
+  }).join('');
+  window.__activityKind = 'all';
+
+  el.innerHTML =
+    '<div class="page-intro" style="margin-bottom:16px">'+
+      '<h2 style="margin:0 0 4px">🗒️ Journal d\'activité</h2>'+
+      '<p style="margin:0;font-size:13px;color:var(--g500)">'+esc(scopeNote)+' Descentes terrain, appels, visites, messages et courriers — avec toutes les notes.</p>'+
+    '</div>'+
+    '<div class="section" style="padding:16px">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">'+
+        personSelect +
+        '<input id="act-search" type="text" oninput="renderActivityList()" placeholder="🔎 Rechercher école, note, contact…" '+
+          'style="flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--g200);border-radius:10px;font-family:inherit;font-size:13px;color:var(--ink);background:var(--paper)">'+
+        '<span id="act-summary" style="font-size:12px;font-weight:700;color:var(--g500);white-space:nowrap">'+items.length+' activités · '+withNotes+' avec notes</span>'+
+      '</div>'+
+      '<div class="act-chips" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;overflow-x:auto">'+chips+'</div>'+
+      '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}</style>'+
+      '<div id="activity-list" style="margin-top:6px"></div>'+
+    '</div>';
+  renderActivityList();
+}
+
 var _paneRenderers = null;
-var _paneDirty = { home:true, metrics:true, team:true, market:true, playbook:true, intel:true, glossary:true, suivi:true };
+var _paneDirty = { home:true, metrics:true, team:true, market:true, playbook:true, intel:true, glossary:true, suivi:true, activity:true };
 function _getPaneRenderers(){
   if (_paneRenderers) return _paneRenderers;
-  _paneRenderers = { home:rHome, metrics:rMetrics, team:rTeam, market:rMarket, playbook:rPlaybook, intel:rIntel, glossary:rGlossary, suivi:rSuivi };
+  _paneRenderers = { home:rHome, metrics:rMetrics, team:rTeam, market:rMarket, playbook:rPlaybook, intel:rIntel, glossary:rGlossary, suivi:rSuivi, activity:rActivity };
   return _paneRenderers;
 }
 function _getActivePaneKey(){
@@ -9755,6 +9967,7 @@ var PANE_ACCESS_CONFIG = [
   { key: 'playbook', label: 'Playbook' },
   { key: 'market', label: 'Marché' },
   { key: 'suivi', label: 'Workspace' },
+  { key: 'activity', label: 'Activité' },
   { key: 'metrics', label: 'BI & KPI' },
   { key: 'team', label: 'Équipe' },
   { key: 'intel', label: 'NLP' },
@@ -9936,7 +10149,7 @@ function getDefaultPermissions(user) {
   var expert = isExpert(user);
   var globalData = isSuperAdmin(user) || isSubAdmin(user);
   return {
-    panes: (elevated || expert) ? allPaneKeys() : ['home', 'playbook', 'suivi', 'glossary'],
+    panes: (elevated || expert) ? allPaneKeys() : ['home', 'playbook', 'suivi', 'activity', 'glossary'],
     // Only SuperAdmin + SubAdmin see team-wide ('all'). Experts (and everyone else)
     // are strictly scoped to their OWN data — no team totals or overall numbers.
     dataScope: globalData ? 'all' : 'own',
@@ -10113,6 +10326,12 @@ function applyNavigationAccess() {
     var isAllowed = allowed.indexOf(btn.dataset.pane) > -1;
     btn.style.display = isAllowed ? '' : 'none';
     btn.disabled = !isAllowed;
+    if (!isAllowed) btn.classList.remove('act');
+  });
+  // Mirror access on the mobile bottom-nav tabs
+  document.querySelectorAll('.bottom-tab').forEach(function(btn) {
+    var isAllowed = allowed.indexOf(btn.dataset.pane) > -1;
+    btn.style.display = isAllowed ? '' : 'none';
     if (!isAllowed) btn.classList.remove('act');
   });
   document.querySelectorAll('.pane').forEach(function(pane) {
