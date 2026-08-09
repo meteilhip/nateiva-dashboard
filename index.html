@@ -394,6 +394,7 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 
 .section{margin-bottom:40px}
 .sec-head{
+  position:relative;
   display:flex;align-items:flex-end;justify-content:space-between;
   margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid var(--g100);gap:20px;
 }
@@ -405,6 +406,42 @@ table tbody tr:hover{background:rgba(220,38,38,.04)}
 .sec-head .anno{
   font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g500);
   letter-spacing:.12em;text-transform:uppercase;font-weight:700;
+}
+
+/* ============================================
+   AUTO-COLLAPSE NAV ON SCROLL (down hides, up reveals)
+   ============================================ */
+.nav-main{transition:transform .5s cubic-bezier(.16,1,.3,1),opacity .35s ease,box-shadow .35s ease}
+.nav-main.nav-collapsed{transform:translateY(-170%);opacity:0;pointer-events:none;box-shadow:none}
+.bottom-nav{transition:transform .45s cubic-bezier(.16,1,.3,1),opacity .3s ease}
+.bottom-nav.nav-collapsed{transform:translateY(135%);opacity:0;pointer-events:none}
+
+/* ============================================
+   PREMIUM SECTION SEPARATORS + REVEAL-ON-SCROLL
+   ============================================ */
+/* subtle rise on the section title as its section scrolls into view
+   (kept off .section itself so it never fights the cardPop entrance) */
+.reveal-on .section .sec-head{opacity:0;transform:translateY(16px)}
+.reveal-on .section.sec-in .sec-head{opacity:1;transform:none;transition:opacity .6s ease,transform .75s cubic-bezier(.16,1,.3,1)}
+/* animated gradient rule that draws in under each section title */
+.sec-head::after{
+  content:'';position:absolute;left:0;bottom:-2px;height:2px;width:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--red),var(--saffron),var(--teal),transparent);
+  background-size:220% 100%;
+  transform:scaleX(1);transform-origin:left;
+  transition:transform .9s cubic-bezier(.16,1,.3,1) .12s;
+  animation:sepShimmer 7s linear infinite;
+}
+.reveal-on .sec-head::after{transform:scaleX(0)}
+.reveal-on .section.sec-in .sec-head::after{transform:scaleX(1)}
+/* the italic accent word gets a soft glow as the section reveals */
+.reveal-on .section.sec-in .sec-head h2 .it{animation:accentGlow 1.1s ease .2s both}
+@keyframes sepShimmer{0%{background-position:0% 0}100%{background-position:220% 0}}
+@keyframes accentGlow{0%{text-shadow:0 0 0 rgba(220,38,38,0)}45%{text-shadow:0 0 18px rgba(220,38,38,.35)}100%{text-shadow:0 0 0 rgba(220,38,38,0)}}
+@media (prefers-reduced-motion: reduce){
+  .reveal-on .section{opacity:1;transform:none}
+  .sec-head::after,.reveal-on .section.sec-in .sec-head h2 .it{animation:none}
+  .nav-main,.bottom-nav{transition:none}
 }
 
 /* ============================================
@@ -3463,7 +3500,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.55 · Effort → signature corrigé (par école)</span>
+      <span class="meta-pill red">v11.56 · Nav auto-collapse + séparateurs animés</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -14913,7 +14950,13 @@ setInterval(updateVercelToolbarVisibility, 60000);
   function el(){ return document.scrollingElement || document.documentElement; }
   up.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
   down.addEventListener('click', function(){ window.scrollTo({top:el().scrollHeight, behavior:'smooth'}); });
-  var ticking=false;
+  var ticking=false, lastY=0;
+  var navMain=document.querySelector('.nav-main');
+  var bottomNav=document.getElementById('bottomNav');
+  function setNavCollapsed(on){
+    if(navMain) navMain.classList.toggle('nav-collapsed', on);
+    if(bottomNav) bottomNav.classList.toggle('nav-collapsed', on);
+  }
   function update(){
     ticking=false;
     var e=el();
@@ -14924,12 +14967,45 @@ setInterval(updateVercelToolbarVisibility, 60000);
     nav.setAttribute('aria-hidden', scrollable ? 'false' : 'true');
     up.classList.toggle('hidden', y < 120);
     down.classList.toggle('hidden', y > max - 120);
+    // Collapse the nav panel on scroll DOWN, reveal on scroll UP — for a clear view.
+    if(y > lastY + 5 && y > 170) setNavCollapsed(true);
+    else if(y < lastY - 5 || y < 120) setNavCollapsed(false);
+    lastY = y;
   }
   function onScroll(){ if(!ticking){ ticking=true; requestAnimationFrame(update); } }
   window.addEventListener('scroll', onScroll, {passive:true});
   window.addEventListener('resize', onScroll, {passive:true});
   setInterval(update, 1000); // re-evaluate after SPA pane swaps change page height
   update();
+})();
+
+// — Premium reveal-on-scroll for every section (fade + rise + animated separator) —
+(function(){
+  if(!('IntersectionObserver' in window)) return; // graceful: sections stay fully visible
+  var root=document.documentElement;
+  root.classList.add('reveal-on');
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(en.isIntersecting){ en.target.classList.add('sec-in'); io.unobserve(en.target); }
+    });
+  }, {root:null, rootMargin:'0px 0px -6% 0px', threshold:0.05});
+  function scan(){
+    var list=document.querySelectorAll('.section:not([data-rev])');
+    for(var i=0;i<list.length;i++){ list[i].setAttribute('data-rev','1'); io.observe(list[i]); }
+  }
+  window.__revealSections=scan;
+  // Safety net: never leave an in-viewport section hidden (covers SPA pane swaps)
+  function safety(){
+    var vh=window.innerHeight||800;
+    document.querySelectorAll('.reveal-on .section:not(.sec-in)').forEach(function(s){
+      var r=s.getBoundingClientRect();
+      if(r.top < vh*0.94 && r.bottom > 0) s.classList.add('sec-in');
+    });
+    scan();
+  }
+  scan();
+  setInterval(safety, 600);
+  safety();
 })();
 </script>
 </body>
