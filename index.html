@@ -3463,7 +3463,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.54 · Journal d'activité + nav mobile complet</span>
+      <span class="meta-pill red">v11.55 · Effort → signature corrigé (par école)</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3804,6 +3804,12 @@ function buildActivitySummary(rawRows, followups){
 //   signed      = écoles gagnées attribuées à la personne (closedBy / expert)
 // Ratios tell us how many field days + follow-ups it takes, on average, to sign a school.
 // =============================================================
+function _median(arr){
+  if(!arr || !arr.length) return null;
+  var a = arr.slice().sort(function(x,y){ return x-y; });
+  var m = Math.floor(a.length/2);
+  return a.length%2 ? a[m] : (a[m-1]+a[m])/2;
+}
 function buildFieldEffortAnalytics(rawRows, followups, records){
   var byExpert = {};
   function ensure(name){
@@ -3812,7 +3818,8 @@ function buildFieldEffortAnalytics(rawRows, followups, records){
     if(!byExpert[key]) byExpert[key] = {
       expert: canonicalPersonName(name) || String(name||'').trim(),
       terrainDaySet:{}, callDaySet:{}, activeDaySet:{},
-      rawDescentes:0, followupVisits:0, followupCalls:0, followupOther:0, demoVisits:0, signed:0
+      rawDescentes:0, followupVisits:0, followupCalls:0, followupOther:0, demoVisits:0,
+      signed:0, sTouches:0, sCalls:0, sVisits:0, sDaysSum:0, sDaysCount:0
     };
     return byExpert[key];
   }
@@ -3836,11 +3843,31 @@ function buildFieldEffortAnalytics(rawRows, followups, records){
     }
     else { b.followupOther++; }
   });
+  // === EFFORT → SIGNATURE — linked to EACH SIGNED SCHOOL itself ===
+  // The real "effort to close" is the effort spent ON THAT school: its own contacts
+  // (raw descentes + follow-ups), calls, visits, and the cycle time from first contact
+  // to signature. We average across signed schools — NOT the expert's whole workload
+  // divided by their signatures (which wrongly counted effort on schools that never signed).
+  var signedSchools = [];
+  var allTouches = [], allDays = [], allCalls = [], allVisits = [];
   (records||[]).forEach(function(rec){
     if(!rec || rec.stage!=='gagne') return;
     var b = ensure(rec.closedBy || rec.expert); if(!b) return;
-    b.signed++;
+    var touches = (rec.rawCount||0) + (rec.followupCount||0);
+    var calls = rec.callCount||0;
+    var visits = rec.visitCount||0;
+    var days = null;
+    if(rec.firstTouch && rec.closedAt){
+      var d = Math.round((rec.closedAt.getTime() - rec.firstTouch.getTime())/86400000);
+      if(d>=0) days = d;
+    }
+    b.signed++; b.sTouches+=touches; b.sCalls+=calls; b.sVisits+=visits;
+    if(days!=null){ b.sDaysSum+=days; b.sDaysCount++; }
+    allTouches.push(touches); allCalls.push(calls); allVisits.push(visits);
+    if(days!=null) allDays.push(days);
+    signedSchools.push({ school:rec.schoolName, city:rec.city, expert:b.expert, touches:touches, calls:calls, visits:visits, days:days, amount:rec.amount||0 });
   });
+  signedSchools.sort(function(a,b){ return (a.touches||0)-(b.touches||0); });
   var rows = Object.keys(byExpert).map(function(k){
     var b = byExpert[k];
     var terrainDays = Object.keys(b.terrainDaySet).length;
@@ -3851,11 +3878,11 @@ function buildFieldEffortAnalytics(rawRows, followups, records){
       expert:b.expert, terrainDays:terrainDays, callDays:callDays, activeDays:activeDays,
       rawDescentes:b.rawDescentes, followupVisits:b.followupVisits, demoVisits:b.demoVisits,
       followupCalls:b.followupCalls, followupOther:b.followupOther, totalFollowups:totalFollowups, signed:b.signed,
-      fieldDaysPerSign: b.signed ? terrainDays/b.signed : null,
-      activeDaysPerSign: b.signed ? activeDays/b.signed : null,
-      followupsPerSign: b.signed ? totalFollowups/b.signed : null,
-      callsPerSign: b.signed ? b.followupCalls/b.signed : null,
-      visitsPerSign: b.signed ? b.followupVisits/b.signed : null
+      // averages over THIS expert's own signed schools
+      avgTouchesPerSign: b.signed ? b.sTouches/b.signed : null,
+      avgCallsPerSign: b.signed ? b.sCalls/b.signed : null,
+      avgVisitsPerSign: b.signed ? b.sVisits/b.signed : null,
+      avgDaysPerSign: b.sDaysCount ? b.sDaysSum/b.sDaysCount : null
     };
   }).sort(function(a,b){ return (b.signed-a.signed) || (b.activeDays-a.activeDays); });
   var team = rows.reduce(function(t,r){
@@ -3864,30 +3891,21 @@ function buildFieldEffortAnalytics(rawRows, followups, records){
     t.followupCalls+=r.followupCalls; t.totalFollowups+=r.totalFollowups; t.signed+=r.signed;
     return t;
   }, {terrainDays:0,callDays:0,activeDays:0,rawDescentes:0,followupVisits:0,demoVisits:0,followupCalls:0,totalFollowups:0,signed:0});
-  // "Effort → signature" must reflect ONLY the people who actually signed — their own effort
-  // divided by their own signatures. One signer with 3 écoles → HER days/3. When others sign,
-  // it becomes the average across the signers (weighted by signatures). Non-signers' effort is
-  // NOT diluted into this ratio.
-  var signers = rows.filter(function(r){ return r.signed > 0; });
-  var sig = signers.reduce(function(a,r){
-    a.terrainDays+=r.terrainDays; a.callDays+=r.callDays; a.activeDays+=r.activeDays;
-    a.followupVisits+=r.followupVisits; a.followupCalls+=r.followupCalls;
-    a.totalFollowups+=r.totalFollowups; a.signed+=r.signed;
-    return a;
-  }, {terrainDays:0,callDays:0,activeDays:0,followupVisits:0,followupCalls:0,totalFollowups:0,signed:0});
-  team.signerCount = signers.length;
-  team.signerTerrainDays = sig.terrainDays;
-  team.signerCallDays = sig.callDays;
-  team.signerActiveDays = sig.activeDays;
-  team.signerFollowups = sig.totalFollowups;
-  team.signerCalls = sig.followupCalls;
-  team.signerVisits = sig.followupVisits;
-  team.fieldDaysPerSign = sig.signed ? sig.terrainDays/sig.signed : null;
-  team.activeDaysPerSign = sig.signed ? sig.activeDays/sig.signed : null;
-  team.followupsPerSign = sig.signed ? sig.totalFollowups/sig.signed : null;
-  team.callsPerSign = sig.signed ? sig.followupCalls/sig.signed : null;
-  team.visitsPerSign = sig.signed ? sig.followupVisits/sig.signed : null;
-  return { rows:rows, team:team };
+  var _sum = function(a){ return a.reduce(function(s,x){return s+x;},0); };
+  var _avg = function(a){ return a.length ? _sum(a)/a.length : null; };
+  team.signerCount   = rows.filter(function(r){ return r.signed>0; }).length;
+  // Closing KPIs — the average EFFORT PER SIGNED SCHOOL (this is the corrected metric)
+  team.avgTouches    = _avg(allTouches);
+  team.medTouches    = _median(allTouches);
+  team.minTouches    = allTouches.length ? Math.min.apply(null, allTouches) : null;
+  team.maxTouches    = allTouches.length ? Math.max.apply(null, allTouches) : null;
+  team.avgCalls      = _avg(allCalls);
+  team.avgVisits     = _avg(allVisits);
+  team.avgDays       = _avg(allDays);
+  team.medDays       = _median(allDays);
+  team.daysKnown     = allDays.length;
+  team.oneTouchCloses= allTouches.filter(function(x){ return x<=1; }).length;
+  return { rows:rows, team:team, signedSchools:signedSchools };
 }
 
 // Render the "Effort terrain & closing" section (team tiles + averages + per-expert table).
@@ -3907,40 +3925,56 @@ function renderFieldEffort(fe){
     tile('📞','Jours d\'appels', t.callDays, t.followupCalls+' appels de suivi','var(--teal)')+
     tile('📅','Jours actifs combinés', t.activeDays, 'jours distincts (terrain + appels)','var(--purple)')+
     tile('✅','Écoles signées', t.signed, 'deals gagnés validés','var(--green)');
+  var daysVal = (t.daysKnown>0) ? n1(t.avgDays)+' j' : '—';
+  var daysSub = (t.daysKnown>0) ? ('du 1er contact à la signature · médiane '+n1(t.medDays)+' j'+(t.daysKnown<t.signed?(' · '+t.daysKnown+'/'+t.signed+' datées'):'')) : 'dates insuffisantes';
   var costTiles =
-    tile('🚶→✅','Jours terrain / signature', n1(t.fieldDaysPerSign), 'jours sur le terrain par école signée','var(--saffron-deep)')+
-    tile('📅→✅','Jours actifs / signature', n1(t.activeDaysPerSign), 'jours actifs par école signée','var(--purple)')+
-    tile('🔁→✅','Suivis / signature', n1(t.followupsPerSign), 'suivis totaux par école signée','var(--red)')+
-    tile('📞→✅','Appels suivi / signature', n1(t.callsPerSign), 'appels de suivi par école signée','var(--teal)');
-  var who = (t.signerCount===1) ? 'la personne ayant signé a' : 'les '+t.signerCount+' personnes ayant signé ont';
+    tile('🔗→✅','Contacts / signature', n1(t.avgTouches), 'contacts (terrain+suivi) par école signée · médiane '+n1(t.medTouches),'var(--red)')+
+    tile('📞→✅','Appels / signature', n1(t.avgCalls), 'appels par école signée','var(--teal)')+
+    tile('🚶→✅','Visites / signature', n1(t.avgVisits), 'visites terrain par école signée','var(--saffron-deep)')+
+    tile('⏳→✅','Délai de signature', daysVal, daysSub,'var(--purple)');
   var insight = t.signed>0
-    ? 'En moyenne, '+who+' investi <b>'+n1(t.fieldDaysPerSign)+' jours terrain</b> et <b>'+n1(t.followupsPerSign)+' suivis</b> (dont <b>'+n1(t.callsPerSign)+' appels</b> et <b>'+n1(t.visitsPerSign)+' visites/démo</b>) par école signée — sur <b>'+t.signed+'</b> école'+(t.signed>1?'s':'')+' signée'+(t.signed>1?'s':'')+' par <b>'+t.signerCount+'</b> personne'+(t.signerCount>1?'s':'')+' ('+t.signerTerrainDays+' jours terrain + '+t.signerCallDays+' jours d\'appels des signataires). L\'effort des personnes n\'ayant pas encore signé n\'entre PAS dans cette moyenne.'
-    : 'Aucune école signée sur la période visible : dès la première signature, la moyenne « effort → signature » (basée uniquement sur les signataires) s\'affiche ici.';
-  var head = '<tr><th>Personne</th><th class="num">Jours terrain</th><th class="num">Jours appels</th><th class="num">Jours actifs</th><th class="num">Descentes</th><th class="num">Visites suivi</th><th class="num">Appels suivi</th><th class="num">Signées</th><th class="num">J.&nbsp;terrain/sign.</th><th class="num">Suivis/sign.</th></tr>';
+    ? 'En moyenne, <b>une école signée a demandé '+n1(t.avgTouches)+' contact'+((t.avgTouches>1)?'s':'')+'</b> (médiane '+n1(t.medTouches)+') — dont <b>'+n1(t.avgCalls)+' appel'+((t.avgCalls>1)?'s':'')+'</b> et <b>'+n1(t.avgVisits)+' visite'+((t.avgVisits>1)?'s':'')+'</b>'+(t.daysKnown>0?(', et s\'est signée en <b>'+n1(t.avgDays)+' jour'+((t.avgDays>1)?'s':'')+'</b> après le 1er contact'):'')+'. Sur <b>'+t.signed+'</b> école'+(t.signed>1?'s':'')+' signée'+(t.signed>1?'s':'')+' — de <b>'+t.minTouches+'</b> à <b>'+t.maxTouches+'</b> contacts. '+(t.oneTouchCloses>0?('<b>'+t.oneTouchCloses+'</b> signée'+(t.oneTouchCloses>1?'s':'')+' au 1er contact.'):'Aucune signée au 1er contact — la relance paie.')+' Effort mesuré école par école, pas dilué sur les fiches non signées.'
+    : 'Aucune école signée sur la période visible : dès la première signature, l\'effort réel dépensé sur cette école (contacts, appels, visites, délai) s\'affiche ici.';
+  var head = '<tr><th>Personne</th><th class="num">Jours actifs</th><th class="num">Descentes</th><th class="num">Visites</th><th class="num">Appels</th><th class="num">Signées</th><th class="num">Contacts/sign.</th><th class="num">Appels/sign.</th><th class="num">Délai&nbsp;(j)</th></tr>';
   var body = fe.rows.map(function(r){
-    return '<tr>'+
+    return '<tr'+(r.signed>0?' style="background:rgba(16,185,129,.04)"':'')+'>'+
       '<td><b>'+esc(r.expert)+'</b></td>'+
-      '<td class="num">'+r.terrainDays+'</td>'+
-      '<td class="num">'+r.callDays+'</td>'+
       '<td class="num">'+r.activeDays+'</td>'+
       '<td class="num">'+r.rawDescentes+'</td>'+
       '<td class="num">'+r.followupVisits+(r.demoVisits?' <span class="fe-demo">('+r.demoVisits+' démo)</span>':'')+'</td>'+
       '<td class="num">'+r.followupCalls+'</td>'+
       '<td class="num"><b>'+r.signed+'</b></td>'+
-      '<td class="num">'+n1(r.fieldDaysPerSign)+'</td>'+
-      '<td class="num">'+n1(r.followupsPerSign)+'</td>'+
+      '<td class="num">'+n1(r.avgTouchesPerSign)+'</td>'+
+      '<td class="num">'+n1(r.avgCallsPerSign)+'</td>'+
+      '<td class="num">'+(r.avgDaysPerSign==null?'—':n1(r.avgDaysPerSign))+'</td>'+
     '</tr>';
   }).join('');
+  // Per-signed-school breakdown — the actual effort behind each signature
+  var schoolRows = (fe.signedSchools||[]).map(function(s){
+    return '<tr>'+
+      '<td><b>'+esc(s.school||'—')+'</b>'+(s.city?' <span style="color:var(--g500);font-size:11px">'+esc(getCityLabel(s.city))+'</span>':'')+'</td>'+
+      '<td>'+esc(s.expert||'—')+'</td>'+
+      '<td class="num"><b>'+s.touches+'</b></td>'+
+      '<td class="num">'+s.calls+'</td>'+
+      '<td class="num">'+s.visits+'</td>'+
+      '<td class="num">'+(s.days==null?'—':s.days)+'</td>'+
+    '</tr>';
+  }).join('');
+  var schoolTable = (fe.signedSchools && fe.signedSchools.length)
+    ? '<div class="fe-cost-label" style="margin-top:18px">🏫 Effort derrière chaque école signée ('+fe.signedSchools.length+')</div>'+
+      '<div class="fe-table-wrap"><table class="tbl fe-table"><thead><tr><th>École signée</th><th>Signée par</th><th class="num">Contacts</th><th class="num">Appels</th><th class="num">Visites</th><th class="num">Délai&nbsp;(j)</th></tr></thead><tbody>'+schoolRows+'</tbody></table></div>'
+    : '';
   return '<div class="section fe-section">'+
     '<div class="sec-head"><h2>⏱️ Effort <span class="it">terrain &amp; closing</span></h2>'+
-    '<span class="anno">Jours terrain · jours d\'appels · suivis → écoles signées</span></div>'+
+    '<span class="anno">Effort réel par école signée · contacts · appels · visites · délai</span></div>'+
     '<div class="fe-tiles">'+tiles+'</div>'+
     '<div class="fe-insight"><div class="fe-insight-title">🎯 Combien d\'effort pour signer une école ?</div><div class="fe-insight-body">'+insight+'</div></div>'+
-    '<div class="fe-cost-label">📐 Effort → signature — calculé uniquement sur '+(t.signerCount||0)+' signataire'+((t.signerCount||0)>1?'s':'')+' (leur effort ÷ leurs signatures)</div>'+
+    '<div class="fe-cost-label">📐 Effort → signature — moyenne de l\'effort dépensé sur chaque école signée (école par école)</div>'+
     '<div class="fe-tiles fe-tiles-cost">'+costTiles+'</div>'+
     '<div class="fe-table-wrap"><table class="tbl fe-table"><thead>'+head+'</thead><tbody>'+
-      (body || '<tr><td colspan="10" style="text-align:center;color:var(--g500);padding:20px">Aucune activité visible.</td></tr>')+
+      (body || '<tr><td colspan="9" style="text-align:center;color:var(--g500);padding:20px">Aucune activité visible.</td></tr>')+
     '</tbody></table></div>'+
+    schoolTable +
   '</div>';
 }
 
@@ -4212,6 +4246,7 @@ function buildSchoolRecords(rawRows, followups){
         callCount:0,
         followupCount:0,
         lastTouch:null,
+        firstTouch:null,
         won:false,
         lost:false,
         closedAt:null,
@@ -4253,6 +4288,7 @@ function buildSchoolRecords(rawRows, followups){
     const effectif=parseStudentCount(r.ef);
     if(Number.isFinite(effectif))rec.effectif=Math.max(rec.effectif,effectif);
     const dt=parseEntryDate(r.t);
+    if(dt && (!rec.firstTouch || dt<rec.firstTouch))rec.firstTouch=dt;
     if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
       rec.lastTouch=dt;
       if(typeof r.r==='number')rec.rate=r.r;
@@ -4308,6 +4344,7 @@ function buildSchoolRecords(rawRows, followups){
     if(item.FollowupType==='VISIT')rec.visitCount++;
     if(meta.rate && !Number.isNaN(Number(meta.rate)))rec.rate=Number(meta.rate);
     const dt=parseEntryDate(item.Timestamp);
+    if(dt && (!rec.firstTouch || dt<rec.firstTouch))rec.firstTouch=dt;
     if(dt && (!rec.lastTouch || dt>rec.lastTouch)){
       rec.lastTouch=dt;
       rec.notes=[item.Outcome||'',item.Status||'',cleanNotes||'',item.NextAction||''].filter(Boolean).join(' · ');
