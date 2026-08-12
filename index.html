@@ -3500,7 +3500,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.56 · Nav auto-collapse + séparateurs animés</span>
+      <span class="meta-pill red">v11.57 · Saisies fiables (sauvegarde locale + auteur exact)</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -9990,6 +9990,10 @@ var NATEIVA_SALE_ANALYTIC_API_URL = window.NATEIVA_CONFIG.API_URL;
 var NCFG = window.NATEIVA_CONFIG;
 var currentUser = safeStorageParse('nateiva_user', null);
 var suiviFollowups = safeStorageParse('nateiva_followups', []);
+// Optimistic / offline queue: entries the user saved that are not yet confirmed by the
+// backend. They are ALWAYS shown (so a saisie never "disappears") and survive a backend
+// bootstrap replace; each is pruned once its synced twin arrives, or resent on next sync.
+var pendingFollowups = safeStorageParse('nateiva_pending_followups', []);
 var nateivaApiToken = localStorage.getItem('nateiva_sale_analytic_token') || '';
 var serverUsers = safeStorageParse('nateiva_server_users', []);
 var nateivaDeviceId = localStorage.getItem('nateiva_sale_analytic_device_id') || '';
@@ -10137,7 +10141,72 @@ function setServerUsers(users) {
 function setSyncedFollowups(followups) {
   suiviFollowups = dedupeFollowupRecords(Array.isArray(followups) ? followups : []);
   persistFollowupStore();
+  prunePendingAgainstSynced();
   if (typeof bumpDataVersion === 'function') bumpDataVersion();
+}
+
+// ===== Optimistic / offline follow-up queue =====
+function persistPendingFollowups() {
+  try { localStorage.setItem('nateiva_pending_followups', JSON.stringify(Array.isArray(pendingFollowups) ? pendingFollowups : [])); } catch (e) {}
+  if (typeof bumpDataVersion === 'function') bumpDataVersion();
+}
+function _fuSig(f) {
+  try { return followupDedupeKey(f); } catch (e) { return JSON.stringify(f || {}); }
+}
+// Format-tolerant signature for matching an optimistic entry to its backend twin, even when
+// the server returns the timestamp in a different format (e.g. MySQL DATETIME vs ISO). Uses
+// the date (day) only, plus author + school + type + notes + outcome.
+function _fuLooseSig(f) {
+  var item = hydrateFollowupRecord(f);
+  return [
+    canonicalPersonKey(item.Expert),
+    schoolKey(item.SchoolName),
+    String(item.FollowupType || '').toUpperCase(),
+    normalizeText(getFollowupPlainNotes(item)),
+    normalizeText(item.Outcome),
+    String(item.Timestamp || '').slice(0, 10)
+  ].join('|');
+}
+// Add (or replace) an optimistic record so the saisie shows immediately everywhere.
+function addPendingFollowup(rec) {
+  var h = hydrateFollowupRecord(rec);
+  var sig = _fuSig(h);
+  pendingFollowups = (Array.isArray(pendingFollowups) ? pendingFollowups : []).filter(function(p) { return _fuSig(p) !== sig; });
+  pendingFollowups.push(h);
+  persistPendingFollowups();
+  return h;
+}
+function removePendingFollowup(rec) {
+  var sig = _fuSig(hydrateFollowupRecord(rec));
+  var before = (pendingFollowups || []).length;
+  pendingFollowups = (Array.isArray(pendingFollowups) ? pendingFollowups : []).filter(function(p) { return _fuSig(p) !== sig; });
+  if (pendingFollowups.length !== before) persistPendingFollowups();
+}
+// Drop any pending entry whose confirmed twin is already in the synced store.
+function prunePendingAgainstSynced() {
+  if (!pendingFollowups || !pendingFollowups.length) return;
+  var syncedSigs = {};
+  (Array.isArray(suiviFollowups) ? suiviFollowups : []).forEach(function(s) {
+    syncedSigs[_fuSig(s)] = 1; syncedSigs[_fuLooseSig(s)] = 1;
+  });
+  var before = pendingFollowups.length;
+  pendingFollowups = pendingFollowups.filter(function(p) { return !syncedSigs[_fuSig(p)] && !syncedSigs[_fuLooseSig(p)]; });
+  if (pendingFollowups.length !== before) persistPendingFollowups();
+}
+// Best-effort resend of queued entries once a backend token is available.
+async function flushPendingFollowups() {
+  if (!pendingFollowups || !pendingFollowups.length) return;
+  if (!isBackendConfigured() || !nateivaApiToken) return;
+  var queue = pendingFollowups.slice();
+  for (var i = 0; i < queue.length; i++) {
+    var p = queue[i];
+    var payload = p && p._apiData ? p._apiData : null;
+    if (!payload) continue; // nothing to resend with
+    try {
+      var res = await backendRequest('/api/followups', { method: 'POST', body: Object.assign({}, payload, { deviceId: nateivaDeviceId }) });
+      if (res && res.success) removePendingFollowup(p);
+    } catch (e) { /* keep it queued for the next try */ }
+  }
 }
 
 function persistEntryImpacts() {
@@ -10781,11 +10850,20 @@ function buildImportedSheetFollowups() {
 function getAllFollowups() {
   var hit = (typeof _cacheGet === 'function') ? _cacheGet('allFup','_') : undefined;
   if (hit) return hit;
-  var merged = (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).concat(Array.isArray(suiviFollowups) ? suiviFollowups : []);
-  // Apply remap (Ivan → Kessi everywhere, Fabiola Yaoundé calls → Kessi)
-  var mapped = merged.map(remapExpertForFollowup);
-  if (typeof _cachePut === 'function') return _cachePut('allFup','_', mapped);
-  return mapped;
+  // Remap (Ivan → Kessi, Fabiola Yaoundé calls → Kessi) applies ONLY to imported historical
+  // sheet data — NEVER to entries a user makes in the app, otherwise their own saisie is
+  // re-attributed to someone else and vanishes from their "Mes saisies". User entries keep
+  // their true author. Pending (not-yet-synced) entries are included so a saisie always shows.
+  var imported = (Array.isArray(importedSheetFollowups) ? importedSheetFollowups : []).map(remapExpertForFollowup);
+  var synced = (Array.isArray(suiviFollowups) ? suiviFollowups : []);
+  var syncedSigs = {};
+  synced.forEach(function(s){ try { syncedSigs[_fuSig(s)] = 1; syncedSigs[_fuLooseSig(s)] = 1; } catch(e){} });
+  var pend = (Array.isArray(pendingFollowups) ? pendingFollowups : []).filter(function(p){
+    try { return !syncedSigs[_fuSig(p)] && !syncedSigs[_fuLooseSig(p)]; } catch(e){ return true; }
+  });
+  var merged = imported.concat(synced).concat(pend);
+  if (typeof _cachePut === 'function') return _cachePut('allFup','_', merged);
+  return merged;
 }
 
 function isImportedCallFollowup(item) {
@@ -10990,6 +11068,7 @@ async function apiDeleteFollowup(id) {
 
 async function refreshSyncedState() {
   if (!nateivaApiToken || !isBackendConfigured()) return { success: false };
+  await flushPendingFollowups(); // resend any saisies queued while offline / unauthenticated
   var res = await apiCall('bootstrap', {});
   if (res && res.success) {
     applyBackendBootstrap(res);
@@ -14310,8 +14389,12 @@ async function submitFollowup() {
   }
   var _effectiveCityFu = document.getElementById('fuCity').value;
   var _effectiveTsFu = editableExisting ? (editableExisting.Timestamp || entryTimestamp) : entryTimestamp;
-  var _effectiveExpertFu = (typeof resolveSubmitExpertName === 'function')
-    ? resolveSubmitExpertName(currentUser.fullName, _effectiveCityFu, _effectiveTsFu)
+  // Authorship = the person actually entering the saisie. A live entry is NEVER remapped to
+  // another expert (that rule is for imported historical data only; remapping here hid
+  // Fabiola's Yaoundé entries under Kessi, so they vanished from her "Mes saisies").
+  // On edit, keep the original author.
+  var _effectiveExpertFu = editableExisting
+    ? (editableExisting.Expert || currentUser.fullName)
     : currentUser.fullName;
   var data = {
     action: editableExisting ? 'updateFollowup' : 'addFollowup', expert: _effectiveExpertFu, schoolName: schoolName,
@@ -14406,12 +14489,48 @@ async function submitFollowup() {
     LetterContent: questionnaireMeta.letterContent,
     letterContent: questionnaireMeta.letterContent
   };
+  // Optimistic save: for a NEW entry, record it locally BEFORE the network call so it shows
+  // instantly in "Mes saisies" / "Activité" with its date, time and author — and is never
+  // lost if the backend is unreachable. It is pruned once the backend confirms the twin.
+  var optimistic = null;
+  if (!editableExisting) {
+    optimistic = addPendingFollowup({
+      ID: 'LOCAL-' + capturedAt.getTime() + '-' + entryTimestamp.slice(-6).replace(/\D/g, ''),
+      Timestamp: entryTimestamp,
+      Expert: _effectiveExpertFu,
+      SchoolName: schoolName,
+      ContactName: data.contactName,
+      ContactPhone: data.contactPhone,
+      FollowupType: data.followupType,
+      Notes: data.notes,
+      Outcome: data.outcome,
+      NextAction: data.nextAction,
+      NextDate: data.nextDate,
+      Cost: data.cost,
+      Status: data.status,
+      City: data.city,
+      Sector: data.sector,
+      SchoolType: data.schoolType,
+      Category: data.category,
+      Effectif: data.effectif,
+      Location: data.location,
+      ContactRole: data.contactRole,
+      _pendingLocal: true,
+      _apiData: data
+    });
+  }
   setFollowupSubmitBusy(true);
   try {
     var res = await apiPost(data);
-    if (res.success) {
-      if (isBackendConfigured() && nateivaApiToken) {
+    var savedOk = res.success || !!optimistic; // optimistic entry keeps the data safe locally
+    if (savedOk) {
+      if (res.success && optimistic) removePendingFollowup(optimistic); // confirmed → drop the temp
+      if (res.success && isBackendConfigured() && nateivaApiToken) {
         await refreshSyncedState();
+      } else if (res.success && res.followup) {
+        // success without a re-sync path (local fallback echo): keep the returned record
+        suiviFollowups.push(hydrateFollowupRecord(res.followup));
+        sanitizeFollowupStore();
       }
       var afterSnapshot = buildVisibleFunnelSnapshot();
       setEntryImpactForUser(currentUser.username, buildEntryImpactPayload(res.followup || {
@@ -14424,7 +14543,7 @@ async function submitFollowup() {
         NextAction: data.nextAction,
         NextDate: data.nextDate
       }, beforeSnapshot, afterSnapshot));
-      showToast(res.message || 'Suivi enregistré!');
+      showToast(res.success ? (res.message || 'Suivi enregistré ✓') : 'Enregistré sur cet appareil — synchronisation en attente ⏳');
       document.getElementById('fuSchool').selectedIndex = 0;
       if (document.getElementById('fuSchoolCustom')) document.getElementById('fuSchoolCustom').value = '';
       if (document.getElementById('fuSchoolCustomWrap')) document.getElementById('fuSchoolCustomWrap').style.display = 'none';
@@ -14473,7 +14592,19 @@ async function submitFollowup() {
       showToast(res.error || 'Erreur', true);
     }
   } catch (error) {
-    showToast((error && error.message) || 'Erreur', true);
+    if (optimistic) {
+      // The saisie is safely queued locally — show it rather than alarm the user.
+      showToast('Enregistré sur cet appareil — synchronisation en attente ⏳');
+      try {
+        resetFollowupFormMode();
+        updateSchoolOwnershipNotice();
+        suiviPreferredTab = 'history';
+        rSuivi();
+        activateSuiviPanel('history', { scroll: true });
+      } catch (e) {}
+    } else {
+      showToast((error && error.message) || 'Erreur', true);
+    }
   } finally {
     setFollowupSubmitBusy(false);
   }
