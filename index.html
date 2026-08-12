@@ -3500,7 +3500,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.57 · Saisies fiables (sauvegarde locale + auteur exact)</span>
+      <span class="meta-pill red">v11.58 · Chaque saisie reste à son auteur (tous les experts)</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -14687,9 +14687,9 @@ async function submitNewSchoolDirect() {
   };
   
   var _effectiveCityNs = document.getElementById('nsCity').value;
-  var _effectiveExpertNs = (typeof resolveSubmitExpertName === 'function')
-    ? resolveSubmitExpertName(currentUser.fullName, _effectiveCityNs, entryTimestamp)
-    : currentUser.fullName;
+  // A new school created by an expert always stays attributed to THAT expert (no remap on
+  // live entries — the remap is for imported historical data only).
+  var _effectiveExpertNs = currentUser.fullName;
   var data = {
     action: 'addFollowup',
     timestamp: entryTimestamp,
@@ -14784,12 +14784,42 @@ async function submitNewSchoolDirect() {
     LetterContent: questionnaireMeta.letterContent,
     letterContent: questionnaireMeta.letterContent
   };
+  // Optimistic save so the new school shows instantly under its author and is never lost.
+  var optimisticNs = addPendingFollowup({
+    ID: 'LOCAL-' + capturedAt.getTime() + '-ns',
+    Timestamp: entryTimestamp,
+    Expert: _effectiveExpertNs,
+    SchoolName: schoolName,
+    ContactName: data.contactName,
+    ContactPhone: data.contactPhone,
+    FollowupType: data.followupType,
+    Notes: data.notes,
+    Outcome: data.outcome,
+    NextAction: data.nextAction,
+    NextDate: data.nextDate,
+    Status: data.status,
+    City: data.city,
+    Sector: data.sector,
+    SchoolType: data.schoolType,
+    Category: data.category,
+    Effectif: data.effectif,
+    Location: data.location,
+    ContactRole: data.contactRole,
+    EntryOrigin: 'new-school',
+    _pendingLocal: true,
+    _apiData: data
+  });
   setNewSchoolSubmitBusy(true);
   try {
     var res = await apiPost(data);
-    if (res.success) {
-      if (isBackendConfigured() && nateivaApiToken) {
+    var savedOk = res.success || !!optimisticNs;
+    if (savedOk) {
+      if (res.success && optimisticNs) removePendingFollowup(optimisticNs);
+      if (res.success && isBackendConfigured() && nateivaApiToken) {
         await refreshSyncedState();
+      } else if (res.success && res.followup) {
+        suiviFollowups.push(hydrateFollowupRecord(res.followup));
+        sanitizeFollowupStore();
       }
       var afterSnapshot = buildVisibleFunnelSnapshot();
       setEntryImpactForUser(currentUser.username, buildEntryImpactPayload(res.followup || {
@@ -14802,7 +14832,7 @@ async function submitNewSchoolDirect() {
         NextAction: data.nextAction,
         NextDate: data.nextDate
       }, beforeSnapshot, afterSnapshot));
-      showToast('Nouvelle école enregistrée!');
+      showToast(res.success ? 'Nouvelle école enregistrée ✓' : 'Enregistrée sur cet appareil — synchronisation en attente ⏳');
       document.getElementById('nsSchoolName').value = '';
       document.getElementById('nsSchoolType').selectedIndex = 0;
       document.getElementById('nsCategory').selectedIndex = 2; // Standing Moyen
@@ -14848,7 +14878,12 @@ async function submitNewSchoolDirect() {
       showToast(res.error || 'Erreur', true);
     }
   } catch (error) {
-    showToast((error && error.message) || 'Erreur', true);
+    if (optimisticNs) {
+      showToast('Enregistrée sur cet appareil — synchronisation en attente ⏳');
+      try { updateNewSchoolOwnershipNotice(); suiviPreferredTab = 'history'; rSuivi(); activateSuiviPanel('history', { scroll: true }); } catch (e) {}
+    } else {
+      showToast((error && error.message) || 'Erreur', true);
+    }
   } finally {
     setNewSchoolSubmitBusy(false);
   }
