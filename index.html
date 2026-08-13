@@ -3500,7 +3500,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.58 · Chaque saisie reste à son auteur (tous les experts)</span>
+      <span class="meta-pill red">v11.59 · Récap activité par expert (jour/semaine/mois/année) + filtre utilisateur</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3814,6 +3814,28 @@ function buildActivitySummary(rawRows, followups){
       .concat(todayFollowups.map(function(item){ return canonicalPersonName(item && item.Expert || ''); }))
       .filter(Boolean)
   ).size;
+  // Per-expert recap (counts by category) — same categories as the Activity tab, so the
+  // Dashboard strip and the Activity-tab recap always show the same numbers.
+  //   terrain = 1er contact physique (raw) · followup = 2e contact physique (VISIT)
+  const _recap={}, _order=[];
+  function _rk(name){ return (typeof canonicalPersonKey==='function' ? canonicalPersonKey(name) : String(name||'').toLowerCase()); }
+  function _bucket(name){
+    var disp=canonicalPersonName(name||'')||'—';
+    var key=_rk(disp)||disp;
+    if(!_recap[key]){ _recap[key]={ person:disp, terrain:0, followup:0, calls:0, msgs:0, other:0, total:0 }; _order.push(key); }
+    return _recap[key];
+  }
+  activityRawRows.forEach(function(row){ var b=_bucket(row && row.e); b.terrain++; b.total++; });
+  items.forEach(function(item){
+    var type=String(item && item.FollowupType || '').toUpperCase();
+    var b=_bucket(item && item.Expert);
+    if (type==='CALL') b.calls++;
+    else if (type==='VISIT') b.followup++;
+    else if (type==='WHATSAPP'||type==='SMS'||type==='EMAIL'||type==='LETTER') b.msgs++;
+    else b.other++;
+    b.total++;
+  });
+  const byExpert=_order.map(function(k){ return _recap[k]; }).sort(function(a,b){ return b.total-a.total; });
   return {
     rawInputs:activityRawRows.length,
     callInputs:callInputs,
@@ -3821,6 +3843,7 @@ function buildActivitySummary(rawRows, followups){
     terrainInputs:activityRawRows.length+visitInputs,
     totalInputs:activityRawRows.length+items.length,
     activeDays:activeDays,
+    byExpert:byExpert,
     today:{
       total:todayRawRows.length+todayFollowups.length,
       raw:todayRawRows.length,
@@ -4970,6 +4993,7 @@ function buildDashboardModel(){
     activeDays,
     velocity:activeDays ? totalInputs/activeDays : 0,
     today:activity.today,
+    activityByExpert:activity.byExpert||[],
     hotRate,
     currentWeek:weekly[weekly.length-1]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
     previousWeek:weekly[weekly.length-2]||{terrain:0,calls:0,total:0,delta:0,activeDays:0,velocity:0},
@@ -7033,6 +7057,9 @@ function rHome(){
       </div>
     </div>
   </div>
+
+  <!-- 📊 Per-expert activity recap (same numbers as the Activity tab, categorised) -->
+  ${(typeof buildActivityRecapStrip==='function' ? buildActivityRecapStrip(dashboard.activityByExpert) : '')}
 
   <!-- Top Performers removed from Dashboard (kept in Workspace). Activity Feed moved to Workspace via buildActivityFeedStrip(). page-intro moved to top. -->
 
@@ -9554,7 +9581,7 @@ function rGlossary(){
 function _activityKindMeta(type){
   var t = String(type||'').toUpperCase();
   if (t==='CALL') return { icon:'📞', label:'Appel', kind:'call' };
-  if (t==='VISIT') return { icon:'🚶', label:'Visite', kind:'visit' };
+  if (t==='VISIT') return { icon:'🔁', label:'Follow up · 2e contact', kind:'visit' };
   if (t==='WHATSAPP') return { icon:'💬', label:'WhatsApp', kind:'msg' };
   if (t==='SMS') return { icon:'📱', label:'SMS', kind:'msg' };
   if (t==='EMAIL') return { icon:'📧', label:'Email', kind:'msg' };
@@ -9572,12 +9599,60 @@ function _actTime(ts){
   try { return new Date(ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
   catch(e){ return ''; }
 }
+// --- Activity period grouping (day / week / month / year) ---
+function _isoWeek(d){
+  // ISO-8601 week number; returns {year, week}
+  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var day = dt.getUTCDay() || 7;              // Mon=1..Sun=7
+  dt.setUTCDate(dt.getUTCDate() + 4 - day);   // nearest Thursday
+  var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  var week = Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
+  return { year: dt.getUTCFullYear(), week: week };
+}
+function _periodKey(ts, period){
+  if(!ts) return 'x';
+  var d = new Date(ts);
+  if (isNaN(d)) return 'x';
+  var y = d.getFullYear();
+  var m = ('0'+(d.getMonth()+1)).slice(-2);
+  var day = ('0'+d.getDate()).slice(-2);
+  switch(period){
+    case 'week':  { var w = _isoWeek(d); return w.year+'-W'+('0'+w.week).slice(-2); }
+    case 'month': return y+'-'+m;
+    case 'year':  return ''+y;
+    default:      return y+'-'+m+'-'+day; // day
+  }
+}
+function _periodLabel(ts, period){
+  if(!ts) return '📅 Date inconnue';
+  var d = new Date(ts);
+  if (isNaN(d)) return '📅 —';
+  try {
+    switch(period){
+      case 'week':  { var w = _isoWeek(d); return 'Semaine '+w.week+' · '+w.year; }
+      case 'month': return d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+      case 'year':  return ''+d.getFullYear();
+      default:      return d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    }
+  } catch(e){ return '📅 —'; }
+}
+window.__activityPeriod = 'day';
+function setActivityPeriod(p){
+  window.__activityPeriod = p || 'day';
+  document.querySelectorAll('#p-activity .act-per').forEach(function(c){
+    c.classList.toggle('act', c.dataset.p === window.__activityPeriod);
+  });
+  renderActivityList();
+}
 function buildActivityItems(){
   var isSuper = isSuperAdmin(currentUser);
   var me = currentUser ? currentUser.fullName : '';
   function mine(name){ return isSuper || samePerson(name, me); }
   var items = [];
   // 1) Field prospection "descentes" (raw entries) — richest terrain notes (co)
+  //    Terrain = 1er contact physique : the expert's FIRST on-site visit / cold prospection
+  //    of a school (raw prospection sheet). A later on-site return is a VISIT follow-up below,
+  //    labelled "Follow up · 2e contact". The two kinds stay separate on purpose.
   (getBaseRawRows()||[]).forEach(function(r){
     var person = r.e || r.Expert; if(!person || !mine(person)) return;
     var d = parseEntryDate(r.t || r.Timestamp || '');
@@ -9586,7 +9661,7 @@ function buildActivityItems(){
       person: canonicalPersonName(person),
       school: r.n || r.SchoolName || '—',
       city: r.v || r.City || '',
-      kind: 'terrain', icon:'🚶', label:'Descente terrain',
+      kind: 'terrain', icon:'🚶', label:'Terrain · 1er contact',
       contact: r.rn ? (String(r.rn) + (r.rp ? ' · '+r.rp : '')) : '',
       note: r.co || '',
       extra: r.tx ? ('Taux estimé '+r.tx) : '',
@@ -9621,6 +9696,103 @@ function setActivityKind(k){
   });
   renderActivityList();
 }
+// Per-expert recap: counts by category for the already-filtered items.
+// Categories mirror the kind chips — terrain = 1er contact physique,
+// followup(visit) = 2e contact physique, call, msg, other. Kept separate on purpose.
+function buildActivityRecap(items){
+  var map = {}, order = [];
+  (items||[]).forEach(function(it){
+    var key = canonicalPersonKey(it.person) || '—';
+    if(!map[key]){ map[key] = { key:key, person: it.person, terrain:0, followup:0, calls:0, msgs:0, other:0, total:0 }; order.push(key); }
+    var row = map[key];
+    if (it.kind==='terrain') row.terrain++;
+    else if (it.kind==='visit') row.followup++;
+    else if (it.kind==='call') row.calls++;
+    else if (it.kind==='msg') row.msgs++;
+    else row.other++;
+    row.total++;
+  });
+  var rows = order.map(function(k){ return map[k]; }).sort(function(a,b){ return b.total-a.total; });
+  var totals = rows.reduce(function(acc,r){
+    acc.terrain+=r.terrain; acc.followup+=r.followup; acc.calls+=r.calls; acc.msgs+=r.msgs; acc.other+=r.other; acc.total+=r.total; return acc;
+  }, { person:'Équipe', terrain:0, followup:0, calls:0, msgs:0, other:0, total:0 });
+  return { rows: rows, totals: totals };
+}
+function _actRecapHtml(items, periodLabelText){
+  var recap = buildActivityRecap(items);
+  if(!recap.rows.length) return '';
+  var cols = [
+    {k:'terrain', label:'🚶 Terrain', sub:'1er contact', col:'var(--teal)'},
+    {k:'followup',label:'🔁 Follow up', sub:'2e contact', col:'var(--purple)'},
+    {k:'calls',   label:'📞 Appels', sub:'', col:'var(--saffron-bright)'},
+    {k:'msgs',    label:'💬 Messages', sub:'', col:'var(--green)'},
+    {k:'other',   label:'📝 Autres', sub:'', col:'var(--g500)'},
+    {k:'total',   label:'Σ Total', sub:'', col:'var(--ink)'}
+  ];
+  var single = recap.rows.length === 1;
+  var th = '<th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--g500);font-weight:800">Expert</th>' +
+    cols.map(function(c){
+      return '<th style="text-align:center;padding:7px 8px;font-size:11px;font-weight:800;color:'+c.col+'">'+c.label+
+        (c.sub?'<div style="font-size:9.5px;font-weight:600;color:var(--g400)">'+c.sub+'</div>':'')+'</th>';
+    }).join('');
+  function cell(v, strong){
+    return '<td style="text-align:center;padding:7px 8px;font-size:13px;'+(strong?'font-weight:800;color:var(--ink)':'font-weight:600;color:var(--g600)')+'">'+(v||0)+'</td>';
+  }
+  var body = recap.rows.map(function(r){
+    return '<tr style="border-top:1px solid var(--g100)">'+
+      '<td style="padding:7px 10px;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap">'+esc(r.person)+'</td>'+
+      cell(r.terrain)+cell(r.followup)+cell(r.calls)+cell(r.msgs)+cell(r.other)+cell(r.total, true)+
+    '</tr>';
+  }).join('');
+  var foot = (!single) ? '<tr style="border-top:2px solid var(--g200);background:var(--bg-warm)">'+
+      '<td style="padding:7px 10px;font-size:12px;font-weight:800;color:var(--g600)">'+esc(recap.totals.person)+'</td>'+
+      cell(recap.totals.terrain,true)+cell(recap.totals.followup,true)+cell(recap.totals.calls,true)+cell(recap.totals.msgs,true)+cell(recap.totals.other,true)+cell(recap.totals.total,true)+
+    '</tr>' : '';
+  return '<div class="section" style="padding:12px 14px;margin-bottom:14px">'+
+      '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:8px">'+
+        '<b style="font-size:13px;color:var(--ink)">📊 Récap par expert</b>'+
+        '<span style="font-size:11px;color:var(--g500)">'+esc(periodLabelText||'')+' · '+recap.rows.length+' expert'+(recap.rows.length>1?'s':'')+'</span>'+
+      '</div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:520px">'+
+        '<thead><tr>'+th+'</tr></thead><tbody>'+body+foot+'</tbody>'+
+      '</table></div>'+
+    '</div>';
+}
+
+// Compact per-expert recap strip for the Dashboard home pane.
+// Reads model.activityByExpert (built by buildActivitySummary) so it matches the Activity tab.
+function buildActivityRecapStrip(byExpert){
+  var rows = (byExpert||[]).filter(function(r){ return r && r.total; });
+  if(!rows.length) return '';
+  var top = rows.slice(0, 8);
+  var hidden = rows.length - top.length;
+  var cell=function(v,c){ return '<td style="text-align:center;padding:6px 8px;font-size:13px;font-weight:700;color:'+(c||'var(--g600)')+'">'+(v||0)+'</td>'; };
+  var body = top.map(function(r){
+    return '<tr style="border-top:1px solid var(--g100)">'+
+      '<td style="padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap">'+esc(r.person)+'</td>'+
+      cell(r.terrain,'var(--teal)')+cell(r.followup,'var(--purple)')+cell(r.calls,'var(--saffron-deep)')+cell(r.msgs,'var(--green)')+cell(r.other,'var(--g500)')+
+      '<td style="text-align:center;padding:6px 8px;font-size:13px;font-weight:800;color:var(--ink)">'+(r.total||0)+'</td>'+
+    '</tr>';
+  }).join('');
+  return '<div class="section" style="padding:16px;margin-bottom:14px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+
+      '<span style="font-family:\'Fraunces\',serif;font-size:16px;font-weight:700;color:var(--ink)">📊 Récap activité par expert</span>'+
+      '<a href="#" data-jump="activity" style="font-size:12px;font-weight:700;color:var(--red)">Voir le journal →</a>'+
+    '</div>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:520px">'+
+      '<thead><tr>'+
+        '<th style="text-align:left;padding:6px 10px;font-size:11px;color:var(--g500);font-weight:800">Expert</th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--teal);font-weight:800">🚶 Terrain<div style="font-size:9.5px;color:var(--g400);font-weight:600">1er contact</div></th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--purple);font-weight:800">🔁 Follow up<div style="font-size:9.5px;color:var(--g400);font-weight:600">2e contact</div></th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--saffron-deep);font-weight:800">📞 Appels</th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--green);font-weight:800">💬 Messages</th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--g500);font-weight:800">📝 Autres</th>'+
+        '<th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--ink);font-weight:800">Σ</th>'+
+      '</tr></thead><tbody>'+body+'</tbody></table></div>'+
+      (hidden>0 ? '<div style="margin-top:6px;font-size:11px;color:var(--g500)">+ '+hidden+' autre'+(hidden>1?'s':'')+' expert'+(hidden>1?'s':'')+' — voir le journal</div>' : '')+
+  '</div>';
+}
+
 function renderActivityList(){
   var host = document.getElementById('activity-list');
   if(!host) return;
@@ -9641,20 +9813,26 @@ function renderActivityList(){
     }
     return true;
   });
+  var recapHost = document.getElementById('activity-recap');
   if(!filtered.length){
     host.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--g500)">🔍 Aucune activité pour ce filtre.</div>';
     var sc0 = document.getElementById('act-summary'); if(sc0) sc0.textContent = '0 activité';
+    if(recapHost) recapHost.innerHTML = '';
     return;
   }
   var withNotes = filtered.filter(function(x){ return x.note; }).length;
   var sc = document.getElementById('act-summary');
   if (sc) sc.textContent = filtered.length+' activité'+(filtered.length>1?'s':'')+' · '+withNotes+' avec note'+(withNotes>1?'s':'');
-  // Group by day
+  var period = window.__activityPeriod || 'day';
+  var periodName = { day:'Par jour', week:'Par semaine', month:'Par mois', year:'Par année' }[period] || 'Par jour';
+  // Per-expert recap (respects the active person/kind/search filters)
+  if(recapHost) recapHost.innerHTML = _actRecapHtml(filtered, periodName);
+  // Group by the selected period (day / week / month / year)
   var groups = [], gmap = {};
   filtered.forEach(function(it){
-    var dayKey = it.t ? new Date(it.t).toISOString().slice(0,10) : 'x';
-    if(!gmap[dayKey]){ gmap[dayKey] = { key:dayKey, t:it.t, label:_actDayLabel(it.t), rows:[] }; groups.push(gmap[dayKey]); }
-    gmap[dayKey].rows.push(it);
+    var gk = _periodKey(it.t, period);
+    if(!gmap[gk]){ gmap[gk] = { key:gk, t:it.t, label:_periodLabel(it.t, period), rows:[] }; groups.push(gmap[gk]); }
+    gmap[gk].rows.push(it);
   });
   var kindColor = { terrain:'var(--teal)', call:'var(--saffron-bright)', visit:'var(--purple)', msg:'var(--green)', other:'var(--g500)' };
   var html = groups.map(function(g){
@@ -9719,13 +9897,22 @@ function rActivity(){
   }
 
   var chips = [
-    {k:'all',label:'Tout'},{k:'terrain',label:'🚶 Terrain'},{k:'call',label:'📞 Appels'},
-    {k:'visit',label:'🚶 Visites'},{k:'msg',label:'💬 Messages'},{k:'notes',label:'📝 Avec note'}
+    {k:'all',label:'Tout'},{k:'terrain',label:'🚶 Terrain (1er)'},{k:'call',label:'📞 Appels'},
+    {k:'visit',label:'🔁 Follow up (2e)'},{k:'msg',label:'💬 Messages'},{k:'notes',label:'📝 Avec note'}
   ].map(function(c){
     return '<button class="act-chip'+(c.k==='all'?' act':'')+'" data-k="'+c.k+'" onclick="setActivityKind(\''+c.k+'\')" '+
       'style="padding:7px 13px;border:1px solid var(--g200);border-radius:20px;background:var(--paper);font-family:inherit;font-size:12.5px;font-weight:700;color:var(--g600);cursor:pointer;white-space:nowrap">'+c.label+'</button>';
   }).join('');
   window.__activityKind = 'all';
+
+  // Period granularity toggle (day / week / month / year)
+  var periodChips = [
+    {p:'day',label:'Jour'},{p:'week',label:'Semaine'},{p:'month',label:'Mois'},{p:'year',label:'Année'}
+  ].map(function(c){
+    return '<button class="act-per'+(c.p==='day'?' act':'')+'" data-p="'+c.p+'" onclick="setActivityPeriod(\''+c.p+'\')" '+
+      'style="padding:7px 13px;border:1px solid var(--g200);border-radius:20px;background:var(--paper);font-family:inherit;font-size:12.5px;font-weight:700;color:var(--g600);cursor:pointer;white-space:nowrap">'+c.label+'</button>';
+  }).join('');
+  window.__activityPeriod = 'day';
 
   el.innerHTML =
     '<div class="page-intro" style="margin-bottom:16px">'+
@@ -9740,7 +9927,13 @@ function rActivity(){
         '<span id="act-summary" style="font-size:12px;font-weight:700;color:var(--g500);white-space:nowrap">'+items.length+' activités · '+withNotes+' avec notes</span>'+
       '</div>'+
       '<div class="act-chips" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;overflow-x:auto">'+chips+'</div>'+
-      '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}</style>'+
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px">'+
+        '<span style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em">Période</span>'+
+        periodChips+
+      '</div>'+
+      '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}'+
+        '#p-activity .act-per.act{background:var(--red);color:#fff;border-color:var(--red)}</style>'+
+      '<div id="activity-recap"></div>'+
       '<div id="activity-list" style="margin-top:6px"></div>'+
     '</div>';
   renderActivityList();
