@@ -3149,6 +3149,18 @@ button,select,input,textarea{outline:none}
 .me-hl-btn.act{background:var(--ink);border-color:var(--ink);box-shadow:var(--shadow-sm)}
 .me-blink-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--g700);cursor:pointer;margin-left:auto;background:var(--paper);padding:4px 10px;border-radius:8px;border:1.5px solid var(--g200)}
 .me-blink-toggle input{margin:0;accent-color:var(--red)}
+/* Inline status editor (owner/admin) — flip the pipeline stage directly on the card */
+.me-status-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 11px;background:linear-gradient(135deg,rgba(5,150,105,.06),rgba(245,158,11,.04));border:1px solid var(--g200);border-radius:10px;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--g700)}
+.me-status-lbl{margin-right:2px;text-transform:uppercase;letter-spacing:.03em;font-size:10.5px;color:var(--g500)}
+.me-status-chip{background:var(--paper);border:1.5px solid var(--g200);padding:5px 11px;border-radius:100px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:800;color:var(--g600);transition:all .18s ease;white-space:nowrap}
+.me-status-chip:hover{transform:translateY(-1px);border-color:var(--saffron);box-shadow:var(--shadow-sm)}
+.me-status-chip.act{color:#fff;border-color:transparent}
+.me-status-chip.me-status-gagne.act{background:var(--green)}
+.me-status-chip.me-status-chaud.act{background:var(--red)}
+.me-status-chip.me-status-tiede.act{background:var(--saffron)}
+.me-status-chip.me-status-froid.act{background:var(--g500)}
+.me-status-chip.me-status-nouveau.act{background:var(--teal)}
+.me-status-chip.me-status-perdu.act{background:var(--g800)}
 
 /* — Mes Saisies: unified multi-filter bar — */
 .me-filterbar{background:linear-gradient(180deg,var(--g50),var(--paper));border:1px solid var(--g200);border-radius:14px;padding:14px;margin-bottom:14px;animation:fadeInUp .35s cubic-bezier(.16,1,.3,1) both}
@@ -3500,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.59 · Récap activité par expert (jour/semaine/mois/année) + filtre utilisateur</span>
+      <span class="meta-pill red">v11.60 · Statut éditable (Gagné↔Perdu) · suivi bloqué sans 1ère saisie · tableau activité premium par expert</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -4269,6 +4281,11 @@ function getDashboardScope(){
 
 function buildSchoolRecords(rawRows, followups){
   const map=new Map();
+  // Manual status overrides: latest explicit "Statut → X" set by an owner/admin
+  // wins over the derived stage. Keyed by school key → { stage, t, by }.
+  const statusOverrides={};
+  const VALID_STAGE_OVERRIDES={nouveau:1,froid:1,tiede:1,chaud:1,gagne:1,perdu:1};
+  function normStageOverride(v){ v=String(v||'').trim().toLowerCase(); return VALID_STAGE_OVERRIDES[v]?v:''; }
   function ensure(name, forcedKey){
     const key=forcedKey || schoolKey(name);
     if(!key)return null;
@@ -4371,6 +4388,21 @@ function buildSchoolRecords(rawRows, followups){
     const rec=ensure(item.SchoolName,itemKey);
     if(!rec)return;
     const meta=readFollowupMeta(item);
+    // Manual status change: a STATUS follow-up (or any row carrying statusOverride) is
+    // an explicit stage decision, NOT a contact — capture the latest one and skip all
+    // the normal folding so it never inflates call/visit/contact counts or lastTouch.
+    if(String(item.FollowupType||'').toUpperCase()==='STATUS' || meta.statusOverride){
+      var _ovStage=normStageOverride(meta.statusOverride);
+      if(_ovStage){
+        var _ovDt=parseEntryDate(item.Timestamp);
+        var _ovPrev=statusOverrides[rec.key];
+        var _ovT=_ovDt?_ovDt.getTime():0;
+        if(!_ovPrev || _ovT>=(_ovPrev.t||0)){
+          statusOverrides[rec.key]={ stage:_ovStage, t:_ovT, by:canonicalPersonName(item.Expert)||'' };
+        }
+      }
+      return;
+    }
     const cleanNotes=getFollowupPlainNotes(item);
     rec.followupCount++;
     rec.schoolName=item.SchoolName||rec.schoolName;
@@ -4466,6 +4498,21 @@ function buildSchoolRecords(rawRows, followups){
     else if(rec.rate>=_PL.hot)rec.stage='chaud';
     else if(rec.rate>=_PL.warm)rec.stage='tiede';
     else rec.stage='froid';
+    // Manual override wins over the derived stage and reconciles won/lost so revenue,
+    // funnel and the signed/lost tabs all stay consistent with the chosen status.
+    var _ov=statusOverrides[rec.key];
+    if(_ov && _ov.stage){
+      rec.stage=_ov.stage;
+      rec.won=(_ov.stage==='gagne');
+      rec.lost=(_ov.stage==='perdu');
+      rec.statusOverride=_ov.stage;
+      rec.statusOverrideBy=_ov.by||'';
+      if(_ov.stage==='gagne'){
+        rec.closedBy=rec.closedBy||_ov.by||rec.expert;
+        if(_ov.t && !rec.closedAt)rec.closedAt=new Date(_ov.t);
+        if(!rec.closeStatus)rec.closeStatus='Statut défini manuellement · Gagné';
+      }
+    }
     var rev=computeSchoolRevenue(rec);
     rec.amount=rev.total;
     rec.ambassadorAmount=rev.ambassador;
@@ -9671,6 +9718,8 @@ function buildActivityItems(){
   // 2) Follow-ups (calls, visits, messages, letters, platform saisies, imported calls)
   (getAllFollowups()||[]).forEach(function(f){
     var person = f.Expert; if(!person || !mine(person)) return;
+    // Status changes are pipeline decisions, not field activity — never list them here.
+    if(String(f.FollowupType||'').toUpperCase()==='STATUS') return;
     var meta = _activityKindMeta(f.FollowupType);
     var d = parseEntryDate(f.Timestamp || '');
     items.push({
@@ -9718,42 +9767,132 @@ function buildActivityRecap(items){
   }, { person:'Équipe', terrain:0, followup:0, calls:0, msgs:0, other:0, total:0 });
   return { rows: rows, totals: totals };
 }
+function _actInitials(name){
+  var parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '—';
+  return ((parts[0][0]||'')+(parts.length>1?parts[parts.length-1][0]:'')).toUpperCase();
+}
+function _actAvatarBg(name){
+  var s=String(name||''),h=0,i;
+  for(i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))%360; }
+  return 'hsl('+h+',50%,45%)';
+}
+function _actEntryDate(t){
+  if(!t) return '';
+  try{ var d=new Date(t); return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; }
+}
+function _toggleActExpert(idx){
+  var el=document.getElementById('act-exp-'+idx);
+  if(!el) return;
+  var open = el.style.display && el.style.display!=='none';
+  el.style.display = open ? 'none' : 'table-row';
+  var caret=document.getElementById('act-caret-'+idx);
+  if(caret) caret.textContent = open ? '▸' : '▾';
+}
+function _actExpertEntriesHtml(list){
+  if(!list||!list.length) return '<div style="padding:8px 0;color:var(--g400);font-size:12px">Aucune entrée sur la période filtrée.</div>';
+  var rows=list.slice(0,20).map(function(it){
+    var note=it.note?'<div style="margin-top:3px;font-size:12px;color:var(--g600);white-space:pre-wrap;line-height:1.5">'+esc(it.note)+'</div>':'';
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--g100)">'+
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">'+
+        '<span>'+(it.icon||'•')+'</span>'+
+        '<b style="font-size:12.5px;color:var(--ink)">'+esc(it.school||'—')+'</b>'+
+        (it.city?'<span style="font-size:10.5px;color:var(--g500)">📍 '+esc(getCityLabel(it.city))+'</span>':'')+
+        '<span style="font-size:10.5px;font-weight:700;color:var(--g500)">'+esc(it.label||'')+'</span>'+
+        '<span style="margin-left:auto;font-size:10.5px;color:var(--g400)">'+_actEntryDate(it.t)+'</span>'+
+      '</div>'+note+
+    '</div>';
+  }).join('');
+  var more=list.length>20?'<div style="padding:6px 0;font-size:11px;color:var(--g500)">+ '+(list.length-20)+' autres entrées — voir le journal ci-dessous</div>':'';
+  return '<div style="padding-top:6px">'+rows+more+'</div>';
+}
 function _actRecapHtml(items, periodLabelText){
   var recap = buildActivityRecap(items);
   if(!recap.rows.length) return '';
-  var cols = [
-    {k:'terrain', label:'🚶 Terrain', sub:'1er contact', col:'var(--teal)'},
-    {k:'followup',label:'🔁 Follow up', sub:'2e contact', col:'var(--purple)'},
-    {k:'calls',   label:'📞 Appels', sub:'', col:'var(--saffron-bright)'},
-    {k:'msgs',    label:'💬 Messages', sub:'', col:'var(--green)'},
-    {k:'other',   label:'📝 Autres', sub:'', col:'var(--g500)'},
-    {k:'total',   label:'Σ Total', sub:'', col:'var(--ink)'}
+  var period = window.__activityPeriod || 'day';
+  var nowBucket = (typeof _periodKey==='function') ? _periodKey(Date.now(), period) : '';
+  var periodWord = {day:"aujourd'hui",week:'cette semaine',month:'ce mois',year:'cette année'}[period]||'';
+  // Per-expert: last-activity time, active-in-current-bucket flag, and entry list for drill-down
+  var lastT={}, activeNow={}, lists={};
+  (items||[]).forEach(function(it){
+    var key = canonicalPersonKey(it.person) || '—';
+    if(!lastT[key] || (it.t||0)>lastT[key]) lastT[key]=it.t||0;
+    if(((typeof _periodKey==='function') ? _periodKey(it.t, period) : '')===nowBucket) activeNow[key]=true;
+    (lists[key]=lists[key]||[]).push(it);
+  });
+  var catCols=[
+    {k:'terrain', label:'🚶', full:'Terrain · 1er', col:'var(--teal)'},
+    {k:'followup',label:'🔁', full:'Follow up · 2e', col:'var(--purple)'},
+    {k:'calls',   label:'📞', full:'Appels', col:'var(--saffron-bright)'},
+    {k:'msgs',    label:'💬', full:'Messages', col:'var(--green)'},
+    {k:'other',   label:'📝', full:'Autres', col:'var(--g500)'}
   ];
-  var single = recap.rows.length === 1;
-  var th = '<th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--g500);font-weight:800">Expert</th>' +
-    cols.map(function(c){
-      return '<th style="text-align:center;padding:7px 8px;font-size:11px;font-weight:800;color:'+c.col+'">'+c.label+
-        (c.sub?'<div style="font-size:9.5px;font-weight:600;color:var(--g400)">'+c.sub+'</div>':'')+'</th>';
+  var single = recap.rows.length===1;
+  var now=Date.now();
+  function num(v,strong){ return '<td style="text-align:center;padding:8px 8px;font-size:13px;'+(strong?'font-weight:800;color:var(--ink)':'font-weight:600;color:var(--g600)')+'">'+(v||0)+'</td>'; }
+  function bar(r){
+    var segs=catCols.map(function(c){
+      var v=r[c.k]||0; if(!v||!r.total) return '';
+      return '<span title="'+esc(c.full)+': '+v+'" style="width:'+(v/r.total*100).toFixed(1)+'%;background:'+c.col+'"></span>';
     }).join('');
-  function cell(v, strong){
-    return '<td style="text-align:center;padding:7px 8px;font-size:13px;'+(strong?'font-weight:800;color:var(--ink)':'font-weight:600;color:var(--g600)')+'">'+(v||0)+'</td>';
+    return '<div class="act-mix">'+segs+'</div>';
   }
-  var body = recap.rows.map(function(r){
-    return '<tr style="border-top:1px solid var(--g100)">'+
-      '<td style="padding:7px 10px;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap">'+esc(r.person)+'</td>'+
-      cell(r.terrain)+cell(r.followup)+cell(r.calls)+cell(r.msgs)+cell(r.other)+cell(r.total, true)+
+  function signal(key){
+    if(activeNow[key]) return {dot:'var(--green)',lbl:'Actif',sub:periodWord};
+    var lt=lastT[key]||0;
+    var days = lt ? Math.floor((now-lt)/86400000) : 999;
+    if(days<=2) return {dot:'var(--saffron)',lbl:'Ralenti',sub:'dernier : '+_actEntryDate(lt)};
+    return {dot:'var(--red)',lbl:'Inactif',sub: lt?('dernier : '+_actEntryDate(lt)):'aucune activité'};
+  }
+  var th='<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--g500);font-weight:800">Expert</th>'+
+    '<th style="text-align:left;padding:8px 8px;font-size:11px;color:var(--g500);font-weight:800">Activité</th>'+
+    catCols.map(function(c){ return '<th title="'+esc(c.full)+'" style="text-align:center;padding:8px 8px;font-size:13px;font-weight:800;color:'+c.col+'">'+c.label+'</th>'; }).join('')+
+    '<th style="text-align:center;padding:8px 8px;font-size:11px;font-weight:800;color:var(--ink)">Σ</th>'+
+    '<th style="text-align:left;padding:8px 8px;font-size:11px;color:var(--g400);font-weight:800;min-width:110px">Répartition</th>';
+  var body=recap.rows.map(function(r,idx){
+    var sg=signal(r.key);
+    var entries=(lists[r.key]||[]).slice().sort(function(a,b){return (b.t||0)-(a.t||0);});
+    var mainRow='<tr class="act-exp-row" onclick="_toggleActExpert('+idx+')" style="border-top:1px solid var(--g100);cursor:pointer">'+
+      '<td style="padding:8px 10px;white-space:nowrap">'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span id="act-caret-'+idx+'" style="color:var(--g400);font-size:11px;width:10px">▸</span>'+
+          '<span class="act-avatar" style="background:'+_actAvatarBg(r.person)+'">'+esc(_actInitials(r.person))+'</span>'+
+          '<b style="font-size:12.5px;color:var(--ink)">'+esc(r.person)+'</b>'+
+        '</div>'+
+      '</td>'+
+      '<td style="padding:8px 8px;white-space:nowrap">'+
+        '<span style="display:inline-flex;align-items:center;gap:6px">'+
+          '<span style="width:9px;height:9px;border-radius:50%;background:'+sg.dot+'"></span>'+
+          '<span style="font-size:12px;font-weight:800;color:'+sg.dot+'">'+sg.lbl+'</span>'+
+          '<span style="font-size:10.5px;color:var(--g400)">'+esc(sg.sub||'')+'</span>'+
+        '</span>'+
+      '</td>'+
+      num(r.terrain)+num(r.followup)+num(r.calls)+num(r.msgs)+num(r.other)+num(r.total,true)+
+      '<td style="padding:8px 8px">'+bar(r)+'</td>'+
     '</tr>';
+    var drillRow='<tr id="act-exp-'+idx+'" style="display:none;background:var(--bg-warm)"><td colspan="9" style="padding:0 12px 10px 42px">'+
+      _actExpertEntriesHtml(entries)+
+    '</td></tr>';
+    return mainRow+drillRow;
   }).join('');
-  var foot = (!single) ? '<tr style="border-top:2px solid var(--g200);background:var(--bg-warm)">'+
-      '<td style="padding:7px 10px;font-size:12px;font-weight:800;color:var(--g600)">'+esc(recap.totals.person)+'</td>'+
-      cell(recap.totals.terrain,true)+cell(recap.totals.followup,true)+cell(recap.totals.calls,true)+cell(recap.totals.msgs,true)+cell(recap.totals.other,true)+cell(recap.totals.total,true)+
-    '</tr>' : '';
-  return '<div class="section" style="padding:12px 14px;margin-bottom:14px">'+
-      '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:8px">'+
-        '<b style="font-size:13px;color:var(--ink)">📊 Récap par expert</b>'+
-        '<span style="font-size:11px;color:var(--g500)">'+esc(periodLabelText||'')+' · '+recap.rows.length+' expert'+(recap.rows.length>1?'s':'')+'</span>'+
+  var foot=(!single)?'<tr style="border-top:2px solid var(--g200);background:var(--bg-warm)">'+
+    '<td style="padding:8px 10px;font-size:12px;font-weight:800;color:var(--g600)">Σ '+esc(recap.totals.person)+'</td>'+
+    '<td></td>'+
+    num(recap.totals.terrain,true)+num(recap.totals.followup,true)+num(recap.totals.calls,true)+num(recap.totals.msgs,true)+num(recap.totals.other,true)+num(recap.totals.total,true)+
+    '<td></td>'+
+  '</tr>':'';
+  return '<style>'+
+      '.act-avatar{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;color:#fff;font-size:10.5px;font-weight:800;font-family:\'JetBrains Mono\',monospace;flex:0 0 26px}'+
+      '.act-mix{display:flex;height:8px;border-radius:6px;overflow:hidden;background:var(--g100);min-width:90px}'+
+      '.act-mix span{display:block;height:100%}'+
+      '.act-recap-table .act-exp-row:hover{background:var(--g50)}'+
+    '</style>'+
+    '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
+      '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:10px">'+
+        '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">📊 Qui a fait quoi</b>'+
+        '<span style="font-size:11px;color:var(--g500)">'+esc(periodLabelText||'')+' · '+recap.rows.length+' expert'+(recap.rows.length>1?'s':'')+' · cliquez un expert pour voir ses entrées</span>'+
       '</div>'+
-      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:520px">'+
+      '<div style="overflow-x:auto"><table class="act-recap-table" style="width:100%;border-collapse:collapse;min-width:660px">'+
         '<thead><tr>'+th+'</tr></thead><tbody>'+body+foot+'</tbody>'+
       '</table></div>'+
     '</div>';
@@ -11873,7 +12012,8 @@ function readFollowupMeta(item) {
     callVisit: cleanMetaValue((item && item.CallVisit) || stored.callVisit),
     prospectionYear: cleanMetaValue((item && item.ProspectionYear) || stored.prospectionYear),
     entryOrigin: cleanMetaValue((item && item.EntryOrigin) || stored.entryOrigin),
-    firstContactChannel: cleanMetaValue((item && item.FirstContactChannel) || stored.firstContactChannel)
+    firstContactChannel: cleanMetaValue((item && item.FirstContactChannel) || stored.firstContactChannel),
+    statusOverride: cleanMetaValue((item && item.StatusOverride) || stored.statusOverride)
   };
 }
 
@@ -12618,22 +12758,42 @@ function validateSchoolSelectionForUser(schoolName) {
   }
   var info = getSchoolUsageInfo(trimmed);
   if (!info) {
-    return { ok: true, level: 'ok', message: 'Nouvelle école détectée: vous pouvez créer le suivi pour votre portefeuille.', info: null };
+    return { ok: true, level: 'ok', message: 'Nouvelle école détectée: cette saisie sera votre première entrée (1er contact) — vous pouvez continuer.', info: null };
   }
   var owners = info.experts || [];
-  var mine = currentUser && owners.some(function(owner) { return samePerson(owner, currentUser.fullName); });
-  if (mine) {
-    return { ok: true, level: 'ok', message: 'Cette école fait déjà partie de votre portefeuille.', info: info };
+  var me = currentUser ? currentUser.fullName : '';
+  // The gate: a suivi requires that THIS expert has already made the first entry
+  // (descente terrain / 1er contact = a raw prospection row), OR is the school owner
+  // (discoverer) for schools that exist only through a follow-up creation. Merely
+  // having logged a follow-up on someone else's school no longer counts — that was
+  // the loophole that let Richard (and others) pile suivis on schools they never
+  // first-entered.
+  var owner = (typeof getSchoolOwnerName === 'function') ? getSchoolOwnerName(trimmed) : '';
+  var hasFirstEntry = !!(currentUser && (userHasFirstEntry(trimmed, me) || (owner && samePerson(owner, me))));
+  if (hasFirstEntry) {
+    return { ok: true, level: 'ok', message: 'Cette école fait déjà partie de votre portefeuille (première saisie faite).', info: info };
   }
   if (canBypassSchoolOwnership(currentUser)) {
-    return { ok: true, level: 'warn', message: 'École déjà suivie par ' + owners.join(', ') + '. Votre rôle admin vous permet de poursuivre après validation.', info: info };
+    return { ok: true, level: 'warn', message: 'École suivie par ' + owners.join(', ') + '. Votre rôle admin vous permet de poursuivre après validation.', info: info };
   }
   return {
     ok: false,
     level: 'error',
-    message: 'Cette école est déjà suivie par ' + owners.join(', ') + '. Contactez Noah, Mbeuka brice ou Ntsa Guy pour autorisation avant de continuer.',
+    message: 'Vous n\'avez pas encore fait de première saisie (descente terrain · 1er contact) pour cette école — impossible d\'enregistrer un suivi. Faites d\'abord la saisie initiale' + (owners.length ? '. École déjà suivie par ' + owners.join(', ') + ' : contactez Noah, Mbeuka brice ou Ntsa Guy pour autorisation.' : '.'),
     info: info
   };
+}
+// True when the user personally made the FIRST entry (a raw prospection row / descente
+// terrain) for this school. Raw rows only — follow-up authorship does NOT count.
+function userHasFirstEntry(schoolName, userName){
+  if (!schoolName || !userName) return false;
+  var k = schoolKey(schoolName);
+  if (!k) return false;
+  var raws = (typeof getAllRawRows === 'function') ? (getAllRawRows() || []) : [];
+  for (var i=0;i<raws.length;i++){
+    if (raws[i] && raws[i].e && schoolKey(raws[i].n) === k && samePerson(raws[i].e, userName)) return true;
+  }
+  return false;
 }
 
 function updateSchoolOwnershipNotice() {
@@ -13789,7 +13949,7 @@ function _myEntriesFmtDate(ts){
 function _myEntriesStageBadge(stage){
   var map={gagne:{c:'var(--green)',l:'Gagné'},chaud:{c:'var(--red)',l:'Chaud'},tiede:{c:'var(--saffron)',l:'Tiède'},froid:{c:'var(--g500)',l:'Froid'},nouveau:{c:'var(--teal)',l:'Nouveau'},perdu:{c:'var(--g800)',l:'Perdu'}};
   var m=map[stage]||{c:'var(--g400)',l:'—'};
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:'+m.c+';color:#fff;font-size:10.5px;font-weight:700">'+m.l+'</span>';
+  return '<span class="me-stage-badge" style="display:inline-block;padding:2px 8px;border-radius:8px;background:'+m.c+';color:#fff;font-size:10.5px;font-weight:700">'+m.l+'</span>';
 }
 function showMyEntries(expertFilter){
   if (!currentUser){ showToast('Veuillez vous connecter', true); return; }
@@ -13914,6 +14074,18 @@ function showMyEntries(expertFilter){
       }).join('')+
       ' <label class="me-blink-toggle"><input type="checkbox"'+(hi==='blink'?' checked':'')+' onchange="setMyEntryHighlight(\''+safeKey+'\', this.checked?\'blink\':\'\')"> ⚡ clignoter</label>'+
     '</div>';
+    // Inline status editor — owner or admin can flip the pipeline stage right here.
+    // Mirrors the highlight-bar pattern; persists as an explicit STATUS follow-up.
+    var _canEditStatus = (typeof canEditSchool==='function') && canEditSchool(currentUser, r);
+    var statusBar = '';
+    if (_canEditStatus){
+      var _stg = [['gagne','🏆 Gagné'],['chaud','🔥 Chaud'],['tiede','🌤 Tiède'],['froid','❄️ Froid'],['nouveau','✨ Nouveau'],['perdu','⛔ Perdu']];
+      statusBar = '<div class="me-status-bar">✏️ <span class="me-status-lbl">Statut :</span>'+
+        _stg.map(function(s){
+          var act = r.stage===s[0] ? ' act' : '';
+          return '<button class="me-status-chip me-status-'+s[0]+act+'" data-stage="'+s[0]+'" onclick="setSchoolStatus(\''+safeKey+'\',\''+s[0]+'\')">'+s[1]+'</button>';
+        }).join('')+'</div>';
+    }
     // Data attributes used by the unified filter bar to filter without re-rendering
     var dataAttrs = ' data-name="'+esc(String(r.schoolName||'').toLowerCase())+'"'+
       ' data-city="'+esc(String(r.city||'').toLowerCase())+'"'+
@@ -13941,6 +14113,7 @@ function showMyEntries(expertFilter){
         '</div>'+
       '</div>'+
       '<div class="me-row-body">'+
+        statusBar+
         hlBar+
         (r.notes?'<div class="me-field"><b>📝 Notes terrain:</b> '+esc(r.notes)+'</div>':'')+
         (r.decisionReach?'<div class="me-field"><b>👔 Décideur:</b> '+esc(r.decisionReach)+'</div>':'')+
@@ -13953,7 +14126,7 @@ function showMyEntries(expertFilter){
           '<textarea id="me-note-school:'+esc(r.key)+'" placeholder="Ajouter une note d\'explication (lecture seule pour la fiche d\'origine — cette note s\'ajoute en bas)…" rows="2"></textarea>'+
           '<button onclick="submitMyEntryNote(\'school:'+safeKey+'\')">+ Ajouter note</button>'+
         '</div>'+
-        '<div class="me-edit-cta"><span>⚠️ Pour <b>modifier</b> ces données, ouvrez « Nouveau suivi » — la sélection de l\'école pré-remplit automatiquement tout ce qui est déjà saisi.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(r.schoolName).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Nouveau suivi pour cette école</button></div>'+
+        '<div class="me-edit-cta"><span>✏️ Le <b>statut</b> se change directement ci-dessus. Pour <b>modifier les autres champs</b>, ouvrez « Nouveau suivi » — la sélection de l\'école pré-remplit automatiquement tout ce qui est déjà saisi.</span><button onclick="closeMyEntries();showFollowupFromSchool(\''+esc(r.schoolName).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">→ Modifier la fiche</button></div>'+
       '</div>'+
     '</div>';
   }
@@ -14413,6 +14586,67 @@ function resetMyEntriesFilters(){
   if (typeof toast === 'function') toast('Filtres réinitialisés', 'success');
 }
 // Highlight a school with a color (or 'blink' or '' to clear)
+// Who may change a school's status / edit its fiche: the owner (discoverer of the
+// school = earliest first entry) or an admin. Mirrors the follow-up ownership model.
+function canEditSchool(user, rec){
+  if (!user || !rec) return false;
+  if (typeof canBypassSchoolOwnership === 'function' && canBypassSchoolOwnership(user)) return true;
+  var owner = (typeof getSchoolOwnerName === 'function') ? getSchoolOwnerName(rec.schoolName) : '';
+  return !!(owner && samePerson(owner, user.fullName));
+}
+// Optimistic DOM refresh of a school row's status badge + active chip after a change.
+function _updateSchoolRowStatusUI(schoolKeyStr, stage){
+  var sel = '.me-row[data-entry="school:'+CSS.escape(schoolKeyStr)+'"]';
+  document.querySelectorAll(sel).forEach(function(row){
+    row.setAttribute('data-stage', stage);
+    var badge = row.querySelector('.me-stage-badge');
+    if (badge && typeof _myEntriesStageBadge === 'function') badge.outerHTML = _myEntriesStageBadge(stage);
+    row.querySelectorAll('.me-status-chip').forEach(function(c){
+      c.classList.toggle('act', c.getAttribute('data-stage') === stage);
+    });
+  });
+}
+// Explicit status change — persisted as a lightweight STATUS follow-up so it syncs to
+// every device and to admins, and wins over the derived stage in buildSchoolRecords.
+async function setSchoolStatus(schoolKeyStr, stage){
+  if (!currentUser){ showToast('Veuillez vous connecter', true); return; }
+  var records = window.__meExportRecords || [];
+  var rec = null;
+  for (var i=0;i<records.length;i++){ if (records[i].key === schoolKeyStr){ rec = records[i]; break; } }
+  if (!rec){ showToast('École introuvable', true); return; }
+  if (!canEditSchool(currentUser, rec)){ showToast('Seul le propriétaire ou un admin peut changer le statut', true); return; }
+  var LABELS = { nouveau:'Nouveau', froid:'Froid', tiede:'Tiède', chaud:'Chaud', gagne:'Gagné', perdu:'Perdu' };
+  var label = LABELS[stage] || stage;
+  if (rec.stage === stage) return; // already this status — no-op
+  var capturedAt = new Date();
+  var entryTimestamp = capturedAt.toISOString();
+  var notes = buildFollowupNotes('Statut → '+label, { statusOverride: stage });
+  var data = {
+    action:'addFollowup', expert: currentUser.fullName, schoolName: rec.schoolName,
+    id:'', timestamp: entryTimestamp, followupType:'STATUS', notes: notes,
+    outcome:'Statut '+label, status: label, city: rec.city || '',
+    StatusOverride: stage, statusOverride: stage
+  };
+  var optimistic = addPendingFollowup({
+    ID:'LOCAL-'+capturedAt.getTime()+'-status',
+    Timestamp: entryTimestamp, Expert: currentUser.fullName, SchoolName: rec.schoolName,
+    FollowupType:'STATUS', Notes: notes, Outcome:'Statut '+label, Status: label,
+    City: rec.city || '', StatusOverride: stage, _pendingLocal:true, _apiData: data
+  });
+  // Optimistic UI so the change is instant even offline
+  rec.stage = stage; rec.statusOverride = stage;
+  _updateSchoolRowStatusUI(schoolKeyStr, stage);
+  showToast('Statut → '+label+' ✓');
+  try {
+    var res = await apiPost(data);
+    if (res && res.success){
+      removePendingFollowup(optimistic);
+      if (isBackendConfigured() && nateivaApiToken){ await refreshSyncedState(); }
+      else if (res.followup){ suiviFollowups.push(hydrateFollowupRecord(res.followup)); sanitizeFollowupStore(); }
+    }
+  } catch (e) { /* stays queued in pendingFollowups for the next flush */ }
+  if (typeof renderAll === 'function') renderAll();
+}
 function setMyEntryHighlight(schoolKeyStr, color){
   var k = 'highlight:'+(currentUser?currentUser.username:'anon')+':'+schoolKeyStr;
   if (color) localStorage.setItem(k, color); else localStorage.removeItem(k);
