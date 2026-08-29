@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.61 · NLP insights terrain · Online/Offline effort &amp; revenus · Revenue Tracker split Nateiva vs ambassadeur</span>
+      <span class="meta-pill red">v11.62 · NLP par expert (qui génère de l'intérêt / qui est bloqué) · Online/Offline effort · Revenue split Nateiva vs ambassadeur</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -9957,55 +9957,103 @@ function buildActivityNlp(items){
     .sort(function(a,b){ return b.n-a.n; }).slice(0,14);
   return { noteCount:notes.length, total:(items||[]).length, overlap:overlap, primary:primary, segments:segments, keywords:keywords };
 }
+// Per-expert NLP: turn each expert's notes into signal counts so leadership reads
+// numbers, not note-by-note prose. A note can hit several buckets.
+function buildActivityNlpByExpert(items){
+  var notes=(items||[]).filter(function(it){ return it && it.note && String(it.note).trim().length>2; });
+  var map={}, order=[];
+  notes.forEach(function(it){
+    var key=canonicalPersonKey(it.person)||'—';
+    if(!map[key]){ map[key]={ key:key, person:it.person, notes:0, interest:0, objection:0, blocked:0, docs:0, relance:0, ambassador:0, thin:0 }; order.push(key); }
+    var b=map[key]; b.notes++;
+    var s=extractProspectionTheme({ co: it.note, re: it.extra||'', r: null }).signals;
+    if(s.interest) b.interest++;
+    if(s.pricing||s.competition||s.competitor_named) b.objection++;
+    if(s.blocked||s.hierarchie) b.blocked++;
+    if(s.documents) b.docs++;
+    if(s.callback) b.relance++;
+    if(s.ambassador) b.ambassador++;
+    if(s.qualify) b.thin++;
+  });
+  var rows=order.map(function(k){ return map[k]; });
+  rows.forEach(function(r){
+    r.interestPct=r.notes?Math.round(r.interest/r.notes*100):0;
+    r.blockedPct =r.notes?Math.round(r.blocked/r.notes*100):0;
+    r.objPct     =r.notes?Math.round(r.objection/r.notes*100):0;
+    r.thinPct    =r.notes?Math.round(r.thin/r.notes*100):0;
+    r.score      =r.interest-(r.objection+r.blocked);
+  });
+  rows.sort(function(a,b){ return b.notes-a.notes; });
+  return { noteCount:notes.length, rows:rows };
+}
+function _actNlpSignal(r){
+  if(r.notes<3) return {lbl:'—',col:'var(--g400)',emo:'⚪'};
+  // Interest share is the lead signal: if ≥30% of a rep's notes show buying interest
+  // they read as "Fort" even when they also hit gatekeepers a lot (the blockage is
+  // still named in the call-outs) — interest is what ultimately converts.
+  if(r.interestPct>=30) return {lbl:'Fort',col:'var(--green)',emo:'🟢'};
+  if(r.blockedPct>=35) return {lbl:'Bloqué',col:'var(--red)',emo:'🔴'};
+  if(r.thinPct>=55) return {lbl:'Notes pauvres',col:'var(--saffron-deep)',emo:'🟠'};
+  if(r.objPct>=35) return {lbl:'Objections',col:'var(--saffron-deep)',emo:'🟠'};
+  return {lbl:'Moyen',col:'var(--g500)',emo:'⚪'};
+}
 function _actNlpHtml(items){
-  var nlp=buildActivityNlp(items);
+  var nlp=buildActivityNlpByExpert(items);
   if(!nlp.noteCount) return '';
-  var maxSeg=nlp.segments.length ? nlp.segments[0].value : 1;
-  var bars=nlp.segments.slice(0,8).map(function(s){
-    var pct=Math.round(s.value/nlp.noteCount*100);
-    return '<div style="display:flex;align-items:center;gap:10px;margin:5px 0">'+
-        '<div style="flex:0 0 150px;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s.label)+'</div>'+
-        '<div style="flex:1;background:var(--g100);border-radius:6px;height:14px;overflow:hidden;min-width:60px"><div style="width:'+Math.round(s.value/maxSeg*100)+'%;height:100%;background:'+s.color+'"></div></div>'+
-        '<div style="flex:0 0 74px;text-align:right;font-size:11.5px;font-weight:800;color:var(--g600)">'+s.value+' · '+pct+'%</div>'+
-      '</div>';
+  var kwData=buildActivityNlp(items); // reused only for the keyword strip
+  var rows=nlp.rows;
+  var cols=[
+    {k:'interest', h:'🔥 Intérêt', col:'var(--green)', good:true},
+    {k:'objection',h:'💰 Objection', col:'var(--red)'},
+    {k:'blocked',  h:'🏛️ Blocage', col:'var(--g700)'},
+    {k:'docs',     h:'📄 Docs', col:'var(--teal)'},
+    {k:'relance',  h:'🔁 Relance', col:'var(--saffron-bright)'},
+    {k:'ambassador',h:'🤝 Amb.', col:'var(--purple)'},
+    {k:'thin',     h:'📝 Faibles', col:'var(--g500)'}
+  ];
+  function cell(v,col){ return '<td style="text-align:center;padding:8px 8px;font-size:13px;font-weight:700;color:'+(v?col:'var(--g300)')+'">'+(v||0)+'</td>'; }
+  var th='<th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--g500);font-weight:800">Expert</th>'+
+    '<th style="text-align:center;padding:8px 8px;font-size:11px;color:var(--g500);font-weight:800">Notes</th>'+
+    cols.map(function(c){ return '<th style="text-align:center;padding:8px 8px;font-size:11.5px;font-weight:800;color:'+c.col+'">'+c.h+'</th>'; }).join('')+
+    '<th style="text-align:left;padding:8px 8px;font-size:11px;color:var(--g500);font-weight:800">Signal</th>';
+  var body=rows.map(function(r){
+    var sg=_actNlpSignal(r);
+    return '<tr style="border-top:1px solid var(--g100)">'+
+      '<td style="padding:8px 10px;white-space:nowrap"><div style="display:flex;align-items:center;gap:8px">'+
+        '<span class="act-avatar" style="background:'+_actAvatarBg(r.person)+'">'+esc(_actInitials(r.person))+'</span>'+
+        '<b style="font-size:12.5px;color:var(--ink)">'+esc(r.person)+'</b></div></td>'+
+      '<td style="text-align:center;padding:8px 8px;font-size:13px;font-weight:800;color:var(--ink)">'+r.notes+'</td>'+
+      cols.map(function(c){ return cell(r[c.k], c.col); }).join('')+
+      '<td style="padding:8px 8px;white-space:nowrap"><span style="font-size:12px;font-weight:800;color:'+sg.col+'">'+sg.emo+' '+sg.lbl+'</span></td>'+
+    '</tr>';
   }).join('');
-  var kw=nlp.keywords.map(function(k){
-    var sz=12+Math.min(8, k.n); // gentle size scaling
-    return '<span style="display:inline-block;padding:3px 10px;margin:3px;border-radius:100px;background:var(--bg-warm);border:1px solid var(--g200);font-size:'+sz+'px;font-weight:700;color:var(--ink)">'+esc(k.term)+' <b style="color:var(--red)">'+k.n+'</b></span>';
-  }).join('');
-  // Signal callouts
-  var hot=nlp.overlap.interest||0;
-  var obj=(nlp.overlap.pricing||0)+(nlp.overlap.competition||0)+(nlp.overlap.competitor_named||0);
-  var block=(nlp.overlap.blocked||0)+(nlp.overlap.hierarchie||0);
-  var docs=nlp.overlap.documents||0, relance=nlp.overlap.callback||0;
-  function chip(icon,label,val,col){
-    return '<div style="flex:1;min-width:120px;background:var(--paper);border:1px solid var(--g200);border-left:3px solid '+col+';border-radius:10px;padding:9px 12px">'+
-      '<div style="font-size:20px;font-weight:800;color:'+col+';font-family:JetBrains Mono,monospace">'+val+'</div>'+
-      '<div style="font-size:11px;font-weight:700;color:var(--g600)">'+icon+' '+label+'</div></div>';
-  }
+  // Standouts — only among experts with enough notes to be meaningful
+  var reliable=rows.filter(function(r){ return r.notes>=3; });
+  function top(metric){ var a=reliable.slice().sort(function(x,y){ return y[metric]-x[metric]; }); return a.length?a[0]:null; }
   var insights=[];
-  if(block) insights.push('🏛️ <b>'+block+'</b> notes buttent sur le <b>fondateur / hiérarchie ou un accès fermé</b> — c\'est le goulot terrain n°1 : viser le décideur directement.');
-  if(obj) insights.push('💰 <b>'+obj+'</b> signaux <b>prix / concurrent</b> — préparer un argumentaire ROI et une remise cadrée pour ces écoles.');
-  if(hot) insights.push('✨ <b>'+hot+'</b> notes montrent un <b>intérêt chaud</b> — prioriser la relance sous 48 h tant que c\'est frais.');
-  if(docs||relance) insights.push('📄 <b>'+docs+'</b> demandes de documents et <b>'+relance+'</b> de repassage — un envoi WhatsApp + un RDV daté débloquent ces suivis.');
-  if(nlp.overlap.qualify) insights.push('📝 <b>'+nlp.overlap.qualify+'</b> notes sont trop courtes pour une lecture fine — encourager des commentaires métier plus riches.');
+  var bestI=top('interestPct'); if(bestI && bestI.interest) insights.push('🟢 <b>'+esc(bestI.person)+'</b> génère le plus d\'intérêt — <b>'+bestI.interestPct+'%</b> de ses notes ('+bestI.interest+'/'+bestI.notes+'). À dupliquer.');
+  var mostB=top('blockedPct'); if(mostB && mostB.blockedPct>=30) insights.push('🔴 <b>'+esc(mostB.person)+'</b> est surtout bloqué au décideur / hiérarchie — <b>'+mostB.blockedPct+'%</b> ('+mostB.blocked+'/'+mostB.notes+'). L\'aider à atteindre le fondateur.');
+  var mostO=top('objPct'); if(mostO && mostO.objPct>=30 && (!mostB || mostO.key!==mostB.key)) insights.push('⚠️ <b>'+esc(mostO.person)+'</b> bute sur le prix / concurrent — <b>'+mostO.objPct+'%</b>. Renforcer l\'argumentaire ROI.');
+  var thin=reliable.filter(function(r){ return r.notes>=5; }).sort(function(x,y){ return y.thinPct-x.thinPct; })[0];
+  if(thin && thin.thinPct>=50) insights.push('🟠 <b>'+esc(thin.person)+'</b> — <b>'+thin.thinPct+'%</b> de notes trop pauvres pour être exploitées. À coacher sur la qualité des comptes-rendus.');
+  var amb=top('ambassador'); if(amb && amb.ambassador) insights.push('🤝 <b>'+esc(amb.person)+'</b> ramène le plus de pistes ambassadeur ('+amb.ambassador+').');
+  // compact keyword strip
+  var kw=kwData.keywords.slice(0,12).map(function(k){
+    return '<span style="display:inline-block;padding:2px 9px;margin:2px;border-radius:100px;background:var(--bg-warm);border:1px solid var(--g200);font-size:11.5px;font-weight:700;color:var(--ink)">'+esc(k.term)+' <b style="color:var(--red)">'+k.n+'</b></span>';
+  }).join('');
   return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
     '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:12px">'+
-      '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🧠 NLP · Insights terrain</b>'+
-      '<span style="font-size:11px;color:var(--g500)">'+nlp.noteCount+' note'+(nlp.noteCount>1?'s':'')+' analysée'+(nlp.noteCount>1?'s':'')+' sur '+nlp.total+' activité'+(nlp.total>1?'s':'')+' · thèmes détectés automatiquement</span>'+
+      '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🧠 NLP · Signaux par expert</b>'+
+      '<span style="font-size:11px;color:var(--g500)">'+nlp.noteCount+' note'+(nlp.noteCount>1?'s':'')+' analysée'+(nlp.noteCount>1?'s':'')+' · qui génère de l\'intérêt, qui est bloqué — en un coup d\'œil</span>'+
     '</div>'+
-    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
-      chip('✨','Intérêt chaud',hot,'var(--green)')+
-      chip('💰','Prix / concurrent',obj,'var(--red)')+
-      chip('🏛️','Blocage / hiérarchie',block,'var(--g700)')+
-      chip('📄','Docs demandés',docs,'var(--teal)')+
-    '</div>'+
-    (bars?'<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Thèmes dominants</div>'+bars:'')+
-    (kw?'<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">Mots-clés récurrents</div><div style="line-height:1.9">'+kw+'</div>':'')+
-    (insights.length?'<div style="margin-top:14px;padding:12px 14px;background:var(--bg-warm);border-radius:10px;border:1px solid var(--g200)">'+
-      '<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">💡 Ce que ça dit</div>'+
+    (insights.length?'<div style="margin-bottom:14px;padding:12px 14px;background:var(--bg-warm);border-radius:10px;border:1px solid var(--g200)">'+
+      '<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">💡 À retenir</div>'+
       insights.map(function(t){ return '<div style="font-size:13px;line-height:1.6;color:var(--ink);margin:5px 0">'+t+'</div>'; }).join('')+
     '</div>':'')+
+    '<div style="overflow-x:auto"><table class="act-recap-table" style="width:100%;border-collapse:collapse;min-width:680px">'+
+      '<thead><tr>'+th+'</tr></thead><tbody>'+body+'</tbody>'+
+    '</table></div>'+
+    (kw?'<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">Mots-clés récurrents</div><div style="line-height:1.8">'+kw+'</div>':'')+
   '</div>';
 }
 
