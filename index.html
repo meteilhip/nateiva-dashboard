@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.62 · NLP par expert (qui génère de l'intérêt / qui est bloqué) · Online/Offline effort · Revenue split Nateiva vs ambassadeur</span>
+      <span class="meta-pill red">v11.63 · NLP par expert + drill-down des notes · Online/Offline effort · Revenue split Nateiva vs ambassadeur</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -9964,8 +9964,8 @@ function buildActivityNlpByExpert(items){
   var map={}, order=[];
   notes.forEach(function(it){
     var key=canonicalPersonKey(it.person)||'—';
-    if(!map[key]){ map[key]={ key:key, person:it.person, notes:0, interest:0, objection:0, blocked:0, docs:0, relance:0, ambassador:0, thin:0 }; order.push(key); }
-    var b=map[key]; b.notes++;
+    if(!map[key]){ map[key]={ key:key, person:it.person, notes:0, interest:0, objection:0, blocked:0, docs:0, relance:0, ambassador:0, thin:0, items:[] }; order.push(key); }
+    var b=map[key]; b.notes++; b.items.push(it);
     var s=extractProspectionTheme({ co: it.note, re: it.extra||'', r: null }).signals;
     if(s.interest) b.interest++;
     if(s.pricing||s.competition||s.competitor_named) b.objection++;
@@ -9997,6 +9997,14 @@ function _actNlpSignal(r){
   if(r.objPct>=35) return {lbl:'Objections',col:'var(--saffron-deep)',emo:'🟠'};
   return {lbl:'Moyen',col:'var(--g500)',emo:'⚪'};
 }
+function _toggleActNlp(idx){
+  var el=document.getElementById('nlp-exp-'+idx);
+  if(!el) return;
+  var open = el.style.display && el.style.display!=='none';
+  el.style.display = open ? 'none' : 'table-row';
+  var caret=document.getElementById('nlp-caret-'+idx);
+  if(caret) caret.textContent = open ? '▸' : '▾';
+}
 function _actNlpHtml(items){
   var nlp=buildActivityNlpByExpert(items);
   if(!nlp.noteCount) return '';
@@ -10016,16 +10024,22 @@ function _actNlpHtml(items){
     '<th style="text-align:center;padding:8px 8px;font-size:11px;color:var(--g500);font-weight:800">Notes</th>'+
     cols.map(function(c){ return '<th style="text-align:center;padding:8px 8px;font-size:11.5px;font-weight:800;color:'+c.col+'">'+c.h+'</th>'; }).join('')+
     '<th style="text-align:left;padding:8px 8px;font-size:11px;color:var(--g500);font-weight:800">Signal</th>';
-  var body=rows.map(function(r){
+  var body=rows.map(function(r,idx){
     var sg=_actNlpSignal(r);
-    return '<tr style="border-top:1px solid var(--g100)">'+
+    var entries=(r.items||[]).slice().sort(function(a,b){return (b.t||0)-(a.t||0);});
+    var mainRow='<tr class="act-exp-row" onclick="_toggleActNlp('+idx+')" style="border-top:1px solid var(--g100);cursor:pointer">'+
       '<td style="padding:8px 10px;white-space:nowrap"><div style="display:flex;align-items:center;gap:8px">'+
+        '<span id="nlp-caret-'+idx+'" style="color:var(--g400);font-size:11px;width:10px">▸</span>'+
         '<span class="act-avatar" style="background:'+_actAvatarBg(r.person)+'">'+esc(_actInitials(r.person))+'</span>'+
         '<b style="font-size:12.5px;color:var(--ink)">'+esc(r.person)+'</b></div></td>'+
       '<td style="text-align:center;padding:8px 8px;font-size:13px;font-weight:800;color:var(--ink)">'+r.notes+'</td>'+
       cols.map(function(c){ return cell(r[c.k], c.col); }).join('')+
       '<td style="padding:8px 8px;white-space:nowrap"><span style="font-size:12px;font-weight:800;color:'+sg.col+'">'+sg.emo+' '+sg.lbl+'</span></td>'+
     '</tr>';
+    var drillRow='<tr id="nlp-exp-'+idx+'" style="display:none;background:var(--bg-warm)"><td colspan="10" style="padding:0 12px 10px 42px">'+
+      _actExpertEntriesHtml(entries)+
+    '</td></tr>';
+    return mainRow+drillRow;
   }).join('');
   // Standouts — only among experts with enough notes to be meaningful
   var reliable=rows.filter(function(r){ return r.notes>=3; });
@@ -10044,7 +10058,7 @@ function _actNlpHtml(items){
   return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
     '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:12px">'+
       '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🧠 NLP · Signaux par expert</b>'+
-      '<span style="font-size:11px;color:var(--g500)">'+nlp.noteCount+' note'+(nlp.noteCount>1?'s':'')+' analysée'+(nlp.noteCount>1?'s':'')+' · qui génère de l\'intérêt, qui est bloqué — en un coup d\'œil</span>'+
+      '<span style="font-size:11px;color:var(--g500)">'+nlp.noteCount+' note'+(nlp.noteCount>1?'s':'')+' analysée'+(nlp.noteCount>1?'s':'')+' · qui génère de l\'intérêt, qui est bloqué — cliquez un expert pour lire ses notes</span>'+
     '</div>'+
     (insights.length?'<div style="margin-bottom:14px;padding:12px 14px;background:var(--bg-warm);border-radius:10px;border:1px solid var(--g200)">'+
       '<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">💡 À retenir</div>'+
