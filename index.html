@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.65 · Activité restaurée : récap en tête, Notes par école repliées par catégorie, Online/Offline + total combiné</span>
+      <span class="meta-pill red">v11.66 · Online/Offline déplacé vers le Dashboard · Pouls d'activité (KPI + experts actifs/inactifs) sur l'onglet Activité</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -7108,6 +7108,9 @@ function rHome(){
   <!-- 📊 Per-expert activity recap (same numbers as the Activity tab, categorised) -->
   ${(typeof buildActivityRecapStrip==='function' ? buildActivityRecapStrip(dashboard.activityByExpert) : '')}
 
+  <!-- 🌐 Online vs Offline effort & revenus (moved here from the Activity tab) -->
+  ${(typeof _actModesHtml==='function' ? _actModesHtml(dashboard.records) : '')}
+
   <!-- Top Performers removed from Dashboard (kept in Workspace). Activity Feed moved to Workspace via buildActivityFeedStrip(). page-intro moved to top. -->
 
   <!-- 👔 DÉCIDEUR vs NON-DÉCIDEUR — repositioned above Revenue Tracker -->
@@ -10018,9 +10021,62 @@ function _actSchoolRecapHtml(items){
   '</div>';
 }
 
-// === Online vs Offline effort + earnings panel for the Activity tab ===
-// School-level, scoped to the active expert filter. Shows how many schools are on
-// each product mode and what Nateiva (net) vs the ambassador earn on the won ones.
+// === Activity pulse — KPI strip for the Activity tab ===
+// Scoped to the active filter (whole team for admins, self for an expert). Tracks the
+// pace of saisies over time and, for admins, who has gone quiet today.
+function _actPulseHtml(items){
+  if(!items || !items.length) return '';
+  var isSuper=isSuperAdmin(currentUser);
+  var todayKey=activeDayKey(new Date());
+  var weekKey=(typeof _periodKey==='function')?_periodKey(Date.now(),'week'):'';
+  var monthKey=(typeof _periodKey==='function')?_periodKey(Date.now(),'month'):'';
+  var today=0, week=0, month=0, days={}, schools={}, persons={}, personsToday={};
+  items.forEach(function(it){
+    var dk=activeDayKey(it.t);
+    if(dk){ days[dk]=1; if(dk===todayKey) today++; }
+    if(weekKey && _periodKey(it.t,'week')===weekKey) week++;
+    if(monthKey && _periodKey(it.t,'month')===monthKey) month++;
+    if(it.school){ schools[schoolKey(it.school)||it.school]=1; }
+    if(it.person){ var pk=canonicalPersonKey(it.person)||it.person; persons[pk]=it.person; if(dk===todayKey) personsToday[pk]=1; }
+  });
+  var activeDays=Object.keys(days).length, schoolCount=Object.keys(schools).length;
+  var expertsTotal=Object.keys(persons).length, expertsToday=Object.keys(personsToday).length;
+  function tile(icon,val,label,col){
+    return '<div style="flex:1;min-width:120px;background:var(--paper);border:1px solid var(--g200);border-top:3px solid '+col+';border-radius:12px;padding:12px 14px">'+
+      '<div style="font-size:24px;font-weight:800;color:'+col+';font-family:JetBrains Mono,monospace;line-height:1">'+val+'</div>'+
+      '<div style="margin-top:5px;font-size:11.5px;font-weight:700;color:var(--g600)">'+icon+' '+label+'</div>'+
+    '</div>';
+  }
+  var tiles=[
+    tile('📅', today, "Aujourd'hui", 'var(--red)'),
+    tile('🗓️', week, 'Cette semaine', 'var(--saffron-deep)'),
+    tile('📆', month, 'Ce mois', 'var(--teal)'),
+    tile('🔥', activeDays, 'Jours actifs', 'var(--purple)'),
+    tile('🏫', schoolCount, 'Écoles touchées', 'var(--green)')
+  ];
+  if(isSuper) tiles.push(tile('🟢', expertsToday+'/'+expertsTotal, 'Experts actifs auj.', 'var(--ink)'));
+  var note='';
+  if(isSuper){
+    var inactive=Object.keys(persons).filter(function(pk){ return !personsToday[pk]; }).map(function(pk){ return persons[pk]; });
+    if(inactive.length){
+      note='<div style="margin-top:10px;padding:9px 12px;background:var(--red-soft);border:1px solid var(--red);border-radius:10px;font-size:12px;color:var(--red)"><b>😴 Sans activité aujourd\'hui :</b> '+esc(inactive.join(', '))+'</div>';
+    } else if(expertsTotal){
+      note='<div style="margin-top:10px;padding:9px 12px;background:var(--green-soft);border:1px solid var(--green);border-radius:10px;font-size:12px;color:var(--green)"><b>✅ Toute l\'équipe a été active aujourd\'hui.</b></div>';
+    }
+  }
+  return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
+    '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:12px">'+
+      '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🎯 Pouls d\'activité</b>'+
+      '<span style="font-size:11px;color:var(--g500)">'+(isSuper?'Équipe':'Votre activité')+' · rythme des saisies dans le temps</span>'+
+    '</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:10px">'+tiles.join('')+'</div>'+
+    note+
+  '</div>';
+}
+
+// === Online vs Offline effort + earnings panel (Dashboard) ===
+// School-level, scoped by the dashboard model. Shows how many schools are on each
+// product mode and what Nateiva (net) vs the ambassador earn on the won ones.
 function _actModesHtml(records){
   if(!records || !records.length) return '';
   var m={Online:{n:0,won:0,net:0,amb:0,pot:0},Offline:{n:0,won:0,net:0,amb:0,pot:0}};
@@ -10124,22 +10180,16 @@ function renderActivityList(){
   });
   var recapHost = document.getElementById('activity-recap');
   var nlpHost = document.getElementById('activity-nlp');
-  var modesHost = document.getElementById('activity-modes');
-  // Online/Offline effort panel — school-level, scoped to the active expert (or the
-  // logged-in user for non-admins). Built from cached records so keystrokes stay cheap.
-  if(modesHost){
-    var _recs = window.__activityRecs || (window.__activityRecs = buildSchoolRecords(getAllRawRows(), getAllFollowups()));
-    var _scopeKey = pv || (isSuper ? '' : canonicalPersonKey(currentUser ? currentUser.fullName : ''));
-    var _scoped = _scopeKey ? _recs.filter(function(r){ return canonicalPersonKey(r.expert)===_scopeKey; }) : _recs;
-    modesHost.innerHTML = _actModesHtml(_scoped);
-  }
+  var pulseHost = document.getElementById('activity-pulse');
   if(!filtered.length){
     host.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--g500)">🔍 Aucune activité pour ce filtre.</div>';
     var sc0 = document.getElementById('act-summary'); if(sc0) sc0.textContent = '0 activité';
     if(recapHost) recapHost.innerHTML = '';
     if(nlpHost) nlpHost.innerHTML = '';
+    if(pulseHost) pulseHost.innerHTML = '';
     return;
   }
+  if(pulseHost) pulseHost.innerHTML = _actPulseHtml(filtered);
   var withNotes = filtered.filter(function(x){ return x.note; }).length;
   var sc = document.getElementById('act-summary');
   if (sc) sc.textContent = filtered.length+' activité'+(filtered.length>1?'s':'')+' · '+withNotes+' avec note'+(withNotes>1?'s':'');
@@ -10255,8 +10305,8 @@ function rActivity(){
       '</div>'+
       '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}'+
         '#p-activity .act-per.act{background:var(--red);color:#fff;border-color:var(--red)}</style>'+
+      '<div id="activity-pulse"></div>'+
       '<div id="activity-recap"></div>'+
-      '<div id="activity-modes"></div>'+
       '<div id="activity-nlp"></div>'+
       '<div id="activity-list" style="margin-top:6px"></div>'+
     '</div>';
