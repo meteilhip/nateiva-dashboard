@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.64 · Notes par école (groupées par catégorie + drill-down) · Online/Offline avec total combiné · Revenue split Nateiva vs ambassadeur</span>
+      <span class="meta-pill red">v11.65 · Activité restaurée : récap en tête, Notes par école repliées par catégorie, Online/Offline + total combiné</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -9968,35 +9968,51 @@ function _toggleActSchool(idx){
   var caret=document.getElementById('sch-caret-'+idx);
   if(caret) caret.textContent = open ? '▸' : '▾';
 }
+function _toggleActSchoolCat(ci){
+  var el=document.getElementById('schcat-'+ci);
+  if(!el) return;
+  var open = el.style.display && el.style.display!=='none';
+  el.style.display = open ? 'none' : 'block';
+  var caret=document.getElementById('schcat-caret-'+ci);
+  if(caret) caret.textContent = open ? '▸' : '▾';
+}
 function _actSchoolRecapHtml(items){
   var rec=buildActivitySchoolRecap(items);
   if(!rec.schoolCount) return '';
   var STAGES=[['gagne','🏆 Gagné','var(--green)'],['chaud','🔥 Chaud','var(--red)'],['tiede','🌤 Tiède','var(--saffron-deep)'],['froid','❄️ Froid','var(--g500)'],['nouveau','✨ Nouveau','var(--teal)'],['perdu','⛔ Perdu','var(--g800)'],['','❔ Autres','var(--g400)']];
   var byStage={}; rec.rows.forEach(function(r){ var s=r.stage||''; (byStage[s]=byStage[s]||[]).push(r); });
-  var idx={v:0};
+  var idx={v:0}, cat={v:0};
+  // Each pipeline-stage category is a collapsible section (folded by default), and each
+  // school inside is itself collapsible — so the whole recap opens on demand, not as a wall.
   var sections=STAGES.map(function(st){
     var list=byStage[st[0]]; if(!list||!list.length) return '';
+    var ci=cat.v++;
     var schoolRows=list.map(function(r){
       var i=idx.v++;
-      var head='<div class="sch-row-head" onclick="_toggleActSchool('+i+')" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;border-top:1px solid var(--g100)">'+
+      var head='<div class="sch-row-head" onclick="_toggleActSchool('+i+')" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-top:1px solid var(--g100)">'+
         '<span id="sch-caret-'+i+'" style="color:var(--g400);font-size:11px;width:10px">▸</span>'+
         '<b style="font-size:13px;color:var(--ink)">🏫 '+esc(r.school)+'</b>'+
         (r.city?'<span style="font-size:11px;color:var(--g500)">📍 '+esc(getCityLabel(r.city))+'</span>':'')+
         '<span style="font-size:11px;color:var(--g500)">👤 '+esc(r.expertList.join(', '))+'</span>'+
         '<span style="margin-left:auto;font-size:11px;font-weight:800;color:var(--ink);background:var(--g100);padding:2px 9px;border-radius:100px">'+r.items.length+' note'+(r.items.length>1?'s':'')+'</span>'+
       '</div>';
-      var drill='<div id="sch-exp-'+i+'" style="display:none;padding:2px 12px 10px 32px;background:var(--bg-warm)">'+_actSchoolNotesHtml(r.items)+'</div>';
+      var drill='<div id="sch-exp-'+i+'" style="display:none;padding:2px 12px 10px 34px;background:var(--bg-warm)">'+_actSchoolNotesHtml(r.items)+'</div>';
       return head+drill;
     }).join('');
-    return '<div style="margin-bottom:12px">'+
-      '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px"><span style="width:9px;height:9px;border-radius:50%;background:'+st[2]+'"></span><b style="font-size:12.5px;color:'+st[2]+'">'+st[1]+'</b><span style="font-size:11px;color:var(--g500)">'+list.length+' école'+(list.length>1?'s':'')+'</span></div>'+
-      schoolRows+
+    return '<div style="margin-bottom:8px;border:1px solid var(--g200);border-radius:10px;overflow:hidden">'+
+      '<div class="sch-cat-head" onclick="_toggleActSchoolCat('+ci+')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--bg-warm)">'+
+        '<span id="schcat-caret-'+ci+'" style="color:var(--g500);font-size:12px;width:10px">▸</span>'+
+        '<span style="width:9px;height:9px;border-radius:50%;background:'+st[2]+'"></span>'+
+        '<b style="font-size:13px;color:'+st[2]+'">'+st[1]+'</b>'+
+        '<span style="margin-left:auto;font-size:11px;font-weight:800;color:var(--g600);background:var(--paper);border:1px solid var(--g200);padding:2px 9px;border-radius:100px">'+list.length+' école'+(list.length>1?'s':'')+'</span>'+
+      '</div>'+
+      '<div id="schcat-'+ci+'" style="display:none">'+schoolRows+'</div>'+
     '</div>';
   }).join('');
   return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
     '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:10px">'+
       '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🏫 Notes par école</b>'+
-      '<span style="font-size:11px;color:var(--g500)">'+rec.schoolCount+' école'+(rec.schoolCount>1?'s':'')+' · '+rec.noteCount+' note'+(rec.noteCount>1?'s':'')+' · groupées par catégorie · cliquez une école pour lire ses notes</span>'+
+      '<span style="font-size:11px;color:var(--g500)">'+rec.schoolCount+' école'+(rec.schoolCount>1?'s':'')+' · '+rec.noteCount+' note'+(rec.noteCount>1?'s':'')+' · cliquez une catégorie, puis une école, pour lire ses notes</span>'+
     '</div>'+
     sections+
   '</div>';
@@ -10239,9 +10255,9 @@ function rActivity(){
       '</div>'+
       '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}'+
         '#p-activity .act-per.act{background:var(--red);color:#fff;border-color:var(--red)}</style>'+
+      '<div id="activity-recap"></div>'+
       '<div id="activity-modes"></div>'+
       '<div id="activity-nlp"></div>'+
-      '<div id="activity-recap"></div>'+
       '<div id="activity-list" style="margin-top:6px"></div>'+
     '</div>';
   renderActivityList();
