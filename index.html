@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v11.60 · Statut éditable (Gagné↔Perdu) · suivi bloqué sans 1ère saisie · tableau activité premium par expert</span>
+      <span class="meta-pill red">v11.61 · NLP insights terrain · Online/Offline effort &amp; revenus · Revenue Tracker split Nateiva vs ambassadeur</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -7278,11 +7278,37 @@ function rHome(){
     var catCfg = ambCat !== 'all' ? AMBASSADOR_RATES[ambCat] : null;
     var commissionTxt = catCfg ? (catCfg.type === 'pct' ? Math.round(catCfg.commission*100)+'% du base (2 500 × élèves)' : moneyCompact(catCfg.commission)+' / école gagnée') : 'Variable selon catégorie';
 
+    // Earnings split: what Nateiva keeps (net) vs what the ambassador takes — on WON
+    // schools (actual) and on the chaud+tiède pipeline (projected expected value).
+    var natWon=0, ambWon=0, grossWon=0, wonN=0, natProj=0, ambProj=0, projN=0;
+    allRecords.forEach(function(r){
+      if(r.stage==='gagne'){ natWon+=(r.netAmount||0); ambWon+=(r.ambassadorAmount||0); grossWon+=(r.amount||0); wonN++; }
+      else if(r.stage==='chaud' || r.stage==='tiede'){ natProj+=(r.netAmount||0); ambProj+=(typeof estimateAmbForPotential==='function'?estimateAmbForPotential(r):0); projN++; }
+    });
+    var natPct = grossWon ? Math.round(natWon/grossWon*100) : 0;
+    var ambPct = grossWon ? (100-natPct) : 0;
+    var earnSplitHtml = '<div style="margin-bottom:18px;padding:16px;background:linear-gradient(135deg,rgba(5,150,105,.06),rgba(124,58,237,.05));border-radius:14px;border:1px solid var(--g100)">'+
+        '<div style="font-family:Fraunces,serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">🏦 Qui encaisse quoi <span style="font-size:11px;font-weight:600;color:var(--g500)">· '+wonN+' gagnée'+(wonN>1?'s':'')+' encaissée'+(wonN>1?'s':'')+'</span></div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">'+
+          '<div class="stat-modern" style="border-top:3px solid var(--green)"><div class="stat-head"><span class="stat-label">💰 Nateiva (net)</span><span class="stat-icon" style="background:var(--green-soft);color:var(--green)">🏦</span></div><div class="stat-val" style="color:var(--green)">'+moneyCompact(natWon)+'</div><div class="stat-sub">'+natPct+'% du chiffre · après commission</div></div>'+
+          '<div class="stat-modern" style="border-top:3px solid var(--purple)"><div class="stat-head"><span class="stat-label">🤝 Ambassadeur</span><span class="stat-icon" style="background:var(--purple-soft);color:var(--purple)">💸</span></div><div class="stat-val" style="color:var(--purple)">'+moneyCompact(ambWon)+'</div><div class="stat-sub">'+ambPct+'% du chiffre · commissions</div></div>'+
+          '<div class="stat-modern" style="border-top:3px solid var(--ink)"><div class="stat-head"><span class="stat-label">💵 Chiffre brut</span><span class="stat-icon" style="background:var(--g100);color:var(--ink)">∑</span></div><div class="stat-val">'+moneyCompact(grossWon)+'</div><div class="stat-sub">Nateiva + ambassadeur</div></div>'+
+        '</div>'+
+        (grossWon?'<div style="display:flex;height:12px;border-radius:8px;overflow:hidden;background:var(--g100);margin-bottom:12px"><div style="width:'+natPct+'%;background:var(--green)" title="Nateiva '+natPct+'%"></div><div style="width:'+ambPct+'%;background:var(--purple)" title="Ambassadeur '+ambPct+'%"></div></div>':'')+
+        '<div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:10px 12px;background:var(--paper);border:1px dashed var(--g200);border-radius:10px;font-size:12.5px">'+
+          '<span style="font-weight:800;color:var(--g500)">🎯 Projeté pipeline ('+projN+' chaud+tiède)</span>'+
+          '<span>💰 Nateiva <b style="color:var(--green)">'+moneyCompact(natProj)+'</b></span>'+
+          '<span>🤝 Ambassadeur <b style="color:var(--purple)">'+moneyCompact(ambProj)+'</b></span>'+
+          '<span style="color:var(--g400)">valeur attendue, pondérée par le taux</span>'+
+        '</div>'+
+      '</div>';
+
     return '<div class="section" style="padding:18px;margin-bottom:14px">'+
       '<div class="sec-head" style="margin-bottom:18px">'+
         '<h2>💰 Revenue Tracker <span class="it">par période</span></h2>'+
-        '<span class="anno">Week-over-week · Month-over-month · Year-over-year · estimation ambassadeur</span>'+
+        '<span class="anno">Week-over-week · Month-over-month · Year-over-year · Nateiva vs ambassadeur</span>'+
       '</div>'+
+      earnSplitHtml+
       '<div class="rev-periods-stack">'+ PERIODS.map(renderPeriodPanel).join('') +'</div>'+
       '<div style="margin-top:18px;padding:16px;background:linear-gradient(135deg,rgba(124,58,237,.05),rgba(220,38,38,.03));border-radius:14px;border:1px solid var(--g100)">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">'+
@@ -9898,6 +9924,128 @@ function _actRecapHtml(items, periodLabelText){
     '</div>';
 }
 
+// === NLP insights for the Activity tab ===
+// Reuses the prospection theme engine (PROSPECTION_THEME_RULES / extractProspectionTheme)
+// over the notes of the currently-filtered activity items, so the insight always
+// matches the active expert / period / search filters.
+function _actNlpStopwords(){
+  if(_actNlpStopwords._s) return _actNlpStopwords._s;
+  var w = 'le la les un une des du de d au aux a et ou est sont ete etre avoir ont pas ne plus tres pour par sur dans avec sans que qui quoi dont ce cet cette ces son sa ses leur leurs il elle ils elles on nous vous je tu se me te mon ma mes ton ta tes notre votre nos vos y en lui eux mais donc car ni or si comme deja encore alors apres avant chez vers lors aussi meme fait faire dit dire voir cela ceci ici la bien tout tous toute toutes autre autres quand ecole ecoles monsieur madame mr mme svp rt'.split(/\s+/);
+  var set={}; w.forEach(function(x){ set[x]=1; }); _actNlpStopwords._s=set; return set;
+}
+function buildActivityNlp(items){
+  var STOP=_actNlpStopwords();
+  var notes=(items||[]).filter(function(it){ return it && it.note && String(it.note).trim().length>2; });
+  var overlap={qualify:0}, primary={qualify:0};
+  PROSPECTION_THEME_ORDER.forEach(function(k){ overlap[k]=0; primary[k]=0; });
+  var freq={};
+  notes.forEach(function(it){
+    var theme=extractProspectionTheme({ co: it.note, re: it.extra||'', r: null });
+    PROSPECTION_THEME_ORDER.forEach(function(key){ if(theme.signals[key]) overlap[key]++; });
+    if(theme.signals.qualify) overlap.qualify++;
+    primary[theme.primary]=(primary[theme.primary]||0)+1;
+    // keyword frequency
+    normalizeText(it.note).split(/[^a-z0-9]+/).forEach(function(tok){
+      if(tok.length<4 || STOP[tok] || /^\d+$/.test(tok)) return;
+      freq[tok]=(freq[tok]||0)+1;
+    });
+  });
+  var segments=PROSPECTION_THEME_RULES.map(function(rule){
+    return { key:rule.key, label:rule.label, short:rule.short, value:primary[rule.key]||0, overlap:overlap[rule.key]||0, color:resolveToneColor(rule.tone) };
+  }).filter(function(s){ return s.value>0; }).sort(function(a,b){ return b.value-a.value; });
+  var keywords=Object.keys(freq).map(function(k){ return {term:k, n:freq[k]}; })
+    .sort(function(a,b){ return b.n-a.n; }).slice(0,14);
+  return { noteCount:notes.length, total:(items||[]).length, overlap:overlap, primary:primary, segments:segments, keywords:keywords };
+}
+function _actNlpHtml(items){
+  var nlp=buildActivityNlp(items);
+  if(!nlp.noteCount) return '';
+  var maxSeg=nlp.segments.length ? nlp.segments[0].value : 1;
+  var bars=nlp.segments.slice(0,8).map(function(s){
+    var pct=Math.round(s.value/nlp.noteCount*100);
+    return '<div style="display:flex;align-items:center;gap:10px;margin:5px 0">'+
+        '<div style="flex:0 0 150px;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s.label)+'</div>'+
+        '<div style="flex:1;background:var(--g100);border-radius:6px;height:14px;overflow:hidden;min-width:60px"><div style="width:'+Math.round(s.value/maxSeg*100)+'%;height:100%;background:'+s.color+'"></div></div>'+
+        '<div style="flex:0 0 74px;text-align:right;font-size:11.5px;font-weight:800;color:var(--g600)">'+s.value+' · '+pct+'%</div>'+
+      '</div>';
+  }).join('');
+  var kw=nlp.keywords.map(function(k){
+    var sz=12+Math.min(8, k.n); // gentle size scaling
+    return '<span style="display:inline-block;padding:3px 10px;margin:3px;border-radius:100px;background:var(--bg-warm);border:1px solid var(--g200);font-size:'+sz+'px;font-weight:700;color:var(--ink)">'+esc(k.term)+' <b style="color:var(--red)">'+k.n+'</b></span>';
+  }).join('');
+  // Signal callouts
+  var hot=nlp.overlap.interest||0;
+  var obj=(nlp.overlap.pricing||0)+(nlp.overlap.competition||0)+(nlp.overlap.competitor_named||0);
+  var block=(nlp.overlap.blocked||0)+(nlp.overlap.hierarchie||0);
+  var docs=nlp.overlap.documents||0, relance=nlp.overlap.callback||0;
+  function chip(icon,label,val,col){
+    return '<div style="flex:1;min-width:120px;background:var(--paper);border:1px solid var(--g200);border-left:3px solid '+col+';border-radius:10px;padding:9px 12px">'+
+      '<div style="font-size:20px;font-weight:800;color:'+col+';font-family:JetBrains Mono,monospace">'+val+'</div>'+
+      '<div style="font-size:11px;font-weight:700;color:var(--g600)">'+icon+' '+label+'</div></div>';
+  }
+  var insights=[];
+  if(block) insights.push('🏛️ <b>'+block+'</b> notes buttent sur le <b>fondateur / hiérarchie ou un accès fermé</b> — c\'est le goulot terrain n°1 : viser le décideur directement.');
+  if(obj) insights.push('💰 <b>'+obj+'</b> signaux <b>prix / concurrent</b> — préparer un argumentaire ROI et une remise cadrée pour ces écoles.');
+  if(hot) insights.push('✨ <b>'+hot+'</b> notes montrent un <b>intérêt chaud</b> — prioriser la relance sous 48 h tant que c\'est frais.');
+  if(docs||relance) insights.push('📄 <b>'+docs+'</b> demandes de documents et <b>'+relance+'</b> de repassage — un envoi WhatsApp + un RDV daté débloquent ces suivis.');
+  if(nlp.overlap.qualify) insights.push('📝 <b>'+nlp.overlap.qualify+'</b> notes sont trop courtes pour une lecture fine — encourager des commentaires métier plus riches.');
+  return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
+    '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:12px">'+
+      '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🧠 NLP · Insights terrain</b>'+
+      '<span style="font-size:11px;color:var(--g500)">'+nlp.noteCount+' note'+(nlp.noteCount>1?'s':'')+' analysée'+(nlp.noteCount>1?'s':'')+' sur '+nlp.total+' activité'+(nlp.total>1?'s':'')+' · thèmes détectés automatiquement</span>'+
+    '</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
+      chip('✨','Intérêt chaud',hot,'var(--green)')+
+      chip('💰','Prix / concurrent',obj,'var(--red)')+
+      chip('🏛️','Blocage / hiérarchie',block,'var(--g700)')+
+      chip('📄','Docs demandés',docs,'var(--teal)')+
+    '</div>'+
+    (bars?'<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Thèmes dominants</div>'+bars:'')+
+    (kw?'<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">Mots-clés récurrents</div><div style="line-height:1.9">'+kw+'</div>':'')+
+    (insights.length?'<div style="margin-top:14px;padding:12px 14px;background:var(--bg-warm);border-radius:10px;border:1px solid var(--g200)">'+
+      '<div style="font-size:11px;font-weight:800;color:var(--g500);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">💡 Ce que ça dit</div>'+
+      insights.map(function(t){ return '<div style="font-size:13px;line-height:1.6;color:var(--ink);margin:5px 0">'+t+'</div>'; }).join('')+
+    '</div>':'')+
+  '</div>';
+}
+
+// === Online vs Offline effort + earnings panel for the Activity tab ===
+// School-level, scoped to the active expert filter. Shows how many schools are on
+// each product mode and what Nateiva (net) vs the ambassador earn on the won ones.
+function _actModesHtml(records){
+  if(!records || !records.length) return '';
+  var m={Online:{n:0,won:0,net:0,amb:0,pot:0},Offline:{n:0,won:0,net:0,amb:0,pot:0}};
+  records.forEach(function(r){
+    var mode = r.revenueMode==='Online' ? 'Online' : 'Offline';
+    var b=m[mode]; b.n++;
+    if(r.stage==='gagne'){ b.won++; b.net+=(r.netAmount||0); b.amb+=(r.ambassadorAmount||0); }
+    else if(r.stage==='chaud'||r.stage==='tiede'){ b.pot+=(r.netAmount||0); }
+  });
+  var totN=m.Online.n+m.Offline.n;
+  if(!totN) return '';
+  function card(mode,icon,col){
+    var b=m[mode];
+    var pct = totN ? Math.round(b.n/totN*100) : 0;
+    return '<div style="flex:1;min-width:210px;background:var(--paper);border:1px solid var(--g200);border-top:3px solid '+col+';border-radius:12px;padding:14px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+        '<span style="font-size:18px">'+icon+'</span><b style="font-size:14px;color:var(--ink)">'+mode+'</b>'+
+        '<span style="margin-left:auto;font-size:22px;font-weight:800;color:'+col+';font-family:JetBrains Mono,monospace">'+b.n+'</span>'+
+      '</div>'+
+      '<div style="font-size:11.5px;color:var(--g500);margin-bottom:9px">'+pct+'% des écoles · '+b.won+' gagnée'+(b.won>1?'s':'')+' · '+(b.n-b.won)+' en cours</div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0"><span style="color:var(--g600)">💰 Nateiva encaisse</span><b style="color:var(--green)">'+moneyCompact(b.net)+'</b></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0"><span style="color:var(--g600)">🤝 Ambassadeur</span><b style="color:var(--purple)">'+moneyCompact(b.amb)+'</b></div>'+
+      (b.pot?'<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;color:var(--g400)"><span>🎯 Potentiel (chaud+tiède)</span><span>'+moneyCompact(b.pot)+'</span></div>':'')+
+    '</div>';
+  }
+  return '<div class="section" style="padding:14px 16px;margin-bottom:14px">'+
+    '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:12px">'+
+      '<b style="font-family:\'Fraunces\',serif;font-size:16px;color:var(--ink)">🌐 Online vs Offline — effort &amp; revenus</b>'+
+      '<span style="font-size:11px;color:var(--g500)">'+totN+' école'+(totN>1?'s':'')+' dans le périmètre · revenus sur les écoles gagnées</span>'+
+    '</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:12px">'+card('Online','🌐','var(--teal)')+card('Offline','📴','var(--saffron-deep)')+'</div>'+
+  '</div>';
+}
+
 // Compact per-expert recap strip for the Dashboard home pane.
 // Reads model.activityByExpert (built by buildActivitySummary) so it matches the Activity tab.
 function buildActivityRecapStrip(byExpert){
@@ -9953,10 +10101,21 @@ function renderActivityList(){
     return true;
   });
   var recapHost = document.getElementById('activity-recap');
+  var nlpHost = document.getElementById('activity-nlp');
+  var modesHost = document.getElementById('activity-modes');
+  // Online/Offline effort panel — school-level, scoped to the active expert (or the
+  // logged-in user for non-admins). Built from cached records so keystrokes stay cheap.
+  if(modesHost){
+    var _recs = window.__activityRecs || (window.__activityRecs = buildSchoolRecords(getAllRawRows(), getAllFollowups()));
+    var _scopeKey = pv || (isSuper ? '' : canonicalPersonKey(currentUser ? currentUser.fullName : ''));
+    var _scoped = _scopeKey ? _recs.filter(function(r){ return canonicalPersonKey(r.expert)===_scopeKey; }) : _recs;
+    modesHost.innerHTML = _actModesHtml(_scoped);
+  }
   if(!filtered.length){
     host.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--g500)">🔍 Aucune activité pour ce filtre.</div>';
     var sc0 = document.getElementById('act-summary'); if(sc0) sc0.textContent = '0 activité';
     if(recapHost) recapHost.innerHTML = '';
+    if(nlpHost) nlpHost.innerHTML = '';
     return;
   }
   var withNotes = filtered.filter(function(x){ return x.note; }).length;
@@ -9964,7 +10123,8 @@ function renderActivityList(){
   if (sc) sc.textContent = filtered.length+' activité'+(filtered.length>1?'s':'')+' · '+withNotes+' avec note'+(withNotes>1?'s':'');
   var period = window.__activityPeriod || 'day';
   var periodName = { day:'Par jour', week:'Par semaine', month:'Par mois', year:'Par année' }[period] || 'Par jour';
-  // Per-expert recap (respects the active person/kind/search filters)
+  // NLP insights + per-expert recap (both respect the active person/kind/search filters)
+  if(nlpHost) nlpHost.innerHTML = _actNlpHtml(filtered);
   if(recapHost) recapHost.innerHTML = _actRecapHtml(filtered, periodName);
   // Group by the selected period (day / week / month / year)
   var groups = [], gmap = {};
@@ -10011,6 +10171,7 @@ function rActivity(){
   if(!el) return;
   var isSuper = isSuperAdmin(currentUser);
   window.__activityItems = buildActivityItems();
+  window.__activityRecs = null; // rebuilt lazily in renderActivityList (fresh after edits)
   var items = window.__activityItems;
   // Distinct people (super only) for the filter + per-person counts
   var people = [], pcount = {}, seen = {};
@@ -10072,6 +10233,8 @@ function rActivity(){
       '</div>'+
       '<style>#p-activity .act-chip.act{background:var(--ink);color:#fff;border-color:var(--ink)}'+
         '#p-activity .act-per.act{background:var(--red);color:#fff;border-color:var(--red)}</style>'+
+      '<div id="activity-modes"></div>'+
+      '<div id="activity-nlp"></div>'+
       '<div id="activity-recap"></div>'+
       '<div id="activity-list" style="margin-top:6px"></div>'+
     '</div>';
