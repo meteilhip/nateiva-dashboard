@@ -1,0 +1,125 @@
+name: Deploy Sales Analytics API (OVH VPS 15.204.82.200)
+
+# Deploys ONLY the isolated "nateiva-sales-analytics" environment.
+# It never touches the other apps on the VPS, nor the old server's running app.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "nateiva-sale-analytic-api/**"
+      - ".github/workflows/deploy-sales-analytics-vps.yml"
+  workflow_dispatch:
+    inputs:
+      migrate_data:
+        description: "One-time copy of data from the old server (57.129.133.115). Refuses if the new DB already has rows."
+        type: boolean
+        default: false
+      check_vercel:
+        description: "Also verify https://nateiva-dashboard.vercel.app/napi/healthz (only after vercel.json points to the new VPS)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-sales-analytics-vps
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: nateiva-sale-analytic-api/deploy/vps-15-204-82-200
+  VPS_HOST: ${{ vars.SA_VPS_HOST || '15.204.82.200' }}
+  VPS_USER: ${{ vars.SA_VPS_USER || 'ubuntu' }}
+  OLD_HOST: ${{ vars.SA_OLD_HOST || '57.129.133.115' }}
+  OLD_USER: ${{ vars.SA_OLD_USER || 'ubuntu' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax checks
+        run: |
+          node --check nateiva-sale-analytic-api/src/server.js
+          bash -n "$ENV_DIR"/scripts/*.sh
+
+      - name: SSH setup
+        env:
+          SSH_KEY: ${{ secrets.SA_VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SA_VPS_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_KEY" || { echo "Missing secret SA_VPS_SSH_KEY"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/vps && chmod 600 ~/.ssh/vps
+          if [ -n "$KNOWN_HOSTS" ]; then printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else ssh-keyscan -T 15 "$VPS_HOST" >> ~/.ssh/known_hosts; fi
+
+      - name: Build release bundle
+        run: |
+          mkdir -p bundle
+          tar --exclude=node_modules --exclude=.env -czf bundle/release.tgz -C nateiva-sale-analytic-api .
+          cp "$ENV_DIR/env.conf" bundle/ && cp -r "$ENV_DIR/templates" bundle/
+          cp "$ENV_DIR/scripts/remote-deploy.sh" bundle/
+
+      - name: Deploy (isolated environment, auto-rollback on failure)
+        env:
+          INIT_DB_PASSWORD: ${{ secrets.SA_DB_PASSWORD }}
+        run: |
+          R="/tmp/nsa-deploy-${GITHUB_SHA::12}"
+          SSH="ssh -i ~/.ssh/vps -o BatchMode=yes $VPS_USER@$VPS_HOST"
+          $SSH "rm -rf $R && mkdir -p $R"
+          scp -i ~/.ssh/vps -o BatchMode=yes -r bundle/. "$VPS_USER@$VPS_HOST:$R/"
+          # DB password goes through stdin (never on a command line); used only on first install.
+          printf '%s' "$INIT_DB_PASSWORD" | $SSH "sudo bash $R/remote-deploy.sh $R ${GITHUB_SHA::12}; rc=\$?; rm -rf $R; exit \$rc"
+
+      - name: Verify public HTTPS route (from the internet)
+        run: |
+          source "$ENV_DIR/env.conf"
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "https://$APP_DOMAIN/healthz" || true)
+            echo "attempt $i: https://$APP_DOMAIN/healthz -> $code"
+            [ "$code" = 200 ] && exit 0; sleep 6
+          done
+          exit 1
+
+  migrate-data:
+    if: github.event_name == 'workflow_dispatch' && inputs.migrate_data
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH setup (old + new)
+        env:
+          SSH_KEY: ${{ secrets.SA_VPS_SSH_KEY }}
+          OLD_KEY: ${{ secrets.SA_OLD_SSH_KEY }}
+        run: |
+          test -n "$OLD_KEY" || { echo "Missing secret SA_OLD_SSH_KEY"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/vps && printf '%s\n' "$OLD_KEY" > ~/.ssh/old && chmod 600 ~/.ssh/vps ~/.ssh/old
+          ssh-keyscan -T 15 "$VPS_HOST" "$OLD_HOST" >> ~/.ssh/known_hosts
+      - name: Export from old server (read-only)
+        run: |
+          ssh -i ~/.ssh/old -o BatchMode=yes "$OLD_USER@$OLD_HOST" "sudo bash -s" \
+            < "$ENV_DIR/scripts/export-old-data.sh" > dump.sql.gz 2> source-counts.txt
+          cat source-counts.txt; test -s dump.sql.gz
+      - name: Import into new isolated DB (refuses if not empty)
+        run: |
+          R="/tmp/nsa-import-${GITHUB_RUN_ID}"
+          ssh -i ~/.ssh/vps -o BatchMode=yes "$VPS_USER@$VPS_HOST" "mkdir -p $R"
+          scp -i ~/.ssh/vps -o BatchMode=yes dump.sql.gz "$ENV_DIR/env.conf" "$ENV_DIR/scripts/import-new-data.sh" "$VPS_USER@$VPS_HOST:$R/"
+          ssh -i ~/.ssh/vps -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+            "sudo bash $R/import-new-data.sh $R/dump.sql.gz $R/env.conf; rc=\$?; rm -rf $R; exit \$rc" | tee target-counts.txt
+      - name: Compare row counts
+        run: |
+          grep -v '^===' source-counts.txt | sort > a; grep -v '^===' target-counts.txt | sort > b
+          diff a b && echo "Row counts match"
+
+  verify-vercel:
+    if: github.event_name == 'workflow_dispatch' && inputs.check_vercel
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vercel -> VPS edge route
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -m 15 https://nateiva-dashboard.vercel.app/napi/healthz || true)
+          echo "vercel /napi/healthz -> $code"; [ "$code" = 200 ]

@@ -1,0 +1,9 @@
+# Managed by Nateiva Sales Analytics CI/CD — dedicated include file, never the main Caddyfile.
+# Caddy issues and renews a TLS certificate for this one host automatically.
+__APP_DOMAIN__ {
+	encode gzip
+	reverse_proxy 127.0.0.1:__APP_PORT__
+	log {
+		output file __LOG_DIR__/caddy-access.log
+	}
+}

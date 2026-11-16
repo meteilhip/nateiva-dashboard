@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
+const { pool } = require("./db");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
 const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
@@ -68,6 +69,16 @@ app.get("/health", function healthHandler(req, res) {
     callsDefault: defaultCallCount,
     now: new Date().toISOString()
   });
+});
+
+// Health + database check used by CI/CD (a deploy is rolled back if this is not 200).
+app.get("/healthz", async function healthzHandler(req, res) {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, project: apiName, db: "up", now: new Date().toISOString() });
+  } catch (error) {
+    res.status(503).json({ ok: false, project: apiName, db: "down", error: error.code || error.message });
+  }
 });
 
 app.post("/api/auth/login", async function loginHandler(req, res) {
@@ -319,6 +330,14 @@ app.post("/api/sync/local-state", authRequired, async function syncLocalStateHan
   }
 });
 
-app.listen(port, function onListen() {
-  console.log(`${apiName} listening on port ${port}`);
-});
+// HOST is optional: when unset the app keeps its previous behaviour (all interfaces).
+// The isolated VPS environment sets HOST=127.0.0.1 so only the reverse proxy can reach it.
+if (process.env.HOST) {
+  app.listen(port, process.env.HOST, function onListen() {
+    console.log(`${apiName} listening on ${process.env.HOST}:${port}`);
+  });
+} else {
+  app.listen(port, function onListen() {
+    console.log(`${apiName} listening on port ${port}`);
+  });
+}

@@ -1,0 +1,21 @@
+[Unit]
+Description=Nateiva Sales Analytics API (isolated environment)
+After=network.target mariadb.service mysql.service
+
+[Service]
+Type=simple
+User=__RUN_USER__
+Group=__RUN_USER__
+WorkingDirectory=__BASE_DIR__/current
+EnvironmentFile=__ETC_DIR__/api.env
+ExecStart=__NODE_BIN__ __BASE_DIR__/current/src/server.js
+Restart=always
+RestartSec=5
+StandardOutput=append:__LOG_DIR__/api.log
+StandardError=append:__LOG_DIR__/api-error.log
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=__STATE_DIR__ __LOG_DIR__
+
+[Install]
+WantedBy=multi-user.target
