@@ -197,7 +197,9 @@
 
   // Le serveur est la source de vérité (les Experts ne voient que leurs propres
   // suivis) ; on fusionne avec le calcul local pour couvrir le mode hors-ligne.
+  var _claimsCache = { map: null, at: 0 };
   function getClaimsMap() {
+    if (_claimsCache.map && (Date.now() - _claimsCache.at) < 30000) return _claimsCache.map;
     var map = {};
     (c27State.serverClaims || []).forEach(function (c) {
       if (c && c.schoolKey) map[c.schoolKey] = { owner: c.owner, ownerUsername: c.ownerUsername || '', firstAt: c.firstAt, schoolName: c.schoolName, src: 'server' };
@@ -212,6 +214,7 @@
         map[k] = { owner: canonicalPersonName(f.Expert), ownerUsername: '', firstAt: f.Timestamp, schoolName: f.SchoolName, src: cur ? cur.src : 'local' };
       }
     });
+    _claimsCache.map = map; _claimsCache.at = Date.now();
     return map;
   }
   function getClaim(schoolName) {
@@ -364,6 +367,7 @@
       if (payload && Array.isArray(payload.campaignClaims)) {
         c27State.serverClaims = payload.campaignClaims;
         lsSet(LS_KEYS.serverClaims, c27State.serverClaims);
+        _claimsCache.at = 0; // nouvelles attributions → cache invalidé
       }
       if (payload && Array.isArray(payload.claimRequests)) {
         c27State.requests = payload.claimRequests.map(normalizeRequest);
@@ -375,6 +379,7 @@
       }
       flushPendingRequests();
       flushPendingSchedules();
+      invalidateStripCache();
     } catch (e) { }
   };
 
@@ -1120,6 +1125,7 @@
   }
   function markAllDirty() {
     try { Object.keys(window._paneDirty || {}).forEach(function (k) { window._paneDirty[k] = true; }); } catch (e) { }
+    try { invalidateStripCache(); } catch (e) { }
   }
   window.c27SetScope = function (v) {
     lsSet(SCOPE_KEY, v);
@@ -1301,7 +1307,16 @@
     return Math.round(ds.reduce(function (a, b) { return a + b; }, 0) / ds.length);
   }
 
+  var _stripCache = { key: '', html: '', at: 0 };
+  function invalidateStripCache() { _stripCache.key = ''; _stripCache.at = 0; }
   function buildStripHtml() {
+    var cacheKey = scopeActive() + '|' + (window.currentUser ? window.currentUser.username : '');
+    if (_stripCache.key === cacheKey && (Date.now() - _stripCache.at) < 60000) return _stripCache.html;
+    var html = buildStripHtmlRaw();
+    _stripCache.key = cacheKey; _stripCache.html = html; _stripCache.at = Date.now();
+    return html;
+  }
+  function buildStripHtmlRaw() {
     var s = scopeActive();
     if (s === 'all' && !campaignStarted()) return '';
     if (s !== 'all' && Number(s) <= CFG.YEAR - 1) {
@@ -1396,7 +1411,7 @@
   };
   var STAGE_COLOR = { gagne: '#047857', chaud: '#DC2626', tiede: '#D97706', nouveau: '#2563EB', froid: '#78716C', perdu: '#44403C' };
   var _map = null, _mapLayer = null, _trackLayer = null;
-  var _mapState = { city: '', q: '', stage: '', precise: '', expert: '', period: 'c27' };
+  var _mapState = { city: '', q: '', stage: '', precise: '', expert: '', period: 'c27', quartier: '', osm: '' };
 
   function ensureLeaflet(cb) {
     if (window.L && window.L.map) return cb();
@@ -1452,6 +1467,19 @@
       if (!idx[k] || idx[k].ts < ms) idx[k] = { data: m.photoData, ts: ms };
     });
     return idx;
+  }
+
+  function quartiersOf(schools, city) {
+    var map = {};
+    schools.forEach(function (s) {
+      if (city && s.city !== city) return;
+      var q = String(s.quartier || '').trim().toUpperCase();
+      if (!q) return;
+      var k = normalizeText(q);
+      if (!map[k]) map[k] = { name: q, count: 0 };
+      map[k].count++;
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.count - a.count; });
   }
 
   function jitterFor(key, span) {
@@ -1613,7 +1641,8 @@
       + '<p class="c27-sub">Recherchez une école par son nom ou sa zone. Marqueur plein = position GPS réelle (relevée lors d\'une saisie) ; marqueur pâle = position approximative au centre de la ville, précisée automatiquement à la première visite géolocalisée. ' + _fmt(nPrecise) + ' position(s) précise(s) sur ' + _fmt(schools.length) + ' écoles cartographiées.</p>'
       + '<div class="c27-filters">'
       + '<input type="search" placeholder="🔎 École, quartier, repère…" value="' + _attr(_mapState.q) + '" oninput="c27MapFilter(\'q\',this.value)">'
-      + '<select onchange="c27MapFilter(\'city\',this.value)"><option value="">Toutes les villes</option>' + Object.keys(cities).sort().map(function (c) { return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">' + _esc(c) + ' (' + cities[c] + ')</option>'; }).join('') + '</select>'
+      + '<select onchange="c27MapFilter(\'city\',this.value);c27MapFilter(\'quartier\',\'\')"><option value="">Toutes les villes</option>' + Object.keys(cities).sort().map(function (c) { return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">' + _esc(c) + ' (' + cities[c] + ')</option>'; }).join('') + '</select>'
+      + '<select onchange="c27MapFilter(\'quartier\',this.value)"><option value="">Tous les quartiers</option>' + quartiersOf(schools, _mapState.city).map(function (qr) { return '<option' + (normalizeText(_mapState.quartier) === normalizeText(qr.name) ? ' selected' : '') + ' value="' + _attr(qr.name) + '">' + _esc(qr.name) + ' (' + qr.count + ')</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'stage\',this.value)"><option value="">Tous les statuts</option><option value="gagne"' + (_mapState.stage === 'gagne' ? ' selected' : '') + '>🏆 Signées</option>' + Object.keys(STAGE_LABEL).map(function (s) { return '<option' + (_mapState.stage === s ? ' selected' : '') + ' value="' + s + '">' + STAGE_LABEL[s] + '</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'precise\',this.value)"><option value="">GPS + approximatives</option><option value="1"' + (_mapState.precise === '1' ? ' selected' : '') + '>📍 Positions GPS seulement</option></select>'
       + '<select onchange="c27MapFilter(\'osm\',this.value)">'
@@ -1624,6 +1653,7 @@
       + '</div>'
       + '<div id="c27MapBox" style="height:480px;border-radius:16px;overflow:hidden;border:1px solid var(--g200);background:var(--g50)"><div class="c27-empty">Chargement de la carte…</div></div>'
       + '<div id="c27MapCount" class="c27-muted" style="margin-top:10px"></div>'
+      + '<div id="c27MapConc" style="margin-top:14px"></div>'
       + '<div class="c27-note">Légende — nos écoles : <b style="color:#047857">●</b> signée · <b style="color:#DC2626">●</b> chaude · <b style="color:#D97706">●</b> tiède · <b style="color:#2563EB">●</b> nouvelle · <b style="color:#78716C">●</b> froide · <b style="color:#44403C">●</b> perdue · écoles Internet : <b style="color:#7C3AED">◆</b> à prospecter, <b style="color:#A78BFA">◇</b> déjà dans notre base. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute). Les écoles Internet (maternelles, primaires, secondaires, universités) proviennent d\'OpenStreetMap, la base cartographique mondiale communautaire — les pages Facebook ne peuvent pas être aspirées automatiquement : une école repérée sur Facebook s\'ajoute en la saisissant une fois, elle apparaîtra ensuite sur la carte.</div>'
       + '</div>';
     if (admin) {
@@ -1670,6 +1700,7 @@
       if (_mapState.city && s.city !== _mapState.city) return false;
       if (_mapState.stage && s.stage !== _mapState.stage) return false;
       if (_mapState.precise === '1' && !s.precise) return false;
+      if (_mapState.quartier && normalizeText(s.quartier || '').indexOf(normalizeText(_mapState.quartier)) === -1) return false;
       if (q) {
         var hay = normalizeText([s.name, s.quartier, s.location, s.city].join(' '));
         if (hay.indexOf(q) === -1) return false;
@@ -1710,6 +1741,7 @@
     });
     // — Écoles découvertes sur Internet (OpenStreetMap) —
     var osmShown = 0, osmNew = 0;
+    var _osmFiltered = [];
     if (_mapState.osm) {
       var city = (_mapState.city || 'DOUALA').toUpperCase();
       var discovered = discoveredForCity(city);
@@ -1720,12 +1752,14 @@
         discovered.forEach(function (d) {
           var known = osmMatchesOurs(d.name, ourIdx);
           if (_mapState.osm === 'new' && known) return;
+          if (_mapState.quartier && normalizeText(d.quartier || '').indexOf(normalizeText(_mapState.quartier)) === -1) return;
           if (q) {
             var hay2 = normalizeText([d.name, d.kind, d.quartier, d.operator].join(' '));
             if (hay2.indexOf(q) === -1) return;
           }
           osmShown++;
           if (!known) osmNew++;
+          _osmFiltered.push({ quartier: d.quartier || '', known: !!known });
           var col = known ? '#A78BFA' : '#7C3AED';
           var mk2 = L.circleMarker([d.lat, d.lng], {
             radius: known ? 6 : 8, color: col, weight: 2,
@@ -1755,7 +1789,54 @@
       if (_mapState.osm) txt += ' · 🌐 ' + osmShown + ' école(s) Internet dont ' + osmNew + ' à prospecter';
       count.textContent = txt;
     }
+    renderConcentration(list, _osmFiltered);
     if (bounds.length) { try { _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 }); } catch (e) { } }
+  }
+
+  // Liste de concentration : où les écoles sont-elles les plus regroupées ?
+  // Agrégées par quartier sur la sélection courante de la carte ; cliquer une
+  // ligne filtre la carte sur ce quartier. Export CSV disponible.
+  window.c27ConcPick = function (q) { _mapState.quartier = (normalizeText(_mapState.quartier) === normalizeText(q)) ? '' : q; rC27(); };
+  var _lastConc = [];
+  window.c27ExportConc = function () {
+    var rows = [['Quartier', 'Nos ecoles', 'Signees', 'Chaudes', 'Internet a prospecter', 'Total']];
+    _lastConc.forEach(function (r) { rows.push([r.name, r.ours, r.signed, r.hot, r.osmNew, r.total]); });
+    downloadCsv('nateiva-concentration-quartiers' + (_mapState.city ? '-' + _mapState.city : '') + '.csv', rows);
+  };
+  function renderConcentration(list, osmFiltered) {
+    var box = document.getElementById('c27MapConc');
+    if (!box) return;
+    var map = {};
+    function bucket(q) {
+      var name = String(q || '').trim().toUpperCase() || '(QUARTIER NON RENSEIGNÉ)';
+      var k = normalizeText(name);
+      if (!map[k]) map[k] = { name: name, ours: 0, signed: 0, hot: 0, osmNew: 0, total: 0 };
+      return map[k];
+    }
+    list.forEach(function (s) {
+      var b = bucket(s.quartier);
+      b.ours++; b.total++;
+      if (s.stage === 'gagne') b.signed++;
+      if (s.stage === 'chaud') b.hot++;
+    });
+    (osmFiltered || []).forEach(function (d) {
+      var b = bucket(d.quartier);
+      b.total++;
+      if (!d.known) b.osmNew++;
+    });
+    var rows = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.total - a.total; });
+    _lastConc = rows;
+    if (!rows.length) { box.innerHTML = ''; return; }
+    var h = '<details class="c27-det" open><summary style="font-size:13px;font-weight:700;color:var(--g700)">📊 Concentration par quartier (' + rows.length + ') — où les écoles sont le plus regroupées <button class="c27-act" style="margin-left:10px" onclick="event.preventDefault();c27ExportConc()">⬇️ CSV</button></summary>'
+      + '<div style="overflow-x:auto;margin-top:10px"><table class="c27-tbl"><thead><tr><th>Quartier</th><th>Nos écoles</th><th>Signées</th><th>🔥 Chaudes</th><th>🌐 À prospecter</th><th>Total</th></tr></thead><tbody>';
+    rows.slice(0, 40).forEach(function (r) {
+      var active = normalizeText(_mapState.quartier) === normalizeText(r.name);
+      h += '<tr onclick="c27ConcPick(' + jsArg(r.name) + ')" style="cursor:pointer' + (active ? ';background:var(--c27-gold-soft)' : '') + '">'
+        + '<td class="c27-school">' + (active ? '📍 ' : '') + _esc(r.name) + '</td>'
+        + '<td>' + r.ours + '</td><td>' + r.signed + '</td><td>' + r.hot + '</td><td>' + r.osmNew + '</td><td><b>' + r.total + '</b></td></tr>';
+    });
+    h += '</tbody></table></div><div class="c27-note">Total = nos écoles affichées + écoles Internet affichées du quartier (selon les filtres actifs). Toucher une ligne filtre la carte sur ce quartier ; retoucher la même ligne annule le filtre. « 🌐 À prospecter » nécessite d\'avoir chargé les écoles Internet de la ville.</div></details>';
+    box.innerHTML = h;
   }
 
   function refreshTrack() {
@@ -2204,20 +2285,24 @@
     } catch (e) { return ''; }
   }
   var _updateShown = false;
+  var _knownEtag = '';
   function checkForUpdate() {
     if (_updateShown || !navigator.onLine) return;
     try {
-      fetch(window.location.pathname + '?update_check=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.text() : ''; })
-        .then(function (t) {
-          var m = t && t.match(/meta-pill red">[^<]*?(v[\d.]+)/);
-          var mine = currentPillVersion();
-          if (m && mine && m[1] !== mine) {
+      // Requête HEAD : on ne télécharge que les en-têtes (quelques octets), pas
+      // la page entière — l'ETag (empreinte de version du serveur) suffit.
+      fetch(window.location.pathname, { method: 'HEAD', cache: 'no-store' })
+        .then(function (r) {
+          if (!r.ok) return;
+          var etag = r.headers.get('etag') || r.headers.get('last-modified') || '';
+          if (!etag) return;
+          if (!_knownEtag) { _knownEtag = etag; return; } // première mesure = référence
+          if (etag !== _knownEtag) {
             _updateShown = true;
             var bar = document.createElement('div');
             bar.id = 'c27UpdateBar';
             bar.style.cssText = 'position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:99999;background:#1C1917;color:#F4EBD6;border:1.5px solid #D4AF37;border-radius:999px;padding:12px 20px;font:700 13.5px "DM Sans",sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;display:flex;align-items:center;gap:10px';
-            bar.innerHTML = '⬆️ Nouvelle version ' + _esc(m[1]) + ' disponible — <u>toucher pour actualiser</u>';
+            bar.innerHTML = '⬆️ Nouvelle version disponible — <u>toucher pour actualiser</u>';
             bar.onclick = function () { window.location.reload(); };
             document.body.appendChild(bar);
           }
@@ -2464,15 +2549,9 @@
   }
 
   function applyNavSimplification() {
-    try {
-      var u = window.currentUser;
-      var isAdmin = u && (typeof canSeeAllData === 'function') && canSeeAllData(u);
-      document.querySelectorAll('.nav-btn[data-pane], .bottom-tab[data-pane]').forEach(function (el) {
-        var key = el.dataset ? el.dataset.pane : '';
-        if (!EXPERT_HIDDEN_PANES[key]) return;
-        el.style.display = (u && !isAdmin) ? 'none' : '';
-      });
-    } catch (e) { }
+    // Depuis v12.9, la visibilité des onglets est pilotée par les autorisations
+    // par personne (éditeur d'accès du Super Admin, honorées par
+    // normalizePermissions / applyNavigationAccess dans index.html).
   }
 
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
@@ -2483,7 +2562,7 @@
     installScopeWrappers();
     injectScopePill();
     // Le pill doit survivre aux re-rendus de l'en-tête (login/logout).
-    setInterval(injectScopePill, 4000);
+    setInterval(injectScopePill, 10000);
     // Enregistrement du pane dans le registre des rendus + état « à rafraîchir ».
     try {
       if (window._paneDirty) window._paneDirty.c27 = true;
@@ -2499,7 +2578,7 @@
     installPhotoGate();
     injectMapShortcut();
     applyNavSimplification();
-    setInterval(function () { injectMapShortcut(); applyNavSimplification(); applySimpleForm(); }, 4000);
+    setInterval(function () { injectMapShortcut(); applySimpleForm(); }, 10000);
     // 4. Mise à jour automatique : vérification 5 min + au retour sur l'app.
     setInterval(checkForUpdate, 5 * 60 * 1000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) checkForUpdate(); });
@@ -2527,7 +2606,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

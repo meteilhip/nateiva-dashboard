@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v12.8 · 🗺 Carte visible dans la barre (corrigé) · 👥 cockpit Sub Admin : équipe du jour, planning, confiance, stats ville vs N-1</span>
+      <span class="meta-pill red">v12.9 · Autorisations par personne (Super Admin) · quartier + concentration sur la carte · chargement accéléré</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -10874,7 +10874,10 @@ function getDefaultPermissions(user) {
   var expert = isExpert(user);
   var globalData = isSuperAdmin(user) || isSubAdmin(user);
   return {
-    panes: (elevated || expert) ? allPaneKeys() : ['home', 'playbook', 'suivi', 'activity', 'glossary'],
+    // Admins : tout. Prospecteurs/Ambassadeurs : navigation allégée par défaut —
+    // le Super Admin accorde ou retire des onglets par personne via l'éditeur
+    // d'accès (Workspace → Gestion des utilisateurs).
+    panes: elevated ? allPaneKeys() : ['home', 'suivi', 'c27', 'activity'],
     // Only SuperAdmin + SubAdmin see team-wide ('all'). Experts (and everyone else)
     // are strictly scoped to their OWN data — no team totals or overall numbers.
     dataScope: globalData ? 'all' : 'own',
@@ -10885,6 +10888,17 @@ function getDefaultPermissions(user) {
 function normalizePermissions(user) {
   var defaults = getDefaultPermissions(user || {});
   var panes = defaults.panes.slice();
+  // Autorisations « voir / ne pas voir » accordées par personne (éditeur
+  // d'accès) : la liste enregistrée fait foi — sauf pour le Super Admin, qui
+  // voit toujours tout. Les onglets de travail (saisie + campagne/carte)
+  // restent toujours garantis pour que personne ne soit bloqué sur le terrain.
+  var stored = user && user.permissions && Array.isArray(user.permissions.panes) ? user.permissions.panes : null;
+  if (stored && stored.length && !isSuperAdmin(user)) {
+    var valid = allPaneKeys();
+    var custom = stored.filter(function(k) { return valid.indexOf(k) > -1; });
+    if (custom.length) panes = custom;
+    ['suivi', 'c27'].forEach(function(k) { if (panes.indexOf(k) === -1) panes.push(k); });
+  }
   if (!panes.length) panes = ['home'];
   if (panes.indexOf('home') === -1) panes.unshift('home');
   return {
@@ -15857,6 +15871,6 @@ setInterval(updateVercelToolbarVisibility, 60000);
   safety();
 })();
 </script>
-<script src="nateiva-2027.js?v=20261118-9"></script>
+<script src="nateiva-2027.js?v=20261118-10"></script>
 </body>
 </html>
