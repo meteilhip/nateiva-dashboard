@@ -768,7 +768,7 @@
     + '#p-c27 .c27-empty{padding:44px 20px;text-align:center;color:var(--g400);font-size:13.5px}'
     + '#p-c27 .c27-note{font-size:11.5px;color:var(--g400);line-height:1.6;margin-top:14px;border-top:1px dashed var(--g200);padding-top:12px}'
     + '.c27-maplabel{background:rgba(255,255,255,.92);border:1px solid #D6D3D1;border-radius:7px;padding:2px 7px;font:600 10.5px "DM Sans",sans-serif;color:#1C1917;box-shadow:0 1px 4px rgba(0,0,0,.18);white-space:nowrap}'
-    + '.c27-maplabel-osm{border-color:#7C3AED;color:#5B21B6}'
+    + '.c27-maplabel-osm{border-color:#9CA3AF;color:#57534E}'
     + '.c27-maplabel:before{display:none}'
     + '@media(max-width:720px){#p-c27 .c27-hero{padding:24px 20px}#p-c27 .c27-card{padding:18px 16px}#p-c27 .c27-wrap{padding-bottom:110px}}';
 
@@ -1709,7 +1709,7 @@
       + '<div id="c27MapCount" class="c27-muted" style="margin-top:10px"></div>'
       + '<div id="c27MapConc" style="margin-top:14px"></div>'
       + '<div id="c27OsmList" style="margin-top:14px"></div>'
-      + '<div class="c27-note">Légende — nos écoles : <b style="color:#047857">●</b> signée · <b style="color:#DC2626">●</b> chaude · <b style="color:#D97706">●</b> tiède · <b style="color:#2563EB">●</b> nouvelle · <b style="color:#78716C">●</b> froide · <b style="color:#44403C">●</b> perdue · écoles Internet : <b style="color:#7C3AED">◆</b> à prospecter, <b style="color:#A78BFA">◇</b> déjà dans notre base. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute). Les écoles Internet (maternelles, primaires, secondaires, universités) proviennent d\'OpenStreetMap, la base cartographique mondiale communautaire — les pages Facebook ne peuvent pas être aspirées automatiquement : une école repérée sur Facebook s\'ajoute en la saisissant une fois, elle apparaîtra ensuite sur la carte.</div>'
+      + '<div class="c27-note">Légende : <b style="color:#1C1917">●</b> école prospectée NATEIVA · <b style="color:#DC2626">●</b> école SIGNÉE NATEIVA · <b style="color:#6B7280">●</b> école trouvée sur Internet (<b style="color:#C9C4BE">●</b> gris clair = Internet mais déjà dans notre base). Le statut détaillé du pipeline (chaud, tiède, froid…) reste visible en touchant le marqueur. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute). Les écoles Internet (maternelles, primaires, secondaires, universités) proviennent d\'OpenStreetMap, la base cartographique mondiale communautaire — les pages Facebook ne peuvent pas être aspirées automatiquement : une école repérée sur Facebook s\'ajoute en la saisissant une fois, elle apparaîtra ensuite sur la carte.</div>'
       + '</div>';
     if (admin) {
       h += '<div class="c27-card"><div class="c27-klabel">Suivi terrain · Super Admin & Admins</div>'
@@ -1767,7 +1767,9 @@
     var showLabels = _mapState.labels === '1' && list.length <= 160;
     var photos = schoolPhotoIndex();
     list.forEach(function (s) {
-      var color = STAGE_COLOR[s.stage] || '#2563EB';
+      // Code couleur : 🔴 rouge = école SIGNÉE NATEIVA · ⚫ noir = école
+      // prospectée par NATEIVA (pas encore signée).
+      var color = s.stage === 'gagne' ? '#DC2626' : '#1C1917';
       var photo = photos[s.key] || null;
       var mk = L.circleMarker(s.pos, {
         radius: s.precise ? 9 : 7,
@@ -1818,14 +1820,15 @@
           osmShown++;
           if (!known) osmNew++;
           _osmFiltered.push({ name: d.name, kind: d.kind, quartier: d.quartier || '', phone: d.phone || '', capacity: d.capacity || '', operator: d.operator || '', known: known || '', lat: d.lat, lng: d.lng });
-          var col = known ? '#A78BFA' : '#7C3AED';
+          // ⚪ gris = école trouvée sur Internet (gris clair si déjà dans notre base)
+          var col = known ? '#C9C4BE' : '#6B7280';
           var mk2 = L.circleMarker([d.lat, d.lng], {
             radius: known ? 6 : 8, color: col, weight: 2,
             fillColor: col, fillOpacity: known ? 0.25 : 0.7
           });
           var pop2 = '<div style="font-family:\'DM Sans\',sans-serif;min-width:220px;max-width:270px">'
             + '<div style="font-weight:800;font-size:14px;margin-bottom:3px">' + _esc(d.name) + '</div>'
-            + '<div style="font-size:11px;color:#7C3AED;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet (OpenStreetMap) — ' + _esc(d.kind) + '</div>'
+            + '<div style="font-size:11px;color:#57534E;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet (OpenStreetMap) — ' + _esc(d.kind) + '</div>'
             + '<div style="font-size:12px;line-height:1.7;margin-bottom:8px">'
             + (known ? '🔗 Correspond à notre école « <b>' + _esc(known) + '</b> »' : '🆕 <b>Pas encore prospectée par NATEIVA</b>')
             + (d.quartier ? '<br>📍 ' + _esc(d.quartier) : '')
@@ -1833,7 +1836,7 @@
             + (d.capacity ? '<br>👩‍🎓 Capacité estimée : ' + _esc(d.capacity) : '')
             + (d.phone ? '<br>📞 <a href="tel:' + _attr(d.phone) + '">' + _esc(d.phone) + '</a>' : '')
             + '</div>'
-            + (known ? '' : '<button onclick="c27StartEntry(' + jsArg(d.name) + ',' + jsArg(city) + ',\'\',' + jsArg(d.phone || '') + ')" style="width:100%;background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:8px;font-weight:700;cursor:pointer">✍️ Prospecter cette école</button>')
+            + (known ? '' : '<button onclick="c27StartEntry(' + jsArg(d.name) + ',' + jsArg(city) + ',\'\',' + jsArg(d.phone || '') + ')" style="width:100%;background:#1C1917;color:#F4EBD6;border:none;border-radius:8px;padding:8px;font-weight:700;cursor:pointer">✍️ Prospecter cette école</button>')
             + '</div>';
           mk2.bindPopup(pop2);
           if (showLabels) mk2.bindTooltip(d.name, { permanent: true, direction: 'top', offset: [0, -8], className: 'c27-maplabel c27-maplabel-osm' });
