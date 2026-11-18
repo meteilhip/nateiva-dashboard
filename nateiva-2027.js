@@ -1414,7 +1414,16 @@
   };
   var STAGE_COLOR = { gagne: '#047857', chaud: '#DC2626', tiede: '#D97706', nouveau: '#2563EB', froid: '#78716C', perdu: '#44403C' };
   var _map = null, _mapLayer = null, _trackLayer = null;
-  var _mapState = { city: '', q: '', stage: '', precise: '', expert: '', period: 'c27', quartier: '', osm: '', labels: '1' };
+  var _mapState = { city: 'DOUALA', q: '', stage: '', precise: '', expert: '', period: 'c27', quartier: '', osm: '', labels: '1', zones: '' };
+  window.c27MapCity = function (v) {
+    _mapState.city = v || 'DOUALA';
+    _mapState.quartier = '';
+    rC27();
+    // Si les écoles Internet étaient affichées, on les charge pour la nouvelle
+    // ville automatiquement (cache 14 jours, sinon requête).
+    if (_mapState.osm) setTimeout(function () { window.c27LoadOsm(); }, 300);
+  };
+  window.c27ToggleZones = function () { _mapState.zones = _mapState.zones === '1' ? '' : '1'; rC27(); };
 
   function ensureLeaflet(cb) {
     if (window.L && window.L.map) return cb();
@@ -1676,19 +1685,26 @@
       + '<div class="c27-klabel">Carte interactive · OpenStreetMap</div>'
       + '<h3>Écoles sur la carte</h3>'
       + '<p class="c27-sub">Recherchez une école par son nom ou sa zone. Marqueur plein = position GPS réelle (relevée lors d\'une saisie) ; marqueur pâle = position approximative au centre de la ville, précisée automatiquement à la première visite géolocalisée. ' + _fmt(nPrecise) + ' position(s) précise(s) sur ' + _fmt(schools.length) + ' écoles cartographiées.</p>'
-      + '<div class="c27-filters">'
-      + '<input type="search" placeholder="🔎 École, quartier, repère…" value="' + _attr(_mapState.q) + '" oninput="c27MapFilter(\'q\',this.value)">'
-      + '<select onchange="c27MapFilter(\'city\',this.value);c27MapFilter(\'quartier\',\'\')"><option value="">Toutes les villes</option>' + Object.keys(cities).sort().map(function (c) { return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">' + _esc(c) + ' (' + cities[c] + ')</option>'; }).join('') + '</select>'
+      + '<div class="c27-filters" style="align-items:center">'
+      + '<select style="font-weight:700;border-color:#B08D2F" onchange="c27MapCity(this.value)">' + Object.keys(CITY_COORDS).sort().map(function (c) { var n = cities[c] || 0; return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">📍 ' + _esc(c) + (n ? ' · ' + n + ' école(s) connue(s)' : '') + '</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'quartier\',this.value)"><option value="">Tous les quartiers</option>' + quartiersOf(schools, _mapState.city).map(function (qr) { return '<option' + (normalizeText(_mapState.quartier) === normalizeText(qr.name) ? ' selected' : '') + ' value="' + _attr(qr.name) + '">' + _esc(qr.name) + ' (' + qr.count + ')</option>'; }).join('') + '</select>'
+      + '<input type="search" placeholder="🔎 École, quartier, repère…" value="' + _attr(_mapState.q) + '" oninput="c27MapFilter(\'q\',this.value)">'
+      + '</div>'
+      + '<div class="c27-filters" style="align-items:center">'
+      + '<button id="c27OsmBtn" class="c27-act' + (_mapState.osm ? ' primary' : '') + '" onclick="c27LoadOsm()">🌐 ' + (_mapState.osm ? 'Écoles Internet affichées — recharger' : 'Ajouter les écoles Internet de ' + _esc(_mapState.city)) + '</button>'
+      + '<button class="c27-act' + (_mapState.zones === '1' ? ' primary' : '') + '" onclick="c27ToggleZones()">🎯 Zones de prospection' + (_mapState.zones === '1' ? ' ✓' : '') + '</button>'
+      + '<button class="c27-act" onclick="c27MapFilter(\'labels\', \'' + (_mapState.labels === '1' ? '' : '1') + '\')">' + (_mapState.labels === '1' ? '🏷 Masquer les noms' : '🏷 Afficher les noms') + '</button>'
+      + '<details class="c27-det" style="margin:0"><summary style="padding:9px 12px;border:1px solid var(--g200);border-radius:10px">⚙️ Filtres avancés</summary>'
+      + '<div class="c27-filters" style="margin-top:10px">'
       + '<select onchange="c27MapFilter(\'stage\',this.value)"><option value="">Tous les statuts</option><option value="gagne"' + (_mapState.stage === 'gagne' ? ' selected' : '') + '>🏆 Signées</option>' + Object.keys(STAGE_LABEL).map(function (s) { return '<option' + (_mapState.stage === s ? ' selected' : '') + ' value="' + s + '">' + STAGE_LABEL[s] + '</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'precise\',this.value)"><option value="">GPS + approximatives</option><option value="1"' + (_mapState.precise === '1' ? ' selected' : '') + '>📍 Positions GPS seulement</option></select>'
       + '<select onchange="c27MapFilter(\'osm\',this.value)">'
       + '<option value=""' + (!_mapState.osm ? ' selected' : '') + '>Nos écoles seulement</option>'
-      + '<option value="1"' + (_mapState.osm === '1' ? ' selected' : '') + '>🌐 + écoles trouvées sur Internet</option>'
-      + '<option value="new"' + (_mapState.osm === 'new' ? ' selected' : '') + '>🆕 À prospecter seulement (Internet)</option></select>'
-      + '<button id="c27OsmBtn" class="c27-act" onclick="c27LoadOsm()">🌐 Charger les écoles Internet de ' + _esc((_mapState.city || 'DOUALA')) + '</button>'
-      + '<button class="c27-act" onclick="c27MapFilter(\'labels\', \'' + (_mapState.labels === '1' ? '' : '1') + '\')">' + (_mapState.labels === '1' ? '🏷 Masquer les noms' : '🏷 Afficher les noms') + '</button>'
+      + '<option value="1"' + (_mapState.osm === '1' ? ' selected' : '') + '>🌐 + écoles Internet</option>'
+      + '<option value="new"' + (_mapState.osm === 'new' ? ' selected' : '') + '>🆕 À prospecter seulement</option></select>'
+      + '</div></details>'
       + '</div>'
+      + '<div id="c27ZonesBox" style="margin:0 0 12px"></div>'
       + '<div id="c27MapBox" style="height:480px;border-radius:16px;overflow:hidden;border:1px solid var(--g200);background:var(--g50)"><div class="c27-empty">Chargement de la carte…</div></div>'
       + '<div id="c27MapCount" class="c27-muted" style="margin-top:10px"></div>'
       + '<div id="c27MapConc" style="margin-top:14px"></div>'
@@ -1726,6 +1742,7 @@
       }).addTo(_map);
       _mapLayer = L.layerGroup().addTo(_map);
       _trackLayer = L.layerGroup().addTo(_map);
+      _zonesLayer = L.layerGroup().addTo(_map);
       refreshMapMarkers();
       refreshTrack();
     });
@@ -1736,7 +1753,7 @@
     _mapLayer.clearLayers();
     var q = normalizeText(_mapState.q || '');
     var list = buildMapSchools().filter(function (s) {
-      if (_mapState.city && s.city !== _mapState.city) return false;
+      if (_mapState.city && s.city !== _mapState.city.toUpperCase()) return false;
       if (_mapState.stage && s.stage !== _mapState.stage) return false;
       if (_mapState.precise === '1' && !s.precise) return false;
       if (_mapState.quartier && normalizeText(s.quartier || '').indexOf(normalizeText(_mapState.quartier)) === -1) return false;
@@ -1833,7 +1850,118 @@
     }
     renderConcentration(list, _osmFiltered);
     renderOsmList(list, _osmFiltered);
+    try { drawZones(list, _osmFiltered); } catch (eZ) { }
     if (bounds.length) { try { _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 }); } catch (e) { } }
+  }
+
+  /* ---- 🎯 Zones de prospection : clusters + point de départ + parcours ---- */
+  // Cibles = écoles non signées affichées + écoles Internet « à prospecter ».
+  // Regroupement : une école rejoint une zone si elle est à ≤ 1,1 km du centre
+  // de la zone (regroupement glouton). Pour chaque zone (≥ 3 écoles), on
+  // calcule le parcours « plus proche voisin » en essayant plusieurs points de
+  // départ et on garde le plus court : d'où le 🚩 Départ et la direction.
+  var _zonesLayer = null;
+  var _lastZones = [];
+  function bearingLabel(a, b) {
+    var dLng = (b.lng - a.lng) * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+    var dLat = b.lat - a.lat;
+    var ang = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
+    var dirs = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest'];
+    return dirs[Math.round(ang / 45) % 8];
+  }
+  function nnPath(points, startIdx) {
+    var left = points.slice(), order = [], cur = left.splice(startIdx, 1)[0], km = 0;
+    order.push(cur);
+    while (left.length) {
+      var bi = 0, bd = Infinity;
+      for (var i = 0; i < left.length; i++) { var d = kmBetween(cur, left[i]); if (d < bd) { bd = d; bi = i; } }
+      km += bd; cur = left.splice(bi, 1)[0]; order.push(cur);
+    }
+    return { order: order, km: km };
+  }
+  function computeZones(targets) {
+    var clusters = [];
+    targets.forEach(function (t) {
+      var best = null, bd = Infinity;
+      clusters.forEach(function (c) { var d = kmBetween(t, c.center); if (d < bd) { bd = d; best = c; } });
+      if (best && bd <= 1.1) {
+        best.points.push(t);
+        best.center = {
+          lat: best.points.reduce(function (a, p) { return a + p.lat; }, 0) / best.points.length,
+          lng: best.points.reduce(function (a, p) { return a + p.lng; }, 0) / best.points.length
+        };
+      } else {
+        clusters.push({ points: [t], center: { lat: t.lat, lng: t.lng } });
+      }
+    });
+    return clusters.filter(function (c) { return c.points.length >= 3; })
+      .sort(function (a, b) { return b.points.length - a.points.length; })
+      .slice(0, 8)
+      .map(function (c, idx) {
+        var pts = c.points.slice(0, 40);
+        var tries = Math.min(pts.length, 12), best = null;
+        for (var i = 0; i < tries; i++) {
+          var p = nnPath(pts, Math.floor(i * pts.length / tries));
+          if (!best || p.km < best.km) best = p;
+        }
+        var quartCount = {};
+        c.points.forEach(function (p) { var q = String(p.quartier || '').trim().toUpperCase(); if (q) quartCount[q] = (quartCount[q] || 0) + 1; });
+        var topQ = '', tn = 0;
+        Object.keys(quartCount).forEach(function (q) { if (quartCount[q] > tn) { tn = quartCount[q]; topQ = q; } });
+        return {
+          rank: idx + 1, count: c.points.length, center: c.center, quartier: topQ,
+          order: best.order, km: best.km,
+          start: best.order[0],
+          dir: bearingLabel(best.order[0], best.order[best.order.length - 1])
+        };
+      });
+  }
+  window.c27ZoneFocus = function (i) {
+    var z = _lastZones[i];
+    if (!z || !_map) return;
+    try { _map.fitBounds(z.order.map(function (p) { return [p.lat, p.lng]; }), { padding: [50, 50], maxZoom: 16 }); } catch (e) { }
+  };
+  function drawZones(list, osmRows) {
+    var box = document.getElementById('c27ZonesBox');
+    if (_zonesLayer) _zonesLayer.clearLayers();
+    if (_mapState.zones !== '1') { if (box) box.innerHTML = ''; _lastZones = []; return; }
+    if (!_zonesLayer && _map) _zonesLayer = L.layerGroup().addTo(_map);
+    var targets = [];
+    list.forEach(function (s) { if (s.stage !== 'gagne') targets.push({ lat: s.pos[0], lng: s.pos[1], name: s.name, quartier: s.quartier, src: 'nateiva' }); });
+    (osmRows || []).forEach(function (d) { if (!d.known && d.lat != null) targets.push({ lat: d.lat, lng: d.lng, name: d.name, quartier: d.quartier, src: 'osm' }); });
+    _lastZones = computeZones(targets);
+    if (!_lastZones.length) {
+      if (box) box.innerHTML = '<div class="c27-note">🎯 Pas assez d\'écoles regroupées avec les filtres actuels. Ajoutez les écoles Internet de la ville pour révéler les zones denses.</div>';
+      return;
+    }
+    _lastZones.forEach(function (z) {
+      var radius = Math.max.apply(null, z.order.map(function (p) { return kmBetween(p, z.center); })) * 1000 + 160;
+      L.circle([z.center.lat, z.center.lng], { radius: radius, color: '#B08D2F', weight: 2, dashArray: '8,6', fillColor: '#D4AF37', fillOpacity: 0.08 }).addTo(_zonesLayer);
+      L.polyline(z.order.map(function (p) { return [p.lat, p.lng]; }), { color: '#B08D2F', weight: 3, opacity: 0.85 }).addTo(_zonesLayer);
+      L.marker([z.start.lat, z.start.lng], {
+        icon: L.divIcon({ className: '', html: '<div style="background:#1C1917;color:#F4EBD6;border:2px solid #D4AF37;border-radius:10px;padding:4px 9px;font:800 11.5px \'DM Sans\',sans-serif;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.35)">🚩 Départ Z' + z.rank + '</div>', iconSize: [1, 1], iconAnchor: [10, 28] })
+      }).addTo(_zonesLayer);
+      z.order.forEach(function (p, j) {
+        if (j === 0) return;
+        L.marker([p.lat, p.lng], {
+          icon: L.divIcon({ className: '', html: '<div style="background:#B08D2F;color:#fff;border:1.5px solid #fff;border-radius:50%;width:19px;height:19px;display:flex;align-items:center;justify-content:center;font:700 10px \'DM Sans\',sans-serif">' + (j + 1) + '</div>', iconSize: [19, 19], iconAnchor: [10, 10] })
+        }).bindPopup('<b>' + (j + 1) + '. ' + _esc(p.name) + '</b>').addTo(_zonesLayer);
+      });
+    });
+    if (box) {
+      var h = '<div class="c27-card" style="padding:16px 18px;margin-bottom:0"><div class="c27-klabel">Où commencer pour toucher le plus d\'écoles</div>';
+      _lastZones.forEach(function (z, i) {
+        h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-bottom:1px dashed var(--g200)">'
+          + '<span class="c27-chip chaud">Zone ' + z.rank + '</span>'
+          + '<b>' + z.count + ' écoles</b>'
+          + (z.quartier ? '<span class="c27-muted">' + _esc(z.quartier) + '</span>' : '')
+          + '<span class="c27-muted">🚩 départ : <b>' + _esc(z.start.name) + '</b> · direction ' + z.dir + ' · parcours ≈ ' + z.km.toFixed(1) + ' km</span>'
+          + '<button class="c27-act" onclick="c27ZoneFocus(' + i + ')">Voir</button>'
+          + '</div>';
+      });
+      h += '<div class="c27-note">Zone = écoles non signées (nôtres + Internet « à prospecter ») à moins de 1,1 km les unes des autres, classées par nombre d\'écoles. Parcours = ordre de visite « plus proche voisin » (chaque étape va à l\'école la plus proche), départ choisi pour minimiser la distance totale ; « ≈ km » = distance à vol d\'oiseau cumulée. Numéros 2, 3, 4… sur la carte = ordre de passage conseillé.</div></div>';
+      box.innerHTML = h;
+    }
   }
 
   // Liste de concentration : où les écoles sont-elles les plus regroupées ?
@@ -2702,7 +2830,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
