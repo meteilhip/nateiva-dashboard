@@ -54,7 +54,7 @@
       nightStart: 22, nightEnd: 5, // saisies nocturnes (signal faible)
       // Pondérations du score (sur 100) — le score démarre à 100 et chaque
       // signal retire (poids × part des saisies concernées) points.
-      weights: { noGps: 25, lowAcc: 10, cluster: 30, travel: 30, fast: 20, burst: 15, dupPhone: 20, night: 5, photoFlag: 15 }
+      weights: { noGps: 25, lowAcc: 10, cluster: 30, travel: 30, fast: 20, burst: 15, dupPhone: 20, night: 5, photoFlag: 15, callFieldDay: 15, fieldAsPhone: 20 }
     }
   };
   var START_MS = Date.parse(CFG.START_ISO);
@@ -191,7 +191,8 @@
   var c27State = {
     serverClaims: lsGet(LS_KEYS.serverClaims, null), // [{schoolKey, schoolName, owner, ownerUsername, firstAt}]
     requests: lsGet(LS_KEYS.requests, []),
-    pendingReqs: lsGet(LS_KEYS.pendingReqs, [])
+    pendingReqs: lsGet(LS_KEYS.pendingReqs, []),
+    schedules: lsGet('nateiva_c27_schedules', [])
   };
 
   // Le serveur est la source de vérité (les Experts ne voient que leurs propres
@@ -368,7 +369,12 @@
         c27State.requests = payload.claimRequests.map(normalizeRequest);
         lsSet(LS_KEYS.requests, c27State.requests);
       }
+      if (payload && Array.isArray(payload.workSchedules)) {
+        c27State.schedules = payload.workSchedules;
+        lsSet('nateiva_c27_schedules', c27State.schedules);
+      }
       flushPendingRequests();
+      flushPendingSchedules();
     } catch (e) { }
   };
 
@@ -499,6 +505,19 @@
       var h = new Date(e.ts).getHours();
       if (h >= T.nightStart || h < T.nightEnd) e.flags.push({ t: 'night', m: 'Saisie nocturne (' + h + 'h)' });
       if (e.photoFlag) e.flags.push({ t: 'photoFlag', m: e.photoFlag === 'rejected' ? 'Photo REJETÉE par ' + (e.photoBy || 'un admin') + ' après vérification' : 'Nom de l\'école non reconnu sur la photo (en attente de vérification)' });
+      if (PHONE_TYPES[e.type] && inCampaign(e.tsIso)) {
+        var dts = e.tsIso ? String(e.tsIso).slice(0, 10) : '';
+        if (dts && dayTypeFor(e.expert, dts) === 'field') {
+          e.flags.push({ t: 'callFieldDay', m: 'Prospection téléphonique un jour TERRAIN (' + new Date(e.ts).toLocaleDateString('fr-FR') + ')' });
+        }
+      }
+      if (PHONE_TYPES[e.type] && e.geo && e.geo.has) {
+        var knownPos = schoolGpsIndex()[e.key];
+        if (knownPos && knownPos.isVisit) {
+          var kmAway = kmBetween({ lat: e.geo.lat, lng: e.geo.lng }, { lat: knownPos.lat, lng: knownPos.lng });
+          if (kmAway * 1000 <= 250) e.flags.push({ t: 'fieldAsPhone', m: 'Appel enregistré depuis l\'école même (' + Math.round(kmAway * 1000) + ' m) — visite déclarée comme appel ?' });
+        }
+      }
     });
 
     Object.keys(byExpert).forEach(function (name) {
@@ -553,7 +572,7 @@
     var W = T.weights;
     var report = Object.keys(byExpert).map(function (name) {
       var list = byExpert[name];
-      var counts = { noGps: 0, lowAcc: 0, cluster: 0, travel: 0, fast: 0, burst: 0, dupPhone: 0, night: 0, photoFlag: 0 };
+      var counts = { noGps: 0, lowAcc: 0, cluster: 0, travel: 0, fast: 0, burst: 0, dupPhone: 0, night: 0, photoFlag: 0, callFieldDay: 0, fieldAsPhone: 0 };
       var flagged = 0;
       list.forEach(function (e) {
         if (e.flags.length) flagged++;
@@ -777,7 +796,7 @@
     var admin = (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
     var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser);
     var tab = currentTab();
-    if ((tab === 'pilot' || tab === 'trust') && !admin) tab = 'list';
+    if ((tab === 'pilot' || tab === 'trust' || tab === 'plan') && !admin) tab = 'list';
 
     var priority = buildPriorityList();
     var claims = getClaimsMap();
@@ -790,10 +809,13 @@
       + '<p>Repartez de zéro, en commençant par les <b>' + _fmt(priority.length) + ' écoles</b> prospectées les années précédentes qui n\'ont pas signé. '
       + 'Première saisie ' + CFG.YEAR + ' sur une école = l\'école vous est attribuée pour la campagne. Position GPS (Global Positioning System) capturée automatiquement à chaque saisie.</p></div>';
 
+    var myDay = myDayTypeToday();
+    if (myDay) h += '<div style="margin:-6px 0 14px">' + dayTypeChip(myDay) + '</div>';
     h += '<div class="c27-tabs">'
       + tabBtn('list', '📞 Liste prioritaire', tab)
       + tabBtn('map', '🗺 Carte des écoles', tab)
       + tabBtn('claims', '👑 Attributions & demandes', tab)
+      + (admin ? tabBtn('plan', '🗓 Planning', tab) : '')
       + (admin ? tabBtn('pilot', '📊 Pilotage & IA', tab) : '')
       + (admin ? tabBtn('trust', '🛡 Score de confiance', tab) : '')
       + '</div>';
@@ -801,6 +823,7 @@
     if (tab === 'list') h += renderPriorityTab(priority, admin);
     else if (tab === 'map') h += renderMapTab(admin);
     else if (tab === 'claims') h += renderClaimsTab(myClaims, superA, admin);
+    else if (tab === 'plan') h += renderPlanningTab();
     else if (tab === 'pilot') h += renderPilotTab(priority);
     else if (tab === 'trust') h += renderTrustTab();
 
@@ -827,7 +850,8 @@
       return true;
     });
     var shown = list.slice(0, 250);
-    var h = '<div class="c27-card">'
+    var h = '<div style="margin:0 0 16px"><button class="c27-act primary" style="width:100%;justify-content:center;padding:14px;font-size:14.5px" onclick="c27SetTab(\'map\')">🗺 Ouvrir la carte des écoles — voir les écoles autour de vous</button></div>';
+    h += '<div class="c27-card">'
       + '<div class="c27-klabel">À appeler · à visiter en premier</div>'
       + '<h3>Écoles non signées des campagnes précédentes</h3>'
       + '<p class="c27-sub">Toutes les écoles travaillées avant le ' + new Date(START_MS).toLocaleDateString('fr-FR') + ' sans signature, classées des plus chaudes aux plus froides (puis par taux d\'intérêt et dernier contact). Saisir une note dessus en ' + CFG.YEAR + ' vous l\'attribue.</p>';
@@ -1018,7 +1042,7 @@
     }
     h += '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr>'
       + '<th>#</th><th>Prospecteur</th><th>Score</th><th>Saisies</th><th>Signalées</th><th>Couverture GPS</th><th>Signaux principaux</th></tr></thead><tbody>';
-    var FLAG_SHORT = { noGps: 'GPS manquant', lowAcc: 'Précision faible', cluster: 'Même endroit', travel: 'Déplacement impossible', fast: 'Trop rapide', burst: 'Rafales', dupPhone: 'Tél. dupliqué', night: 'Nocturne', photoFlag: 'Photo à vérifier/rejetée' };
+    var FLAG_SHORT = { noGps: 'GPS manquant', lowAcc: 'Précision faible', cluster: 'Même endroit', travel: 'Déplacement impossible', fast: 'Trop rapide', burst: 'Rafales', dupPhone: 'Tél. dupliqué', night: 'Nocturne', photoFlag: 'Photo à vérifier/rejetée', callFieldDay: 'Appel un jour terrain', fieldAsPhone: 'Visite déguisée en appel' };
     trust.report.forEach(function (r, idx) {
       var tops = Object.keys(r.counts).filter(function (k) { return r.counts[k] > 0; })
         .sort(function (a, b) { return r.counts[b] - r.counts[a]; }).slice(0, 3)
@@ -1046,10 +1070,10 @@
   window.c27ExportTrust = function () {
     var scope = lsGet(LS_KEYS.trustScope, campaignStarted() ? 'c27' : 'all');
     var trust = computeTrust(scope === 'all');
-    var rows = [['Rang', 'Prospecteur', 'Score/100', 'Saisies', 'Signalees', 'Couverture GPS %', 'GPS manquant', 'Precision faible', 'Meme endroit', 'Deplacement impossible', 'Trop rapide', 'Rafales', 'Tel duplique', 'Nocturne', 'Photo a verifier']];
+    var rows = [['Rang', 'Prospecteur', 'Score/100', 'Saisies', 'Signalees', 'Couverture GPS %', 'GPS manquant', 'Precision faible', 'Meme endroit', 'Deplacement impossible', 'Trop rapide', 'Rafales', 'Tel duplique', 'Nocturne', 'Photo a verifier', 'Appel jour terrain', 'Visite deguisee en appel']];
     trust.report.forEach(function (r, i) {
       rows.push([i + 1, r.expert, r.score, r.entries, r.flagged, r.gpsRate == null ? '' : r.gpsRate,
-        r.counts.noGps || 0, r.counts.lowAcc || 0, r.counts.cluster || 0, r.counts.travel || 0, r.counts.fast || 0, r.counts.burst || 0, r.counts.dupPhone || 0, r.counts.night || 0, r.counts.photoFlag || 0]);
+        r.counts.noGps || 0, r.counts.lowAcc || 0, r.counts.cluster || 0, r.counts.travel || 0, r.counts.fast || 0, r.counts.burst || 0, r.counts.dupPhone || 0, r.counts.night || 0, r.counts.photoFlag || 0, r.counts.callFieldDay || 0, r.counts.fieldAsPhone || 0]);
     });
     downloadCsv('nateiva-score-confiance-' + (scope === 'all' ? 'historique' : CFG.YEAR) + '.csv', rows);
   };
@@ -1696,7 +1720,20 @@
     var sel = document.getElementById('fuType');
     if (!sel) return false;
     if (window.followupEditMode === 'edit') return false; // l'édition garde la photo d'origine
-    return sel.value === 'VISIT';
+    if (sel.value !== 'VISIT') return false;
+    return !hasPriorVisitPhoto(currentFormSchoolName()); // première visite sur place → photo
+  }
+  function hasPriorVisitPhoto(schoolName) {
+    // On peut prospecter au téléphone d'abord ; la photo est due à la
+    // PREMIÈRE visite physique de l'école seulement.
+    var k = schoolKey(schoolName || '');
+    if (!k) return false;
+    return fullFups().some(function (f) {
+      if (!f || schoolKey(f.SchoolName) !== k) return false;
+      if (f.FollowupType !== 'VISIT' && f.FollowupType !== 'PROSPECTION') return false;
+      if (!inCampaign(f.Timestamp)) return false;
+      return !!entryMetaOf(f).photoAt;
+    });
   }
 
   function ensurePhotoField() {
@@ -1729,7 +1766,7 @@
     var req = document.getElementById('c27PhotoReq');
     var needed = photoRequired();
     wrap.style.display = needed ? '' : 'none';
-    if (req) req.textContent = needed ? '· OBLIGATOIRE pour une visite' : '';
+    if (req) req.textContent = needed ? '· OBLIGATOIRE (première visite de cette école)' : '';
   }
 
   var _pendingSubmit = false;
@@ -1851,6 +1888,15 @@
     var orig = window.submitFollowup;
     if (typeof orig !== 'function' || orig.__c27PhotoGate) return;
     var wrapped = function () {
+      // Règle planning : un jour TERRAIN, pas de prospection téléphonique.
+      try {
+        var typeSel = document.getElementById('fuType');
+        var t = typeSel ? String(typeSel.value || '').toUpperCase() : '';
+        if (PHONE_TYPES[t] && myDayTypeToday() === 'field' && !((typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser))) {
+          _toast('🥾 Aujourd\'hui est un jour TERRAIN décidé par votre admin : la prospection téléphonique n\'est pas autorisée. Enregistrez une visite, ou faites vos appels un jour bureau.', true);
+          return;
+        }
+      } catch (e2) { }
       if (photoRequired() && !_photoState) {
         if (typeof isSuperAdmin === 'function' && isSuperAdmin(window.currentUser)) {
           _toast('⚠️ Visite sans photo — autorisé pour le Super Admin uniquement');
@@ -2086,6 +2132,127 @@
     } catch (e) { }
   }
 
+  /* ======================= 14. PLANNING TERRAIN / BUREAU ================== */
+  // Le Sub Admin décide, pour chaque membre de son équipe, les jours TERRAIN
+  // (🥾 visites) et les jours BUREAU (🏢 relances et prospection téléphonique).
+  // Règle : un jour terrain, la prospection téléphonique est interdite
+  // (bloquée à l'enregistrement, côté appareil ET côté serveur).
+  var SCHED_LS = 'nateiva_c27_schedules';
+  var SCHED_PENDING_LS = 'nateiva_c27_schedules_pending';
+  var PHONE_TYPES = { CALL: 1, WHATSAPP: 1, SMS: 1 };
+
+  function getSchedules() { return c27State.schedules || lsGet(SCHED_LS, []) || []; }
+  function dateStrOf(d) { var x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+  function todayStr() { return dateStrOf(Date.now()); }
+  function dayTypeFor(usernameOrName, dateStr) {
+    var list = getSchedules();
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      if (s.date !== dateStr) continue;
+      if (String(s.memberUsername || '').toLowerCase() === String(usernameOrName || '').toLowerCase()) return s.dayType;
+      if (samePerson(s.memberFullName, usernameOrName)) return s.dayType;
+    }
+    return '';
+  }
+  function myDayTypeToday() {
+    var u = window.currentUser;
+    if (!u) return '';
+    return dayTypeFor(u.username, todayStr()) || dayTypeFor(u.fullName, todayStr());
+  }
+  function dayTypeChip(t) {
+    if (t === 'field') return '<span class="c27-chip chaud">🥾 Jour TERRAIN — appels de prospection non autorisés</span>';
+    if (t === 'office') return '<span class="c27-chip nouveau">🏢 Jour BUREAU — relances & prospection téléphonique</span>';
+    return '';
+  }
+
+  // Envoi du planning (Sub Admin / Super Admin) avec repli hors-ligne.
+  function pushScheduleEntries(entries) {
+    if (typeof backendRequest === 'function' && typeof isBackendConfigured === 'function' && isBackendConfigured() && window.nateivaApiToken) {
+      backendRequest('/api/schedule', { method: 'POST', body: { entries: entries } }).then(function (res) {
+        if (res && res.success) {
+          entries.forEach(applyScheduleLocally);
+          _toast('Planning enregistré ✓');
+        } else {
+          queueSchedule(entries);
+        }
+        repaint();
+      }).catch(function () { queueSchedule(entries); repaint(); });
+    } else { queueSchedule(entries); repaint(); }
+  }
+  function queueSchedule(entries) {
+    entries.forEach(applyScheduleLocally);
+    var q = lsGet(SCHED_PENDING_LS, []);
+    lsSet(SCHED_PENDING_LS, q.concat(entries));
+    _toast('Planning gardé sur cet appareil — envoi à la prochaine synchronisation ⏳');
+  }
+  function applyScheduleLocally(e) {
+    var list = getSchedules().filter(function (s) { return !(s.date === e.date && String(s.memberUsername || '').toLowerCase() === String(e.memberUsername || '').toLowerCase()); });
+    if (e.dayType === 'field' || e.dayType === 'office') list.push(e);
+    c27State.schedules = list;
+    lsSet(SCHED_LS, list);
+  }
+  function flushPendingSchedules() {
+    var q = lsGet(SCHED_PENDING_LS, []);
+    if (!q.length) return;
+    if (!(typeof isBackendConfigured === 'function' && isBackendConfigured() && window.nateivaApiToken)) return;
+    lsSet(SCHED_PENDING_LS, []);
+    backendRequest('/api/schedule', { method: 'POST', body: { entries: q } })
+      .then(function (res) { if (!(res && res.success)) lsSet(SCHED_PENDING_LS, q); })
+      .catch(function () { lsSet(SCHED_PENDING_LS, q); });
+  }
+
+  /* ---- Interface Planning (onglet admin) ---- */
+  var _planState = { member: '', weekOffset: 0 };
+  window.c27PlanSet = function (k, v) { _planState[k] = (k === 'weekOffset') ? Number(v) : v; rC27(); };
+  window.c27PlanDay = function (username, fullname, date) {
+    // Chaque touche fait tourner : — → 🥾 terrain → 🏢 bureau → —
+    var cur = dayTypeFor(username, date);
+    var next = cur === '' ? 'field' : (cur === 'field' ? 'office' : 'clear');
+    pushScheduleEntries([{ memberUsername: username, memberFullName: fullname, date: date, dayType: next }]);
+  };
+
+  function renderPlanningTab() {
+    var users = (typeof getAllUsers === 'function') ? getAllUsers() : [];
+    var me = window.currentUser || {};
+    var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(me);
+    var members = users.filter(function (u) {
+      if (!u || u.role === 'SuperAdmin') return false;
+      if (superA || String(me.city || '').toUpperCase() === 'ALL') return true;
+      // Un Sub Admin planifie son équipe : même ville (lui inclus).
+      return String(u.city || '').toUpperCase() === String(me.city || '').toUpperCase() || String(u.city || '').toUpperCase() === 'ALL';
+    });
+    var start = new Date(); start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() + _planState.weekOffset * 7);
+    var days = []; for (var i = 0; i < 7; i++) { var d = new Date(start.getTime() + i * 86400000); days.push(d); }
+    var DOW = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    var h = '<div class="c27-card"><div class="c27-klabel">Organisation de l\'équipe</div>'
+      + '<h3>🗓 Planning terrain / bureau</h3>'
+      + '<p class="c27-sub">Touchez une case pour faire tourner : vide → 🥾 Terrain → 🏢 Bureau → vide. Un jour 🥾 Terrain, le membre ne peut PAS enregistrer d\'appel/WhatsApp/SMS de prospection (bloqué à l\'enregistrement) ; un jour 🏢 Bureau sert aux relances et à la prospection téléphonique. Sans planning défini, rien n\'est bloqué.</p>'
+      + '<div class="c27-filters">'
+      + '<button class="c27-act" onclick="c27PlanSet(\'weekOffset\',' + (_planState.weekOffset - 1) + ')">← Semaine préc.</button>'
+      + '<span class="c27-chip nouveau">' + days[0].toLocaleDateString('fr-FR') + ' → ' + days[6].toLocaleDateString('fr-FR') + '</span>'
+      + '<button class="c27-act" onclick="c27PlanSet(\'weekOffset\',' + (_planState.weekOffset + 1) + ')">Semaine suiv. →</button>'
+      + '</div>'
+      + '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr><th>Membre</th>';
+    days.forEach(function (d) { h += '<th style="text-align:center">' + DOW[d.getDay()] + '<br>' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '</th>'; });
+    h += '</tr></thead><tbody>';
+    members.forEach(function (u) {
+      h += '<tr><td class="c27-school">' + _esc(u.fullName) + '<div class="c27-muted">' + _esc(u.city || '') + ' · ' + _esc(u.role) + '</div></td>';
+      days.forEach(function (d) {
+        var ds = dateStrOf(d);
+        var t = dayTypeFor(u.username, ds) || dayTypeFor(u.fullName, ds);
+        var icon = t === 'field' ? '🥾' : (t === 'office' ? '🏢' : '·');
+        var bg = t === 'field' ? '#FEF2F2' : (t === 'office' ? '#EFF6FF' : 'transparent');
+        h += '<td style="text-align:center"><button onclick="c27PlanDay(' + jsArg(u.username) + ',' + jsArg(u.fullName) + ',' + jsArg(ds) + ')" style="width:44px;height:40px;border:1px solid var(--g200);border-radius:10px;background:' + bg + ';font-size:17px;cursor:pointer">' + icon + '</button></td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>'
+      + '<div class="c27-note">🥾 Terrain = visites d\'écoles (photo + GPS). 🏢 Bureau = relances, prospection téléphonique, WhatsApp. Le planning est visible par chaque membre sur son appareil et appliqué aussi côté serveur. Un appel saisi un jour terrain, ou un appel enregistré depuis l\'emplacement même de l\'école, est signalé dans le Score de confiance.</div>'
+      + '</div>';
+    return h;
+  }
+
   /* ======================= 12. RAPPORT « GPS NON AUTORISÉ » =============== */
   // Qui n'autorise pas la géolocalisation ? Pour chaque prospecteur : combien
   // de saisies terrain sans position, lesquelles ont explicitement REFUSÉ la
@@ -2261,7 +2428,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

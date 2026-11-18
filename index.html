@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v12.6 · Mode terrain : formulaire simplifié pour les ambassadeurs/prospecteurs + bandeau de mise à jour automatique</span>
+      <span class="meta-pill red">v12.7 · 🗺 Carte dans la barre principale · Planning terrain/bureau par le Sub Admin · photo à la 1re visite · appels bloqués les jours terrain</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3546,6 +3546,11 @@ button,select,input,textarea{outline:none}
     <span class="nav-icon">🚀</span>
     <span class="nav-label">2027</span>
     <span class="nav-desc">Campagne · Fresh Start</span>
+  </button>
+  <button class="nav-btn" id="c27MapNavBtn" onclick="if(window.c27OpenMap)c27OpenMap()">
+    <span class="nav-icon">🗺</span>
+    <span class="nav-label">Carte</span>
+    <span class="nav-desc">Écoles & Terrain</span>
   </button>
   <button class="nav-btn" data-pane="activity">
     <span class="nav-icon">🗒️</span>
@@ -3582,6 +3587,7 @@ button,select,input,textarea{outline:none}
     <button class="bottom-tab" data-pane="market"><span class="bt-icon">🗺️</span><span class="bt-label">Marché</span></button>
     <button class="bottom-tab act" data-pane="suivi"><span class="bt-icon">📋</span><span class="bt-label">Workspace</span></button>
     <button class="bottom-tab" data-pane="c27"><span class="bt-icon">🚀</span><span class="bt-label">2027</span></button>
+    <button class="bottom-tab" id="c27MapTabBtn" onclick="if(window.c27OpenMap)c27OpenMap()"><span class="bt-icon">🗺</span><span class="bt-label">Carte</span></button>
     <button class="bottom-tab" data-pane="activity"><span class="bt-icon">🗒️</span><span class="bt-label">Activité</span></button>
     <button class="bottom-tab" data-pane="metrics"><span class="bt-icon">📊</span><span class="bt-label">BI</span></button>
     <button class="bottom-tab" data-pane="team"><span class="bt-icon">👥</span><span class="bt-label">Équipe</span></button>
@@ -15851,6 +15857,6 @@ setInterval(updateVercelToolbarVisibility, 60000);
   safety();
 })();
 </script>
-<script src="nateiva-2027.js?v=20261118-7"></script>
+<script src="nateiva-2027.js?v=20261118-8"></script>
 </body>
 </html>

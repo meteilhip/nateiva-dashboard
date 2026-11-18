@@ -89,3 +89,17 @@ CREATE TABLE IF NOT EXISTS school_claim_requests (
 );
 
 ALTER TABLE followups MODIFY COLUMN notes MEDIUMTEXT NULL;
+
+CREATE TABLE IF NOT EXISTS work_schedules (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  member_username VARCHAR(120) NOT NULL,
+  member_fullname VARCHAR(255) NOT NULL DEFAULT '',
+  work_date DATE NOT NULL,
+  day_type ENUM('field','office') NOT NULL,
+  set_by_username VARCHAR(120) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY ws_member_date (member_username, work_date),
+  KEY ws_date_idx (work_date)
+);

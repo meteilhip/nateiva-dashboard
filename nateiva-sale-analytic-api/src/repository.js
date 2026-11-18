@@ -525,11 +525,69 @@ async function decideClaimRequest(id, viewer, decision, note) {
   return updated.length ? mapClaimRequest(updated[0]) : null;
 }
 
+// === Planning terrain / bureau (décidé par le Sub Admin pour son équipe) ===
+function mapScheduleRow(row) {
+  return {
+    memberUsername: row.member_username,
+    memberFullName: row.member_fullname,
+    date: row.work_date instanceof Date ? row.work_date.toISOString().slice(0, 10) : String(row.work_date).slice(0, 10),
+    dayType: row.day_type,
+    setBy: row.set_by_username || ""
+  };
+}
+
+async function listWorkSchedules(viewer, fromDate, toDate) {
+  const seesAll = !!(viewer && viewer.permissions && viewer.permissions.dataScope === "all") || (viewer && (viewer.role === "SuperAdmin" || viewer.role === "SubAdmin"));
+  const rows = seesAll
+    ? await query(`SELECT * FROM work_schedules WHERE work_date BETWEEN ? AND ? ORDER BY work_date ASC`, [fromDate, toDate])
+    : await query(
+        `SELECT * FROM work_schedules
+         WHERE work_date BETWEEN ? AND ?
+           AND (LOWER(member_username) = LOWER(?) OR LOWER(member_fullname) = LOWER(?))
+         ORDER BY work_date ASC`,
+        [fromDate, toDate, viewer ? viewer.username : "", viewer ? viewer.fullName : ""]
+      );
+  return rows.map(mapScheduleRow);
+}
+
+async function setWorkSchedules(viewer, entries) {
+  const results = [];
+  for (const e of entries || []) {
+    const username = String(e.memberUsername || "").trim();
+    const date = String(e.date || "").slice(0, 10);
+    const dayType = String(e.dayType || "").trim();
+    if (!username || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (dayType === "clear") {
+      await query(`DELETE FROM work_schedules WHERE LOWER(member_username) = LOWER(?) AND work_date = ?`, [username, date]);
+      results.push({ memberUsername: username, date, dayType: "clear" });
+      continue;
+    }
+    if (dayType !== "field" && dayType !== "office") continue;
+    await query(
+      `INSERT INTO work_schedules (member_username, member_fullname, work_date, day_type, set_by_username)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE member_fullname = VALUES(member_fullname), day_type = VALUES(day_type), set_by_username = VALUES(set_by_username), updated_at = CURRENT_TIMESTAMP`,
+      [username, String(e.memberFullName || "").trim(), date, dayType, viewer ? viewer.username : ""]
+    );
+    results.push({ memberUsername: username, date, dayType });
+  }
+  return results;
+}
+
+async function getDayTypeFor(username, dateStr) {
+  const rows = await query(
+    `SELECT day_type FROM work_schedules WHERE LOWER(member_username) = LOWER(?) AND work_date = ? LIMIT 1`,
+    [username || "", String(dateStr || "").slice(0, 10)]
+  );
+  return rows.length ? rows[0].day_type : "";
+}
+
 async function getBootstrapPayload(viewer, extra) {
   const campaignStartIso = (extra && extra.campaignStartIso) || "2027-01-01T00:00:00";
   const campaignYear = (extra && extra.campaignYear) || 2027;
   let campaignClaims = [];
   let claimRequests = [];
+  let workSchedules = [];
   try {
     campaignClaims = await listCampaignClaims(campaignStartIso);
     claimRequests = await listClaimRequests(viewer, campaignYear);
@@ -538,12 +596,21 @@ async function getBootstrapPayload(viewer, extra) {
     campaignClaims = [];
     claimRequests = [];
   }
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const to = new Date(now.getTime() + 60 * 86400000).toISOString().slice(0, 10);
+    workSchedules = await listWorkSchedules(viewer, from, to);
+  } catch (e) {
+    workSchedules = []; // table pas encore migrée
+  }
   return {
     user: viewer,
     users: await listUsers(),
     followups: await listVisibleFollowups(viewer),
     campaignClaims,
     claimRequests,
+    workSchedules,
     campaign: { year: campaignYear, startIso: campaignStartIso },
     meta: Object.assign(
       {
@@ -572,5 +639,8 @@ module.exports = {
   hasApprovedClaimRequest,
   createClaimRequest,
   listClaimRequests,
-  decideClaimRequest
+  decideClaimRequest,
+  listWorkSchedules,
+  setWorkSchedules,
+  getDayTypeFor
 };

@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest, listWorkSchedules, setWorkSchedules, getDayTypeFor } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
@@ -148,6 +148,14 @@ app.post("/api/followups", authRequired, async function createFollowupHandler(re
     if (lockError) {
       return res.status(403).json({ success: false, error: lockError, code: "SCHOOL_LOCKED" });
     }
+    const fieldDayError = await checkFieldDayRule(
+      viewer,
+      req.body.followupType || req.body.FollowupType || "",
+      req.body.timestamp || req.body.Timestamp || new Date().toISOString()
+    );
+    if (fieldDayError) {
+      return res.status(403).json({ success: false, error: fieldDayError, code: "FIELD_DAY" });
+    }
     const followup = await upsertFollowup({
       ...req.body,
       Timestamp: req.body.timestamp || req.body.Timestamp || new Date().toISOString(),
@@ -279,6 +287,50 @@ app.post("/api/users/access", authRequired, async function updateAccessHandler(r
       return res.status(404).json({ success: false, error: "Utilisateur introuvable" });
     }
     return res.json({ success: true, user });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// === Planning terrain / bureau ===
+const PHONE_TYPES = new Set(["CALL", "WHATSAPP", "SMS"]);
+
+// Un jour TERRAIN décidé par le Sub Admin interdit la prospection téléphonique.
+async function checkFieldDayRule(viewer, followupType, timestamp) {
+  if (isSuperAdminViewer(viewer)) return null;
+  const type = String(followupType || "").toUpperCase();
+  if (!PHONE_TYPES.has(type)) return null;
+  if (!isCampaignTimestamp(timestamp) && Date.parse(String(timestamp || "")) < Date.parse(CAMPAIGN_START_ISO)) return null;
+  try {
+    const dateStr = String(timestamp || new Date().toISOString()).slice(0, 10);
+    const dayType = await getDayTypeFor(viewer.username, dateStr);
+    if (dayType === "field") {
+      return "Aujourd'hui est un jour TERRAIN décidé par votre admin : la prospection téléphonique n'est pas autorisée. Enregistrez une visite, ou faites vos appels un jour bureau.";
+    }
+  } catch (e) { /* table pas encore migrée → pas de blocage */ }
+  return null;
+}
+
+app.get("/api/schedule", authRequired, async function listScheduleHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const from = String(req.query.from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)).slice(0, 10);
+    const to = String(req.query.to || new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10)).slice(0, 10);
+    const schedules = await listWorkSchedules(viewer, from, to);
+    return res.json({ success: true, schedules });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/schedule", authRequired, async function setScheduleHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    if (!(viewer.role === "SuperAdmin" || viewer.role === "SubAdmin")) {
+      return res.status(403).json({ success: false, error: "Seuls les Sub Admins et le Super Admin définissent le planning" });
+    }
+    const results = await setWorkSchedules(viewer, Array.isArray(req.body.entries) ? req.body.entries : []);
+    return res.json({ success: true, results });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
