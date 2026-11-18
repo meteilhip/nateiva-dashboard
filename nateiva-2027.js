@@ -1343,6 +1343,121 @@
   window.c27MapFilter = function (k, v) { _mapState[k] = v; refreshMapMarkers(); };
   window.c27MapTrack = function (k, v) { _mapState[k] = v; refreshTrack(); };
 
+  /* ---------- 10b. Écoles découvertes sur Internet (OpenStreetMap) ---------- */
+  // En plus de nos écoles, la carte peut charger TOUTES les écoles connues
+  // d'OpenStreetMap (base cartographique mondiale alimentée par la communauté,
+  // les gouvernements et l'imagerie satellite) : maternelles, primaires,
+  // secondaires et universités, avec leur position réelle. Chaque école
+  // découverte est automatiquement rapprochée de notre base : si on ne la
+  // connaît pas, elle est marquée « à prospecter ». Requête via l'API Overpass
+  // (gratuite, sans clé), mise en cache 14 jours sur l'appareil.
+  var OSM_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
+  var OSM_CACHE_DAYS = 14;
+  var _osmData = {};      // city → [{name,lat,lng,kind,tags}]
+  var _osmLoading = '';
+
+  function osmCacheKey(city) { return 'nateiva_c27_osm_' + normalizeText(city).replace(/\s+/g, '_'); }
+  function osmKindOf(tags) {
+    var a = (tags.amenity || '').toLowerCase();
+    var name = normalizeText(tags.name || '');
+    if (a === 'university') return 'Université';
+    if (a === 'college') return 'Supérieur / Grande école';
+    if (a === 'kindergarten') return 'Maternelle';
+    if (/universite|university|institut superieur|polytech/.test(name)) return 'Université';
+    if (/lycee|lycée|college|collège|secondary|high school|comprehensive/.test(name)) return 'Secondaire';
+    if (/maternelle|nursery|kindergarten|creche/.test(name)) return 'Maternelle';
+    return 'Primaire / École';
+  }
+  var OSM_GENERIC_TOKENS = { groupe: 1, scolaire: 1, bilingue: 1, bilingual: 1, complexe: 1, college: 1, lycee: 1, ecole: 1, school: 1, schools: 1, nursery: 1, primary: 1, secondary: 1, high: 1, prive: 1, privee: 1, laic: 1, laique: 1, publique: 1, public: 1, the: 1, and: 1, et: 1, de: 1, du: 1, des: 1, la: 1, le: 1, les: 1, institut: 1, institution: 1, academy: 1, academie: 1, centre: 1, center: 1, gs: 1, gsb: 1, csb: 1, nkk: 1, enieg: 1 };
+  function osmNameTokens(name) {
+    return normalizeText(name).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+      .filter(function (t) { return t.length > 1 && !OSM_GENERIC_TOKENS[t]; });
+  }
+  function osmMatchesOurs(osmName, ourTokensIndex) {
+    var t = osmNameTokens(osmName);
+    if (!t.length) return null;
+    var best = null, bestScore = 0;
+    Object.keys(ourTokensIndex).forEach(function (key) {
+      var ours = ourTokensIndex[key];
+      if (!ours.length) return;
+      var inter = 0;
+      t.forEach(function (tok) { if (ours.indexOf(tok) > -1) inter++; });
+      var score = inter / Math.max(1, Math.min(t.length, ours.length));
+      if (score > bestScore) { bestScore = score; best = key; }
+    });
+    return bestScore >= 0.6 ? best : null;
+  }
+
+  window.c27LoadOsm = function () {
+    var city = (_mapState.city || 'DOUALA').toUpperCase();
+    var cc = CITY_COORDS[city];
+    var btn = document.getElementById('c27OsmBtn');
+    if (!cc) { _toast('Sélectionnez d\'abord une ville connue de la carte', true); return; }
+    // cache appareil
+    try {
+      var cached = JSON.parse(localStorage.getItem(osmCacheKey(city)) || 'null');
+      if (cached && cached.at && (Date.now() - cached.at) < OSM_CACHE_DAYS * 86400000 && Array.isArray(cached.items)) {
+        _osmData[city] = cached.items;
+        _mapState.osm = '1';
+        refreshMapMarkers();
+        return;
+      }
+    } catch (e) { }
+    if (_osmLoading === city) return;
+    _osmLoading = city;
+    if (btn) { btn.disabled = true; btn.textContent = '🌐 Chargement des écoles de ' + city + '…'; }
+    var query = '[out:json][timeout:50];(nwr["amenity"~"^(school|college|university|kindergarten)$"](around:30000,' + cc[0] + ',' + cc[1] + '););out center tags;';
+    var tryEndpoint = function (i) {
+      if (i >= OSM_ENDPOINTS.length) {
+        _osmLoading = '';
+        if (btn) { btn.disabled = false; btn.textContent = '🌐 Réessayer le chargement Internet'; }
+        _toast('Serveurs OpenStreetMap injoignables — réessayez dans quelques minutes', true);
+        return;
+      }
+      fetch(OSM_ENDPOINTS[i], { method: 'POST', body: 'data=' + encodeURIComponent(query), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (json) {
+          var items = (json.elements || []).map(function (el) {
+            var lat = el.lat != null ? el.lat : (el.center ? el.center.lat : null);
+            var lng = el.lon != null ? el.lon : (el.center ? el.center.lon : null);
+            var tags = el.tags || {};
+            if (lat == null || lng == null || !tags.name) return null;
+            return {
+              name: tags.name, lat: lat, lng: lng, kind: osmKindOf(tags),
+              operator: tags.operator || '', religion: tags.religion || '',
+              capacity: tags.capacity || tags['capacity:pupils'] || '', fee: tags.fee || '',
+              phone: tags.phone || tags['contact:phone'] || '',
+              quartier: tags['addr:suburb'] || tags['addr:quarter'] || tags['addr:street'] || ''
+            };
+          }).filter(Boolean);
+          _osmData[city] = items;
+          try { localStorage.setItem(osmCacheKey(city), JSON.stringify({ at: Date.now(), items: items })); } catch (e) { }
+          _osmLoading = '';
+          _mapState.osm = '1';
+          _toast(items.length + ' écoles trouvées sur Internet pour ' + city + ' ✓');
+          var pane = document.getElementById('p-c27');
+          if (pane && pane.classList.contains('act')) { rC27(); }
+        })
+        .catch(function () { tryEndpoint(i + 1); });
+    };
+    tryEndpoint(0);
+  };
+
+  function discoveredForCity(city) {
+    var items = _osmData[city];
+    if (!items) {
+      try {
+        var cached = JSON.parse(localStorage.getItem(osmCacheKey(city)) || 'null');
+        if (cached && Array.isArray(cached.items)) { _osmData[city] = cached.items; items = cached.items; }
+      } catch (e) { }
+    }
+    return items || [];
+  }
+
   function renderMapTab(admin) {
     var schools = buildMapSchools();
     var cities = {}; schools.forEach(function (s) { if (s.city) cities[s.city] = (cities[s.city] || 0) + 1; });
@@ -1358,10 +1473,15 @@
       + '<select onchange="c27MapFilter(\'city\',this.value)"><option value="">Toutes les villes</option>' + Object.keys(cities).sort().map(function (c) { return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">' + _esc(c) + ' (' + cities[c] + ')</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'stage\',this.value)"><option value="">Tous les statuts</option><option value="gagne"' + (_mapState.stage === 'gagne' ? ' selected' : '') + '>🏆 Signées</option>' + Object.keys(STAGE_LABEL).map(function (s) { return '<option' + (_mapState.stage === s ? ' selected' : '') + ' value="' + s + '">' + STAGE_LABEL[s] + '</option>'; }).join('') + '</select>'
       + '<select onchange="c27MapFilter(\'precise\',this.value)"><option value="">GPS + approximatives</option><option value="1"' + (_mapState.precise === '1' ? ' selected' : '') + '>📍 Positions GPS seulement</option></select>'
+      + '<select onchange="c27MapFilter(\'osm\',this.value)">'
+      + '<option value=""' + (!_mapState.osm ? ' selected' : '') + '>Nos écoles seulement</option>'
+      + '<option value="1"' + (_mapState.osm === '1' ? ' selected' : '') + '>🌐 + écoles trouvées sur Internet</option>'
+      + '<option value="new"' + (_mapState.osm === 'new' ? ' selected' : '') + '>🆕 À prospecter seulement (Internet)</option></select>'
+      + '<button id="c27OsmBtn" class="c27-act" onclick="c27LoadOsm()">🌐 Charger les écoles Internet de ' + _esc((_mapState.city || 'DOUALA')) + '</button>'
       + '</div>'
       + '<div id="c27MapBox" style="height:480px;border-radius:16px;overflow:hidden;border:1px solid var(--g200);background:var(--g50)"><div class="c27-empty">Chargement de la carte…</div></div>'
       + '<div id="c27MapCount" class="c27-muted" style="margin-top:10px"></div>'
-      + '<div class="c27-note">Légende : <b style="color:#047857">●</b> signée · <b style="color:#DC2626">●</b> chaude · <b style="color:#D97706">●</b> tiède · <b style="color:#2563EB">●</b> nouvelle · <b style="color:#78716C">●</b> froide · <b style="color:#44403C">●</b> perdue. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute).</div>'
+      + '<div class="c27-note">Légende — nos écoles : <b style="color:#047857">●</b> signée · <b style="color:#DC2626">●</b> chaude · <b style="color:#D97706">●</b> tiède · <b style="color:#2563EB">●</b> nouvelle · <b style="color:#78716C">●</b> froide · <b style="color:#44403C">●</b> perdue · écoles Internet : <b style="color:#7C3AED">◆</b> à prospecter, <b style="color:#A78BFA">◇</b> déjà dans notre base. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute). Les écoles Internet (maternelles, primaires, secondaires, universités) proviennent d\'OpenStreetMap, la base cartographique mondiale communautaire — les pages Facebook ne peuvent pas être aspirées automatiquement : une école repérée sur Facebook s\'ajoute en la saisissant une fois, elle apparaîtra ensuite sur la carte.</div>'
       + '</div>';
     if (admin) {
       h += '<div class="c27-card"><div class="c27-klabel">Suivi terrain · Super Admin & Admins</div>'
@@ -1387,7 +1507,7 @@
     ensureLeaflet(function () {
       box.innerHTML = '';
       var center = CITY_COORDS['DOUALA'];
-      _map = L.map(box, { scrollWheelZoom: true }).setView(center, 12);
+      _map = L.map(box, { scrollWheelZoom: true, preferCanvas: true }).setView(center, 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -1442,8 +1562,53 @@
       mk.addTo(_mapLayer);
       bounds.push(s.pos);
     });
+    // — Écoles découvertes sur Internet (OpenStreetMap) —
+    var osmShown = 0, osmNew = 0;
+    if (_mapState.osm) {
+      var city = (_mapState.city || 'DOUALA').toUpperCase();
+      var discovered = discoveredForCity(city);
+      if (discovered.length) {
+        // index de rapprochement : école connue → jetons de nom significatifs
+        var ourIdx = {};
+        buildMapSchools().forEach(function (s) { ourIdx[s.name] = osmNameTokens(s.name); });
+        discovered.forEach(function (d) {
+          var known = osmMatchesOurs(d.name, ourIdx);
+          if (_mapState.osm === 'new' && known) return;
+          if (q) {
+            var hay2 = normalizeText([d.name, d.kind, d.quartier, d.operator].join(' '));
+            if (hay2.indexOf(q) === -1) return;
+          }
+          osmShown++;
+          if (!known) osmNew++;
+          var col = known ? '#A78BFA' : '#7C3AED';
+          var mk2 = L.circleMarker([d.lat, d.lng], {
+            radius: known ? 6 : 8, color: col, weight: 2,
+            fillColor: col, fillOpacity: known ? 0.25 : 0.7
+          });
+          var pop2 = '<div style="font-family:\'DM Sans\',sans-serif;min-width:220px;max-width:270px">'
+            + '<div style="font-weight:800;font-size:14px;margin-bottom:3px">' + _esc(d.name) + '</div>'
+            + '<div style="font-size:11px;color:#7C3AED;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet (OpenStreetMap) — ' + _esc(d.kind) + '</div>'
+            + '<div style="font-size:12px;line-height:1.7;margin-bottom:8px">'
+            + (known ? '🔗 Correspond à notre école « <b>' + _esc(known) + '</b> »' : '🆕 <b>Pas encore prospectée par NATEIVA</b>')
+            + (d.quartier ? '<br>📍 ' + _esc(d.quartier) : '')
+            + (d.operator ? '<br>🏛 ' + _esc(d.operator) : '')
+            + (d.capacity ? '<br>👩‍🎓 Capacité estimée : ' + _esc(d.capacity) : '')
+            + (d.phone ? '<br>📞 <a href="tel:' + _attr(d.phone) + '">' + _esc(d.phone) + '</a>' : '')
+            + '</div>'
+            + (known ? '' : '<button onclick="c27StartEntry(' + jsArg(d.name) + ',' + jsArg(city) + ',\'\',' + jsArg(d.phone || '') + ')" style="width:100%;background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:8px;font-weight:700;cursor:pointer">✍️ Prospecter cette école</button>')
+            + '</div>';
+          mk2.bindPopup(pop2);
+          mk2.addTo(_mapLayer);
+          bounds.push([d.lat, d.lng]);
+        });
+      }
+    }
     var count = document.getElementById('c27MapCount');
-    if (count) count.textContent = list.length + ' école(s) affichée(s)' + (_mapState.q ? ' pour « ' + _mapState.q + ' »' : '');
+    if (count) {
+      var txt = list.length + ' école(s) de notre base affichée(s)' + (_mapState.q ? ' pour « ' + _mapState.q + ' »' : '');
+      if (_mapState.osm) txt += ' · 🌐 ' + osmShown + ' école(s) Internet dont ' + osmNew + ' à prospecter';
+      count.textContent = txt;
+    }
     if (bounds.length) { try { _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 }); } catch (e) { } }
   }
 
@@ -1527,7 +1692,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
