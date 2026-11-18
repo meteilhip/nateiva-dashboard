@@ -796,7 +796,7 @@
     var admin = (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
     var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser);
     var tab = currentTab();
-    if ((tab === 'pilot' || tab === 'trust' || tab === 'plan') && !admin) tab = 'list';
+    if ((tab === 'pilot' || tab === 'trust' || tab === 'plan' || tab === 'team') && !admin) tab = 'list';
 
     var priority = buildPriorityList();
     var claims = getClaimsMap();
@@ -815,6 +815,7 @@
       + tabBtn('list', '📞 Liste prioritaire', tab)
       + tabBtn('map', '🗺 Carte des écoles', tab)
       + tabBtn('claims', '👑 Attributions & demandes', tab)
+      + (admin ? tabBtn('team', '👥 Mon équipe', tab) : '')
       + (admin ? tabBtn('plan', '🗓 Planning', tab) : '')
       + (admin ? tabBtn('pilot', '📊 Pilotage & IA', tab) : '')
       + (admin ? tabBtn('trust', '🛡 Score de confiance', tab) : '')
@@ -823,6 +824,7 @@
     if (tab === 'list') h += renderPriorityTab(priority, admin);
     else if (tab === 'map') h += renderMapTab(admin);
     else if (tab === 'claims') h += renderClaimsTab(myClaims, superA, admin);
+    else if (tab === 'team') h += renderTeamTab();
     else if (tab === 'plan') h += renderPlanningTab();
     else if (tab === 'pilot') h += renderPilotTab(priority);
     else if (tab === 'trust') h += renderTrustTab();
@@ -1184,15 +1186,106 @@
   // devient un marqueur « Archive ».
   var STRIP_PANES = { home: 1, metrics: 1, team: 1, market: 1, activity: 1 };
 
+  function teamMembersFor(user) {
+    var users = (typeof getAllUsers === 'function') ? getAllUsers() : [];
+    var city = String(user && user.city || '').toUpperCase();
+    return users.filter(function (u) {
+      if (!u || u.role === 'SuperAdmin') return false;
+      if (!city || city === 'ALL') return true;
+      return String(u.city || '').toUpperCase() === city || String(u.city || '').toUpperCase() === 'ALL';
+    });
+  }
+  function filterByExperts(rows, fups, names) {
+    var set = names.map(function (n) { return normalizeText(n); });
+    function has(n) { return set.indexOf(normalizeText(canonicalPersonName(n))) > -1; }
+    return {
+      rows: rows.filter(function (r) { return has(r.e); }),
+      fups: fups.filter(function (f) { return has(f.Expert); })
+    };
+  }
   function visibleDataForStrip() {
     var fups = fullVisibleFups();
     var rows = fullRows();
-    var seeAll = (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
-    if (!seeAll && window.currentUser) {
+    var u = window.currentUser;
+    var seeAll = (typeof canSeeAllData === 'function') && canSeeAllData(u);
+    if (!seeAll && u) {
       rows = rows.filter(function (r) { return samePerson(r.e, _me()); });
       // fullVisibleFups est déjà restreint aux saisies de l'utilisateur côté données
+    } else if (u && u.role === 'SubAdmin' && String(u.city || '').toUpperCase() !== 'ALL') {
+      // Un Sub Admin pilote SON équipe (sa ville) : le bandeau vs N-1 est à son périmètre.
+      var names = teamMembersFor(u).map(function (m) { return m.fullName; });
+      var t = filterByExperts(rows, fups, names);
+      rows = t.rows; fups = t.fups;
     }
     return { rows: rows, fups: fups };
+  }
+
+  /* ---- 👥 Mon équipe : cockpit du Sub Admin (et du Super Admin par ville) ---- */
+  var _teamState = { city: '' };
+  window.c27TeamCity = function (v) { _teamState.city = v; rC27(); };
+
+  function renderTeamTab() {
+    var me = window.currentUser || {};
+    var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(me);
+    var scopeUser = superA ? { city: _teamState.city || 'ALL', role: 'SubAdmin' } : me;
+    var members = teamMembersFor(scopeUser);
+    var names = members.map(function (m) { return m.fullName; });
+    var data = filterByExperts(fullRows(), fullFups(), names);
+    var yoy = computeYoY(data.fups, data.rows);
+    var trust = computeTrust(false);
+    var teamTrust = trust.report.filter(function (r) { return names.some(function (n) { return samePerson(n, r.expert); }); });
+    var reviews = buildPhotoReviewList().filter(function (r) { return names.some(function (n) { return samePerson(n, r.expert); }); });
+    var refusals = computeGpsRefusals(false).filter(function (r) { return names.some(function (n) { return samePerson(n, r.expert); }); });
+    var today = todayStr();
+    var cityLabel = String(scopeUser.city || 'ALL').toUpperCase() === 'ALL' ? 'Toutes les villes' : scopeUser.city;
+
+    var h = '<div class="c27-card"><div class="c27-klabel">Cockpit ' + (superA ? 'Super Admin' : 'Sub Admin') + ' · ' + _esc(cityLabel) + '</div>'
+      + '<h3>👥 Mon équipe — aujourd\'hui</h3>'
+      + '<p class="c27-sub">Qui est sur le terrain, qui est au bureau, et ce qui attend votre décision. Jours définis dans l\'onglet 🗓 Planning.</p>';
+    if (superA) {
+      var cities = {};
+      ((typeof getAllUsers === 'function') ? getAllUsers() : []).forEach(function (u) { var c = String(u.city || '').toUpperCase(); if (c && c !== 'ALL') cities[c] = 1; });
+      h += '<div class="c27-filters"><select onchange="c27TeamCity(this.value)"><option value="ALL">Toutes les équipes</option>'
+        + Object.keys(cities).sort().map(function (c) { return '<option' + (_teamState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">Équipe ' + _esc(c) + '</option>'; }).join('')
+        + '</select></div>';
+    }
+    h += '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr><th>Membre</th><th>Aujourd\'hui</th><th>Score confiance</th><th>À traiter</th></tr></thead><tbody>';
+    members.forEach(function (m) {
+      var t = dayTypeFor(m.username, today) || dayTypeFor(m.fullName, today);
+      var tr = teamTrust.filter(function (r) { return samePerson(r.expert, m.fullName); })[0];
+      var nbRev = reviews.filter(function (r) { return samePerson(r.expert, m.fullName); }).length;
+      var nbRef = refusals.filter(function (r) { return samePerson(r.expert, m.fullName); }).reduce(function (a, r) { return a + r.noGps; }, 0);
+      h += '<tr><td class="c27-school">' + _esc(m.fullName) + '<div class="c27-muted">' + _esc(m.role) + (m.city ? ' · ' + _esc(m.city) : '') + '</div></td>'
+        + '<td>' + (t === 'field' ? '<span class="c27-chip chaud">🥾 Terrain</span>' : t === 'office' ? '<span class="c27-chip nouveau">🏢 Bureau</span>' : '<span class="c27-muted">— non planifié</span>') + '</td>'
+        + '<td>' + (tr ? scoreBadge(tr.score) : '<span class="c27-muted">pas de saisie campagne</span>') + '</td>'
+        + '<td>' + (nbRev ? '<span class="c27-chip pend">📸 ' + nbRev + ' photo(s)</span> ' : '') + (nbRef ? '<span class="c27-chip pend">🚫 ' + nbRef + ' sans GPS</span>' : '') + (!nbRev && !nbRef ? '<span class="c27-muted">✓ rien</span>' : '') + '</td></tr>';
+    });
+    h += '</tbody></table></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+      + '<button class="c27-act primary" onclick="c27SetTab(\'plan\')">🗓 Assigner terrain / bureau</button>'
+      + '<button class="c27-act" onclick="c27SetTab(\'trust\')">🛡 Vérifier les éléments signalés' + (reviews.length ? ' (' + reviews.length + ')' : '') + '</button>'
+      + '</div></div>';
+
+    h += '<div class="c27-card"><div class="c27-klabel">Équipe ' + _esc(cityLabel) + ' · vs campagne précédente à J+' + yoy.windowDays + '</div>'
+      + '<h3>📊 Statistiques de l\'équipe vs ' + (CFG.YEAR - 1) + '</h3>'
+      + '<p class="c27-sub">Uniquement les saisies des membres de cette équipe. Référence entre parenthèses : même équipe, campagne précédente, sur la même durée d\'activité.</p>'
+      + '<div class="c27-tiles">'
+      + kpiTile('Saisies', yoy.cur.entries, yoy.prevW.entries, true, 'descentes + suivis de l\'équipe')
+      + kpiTile('Écoles touchées', yoy.cur.schools, yoy.prevW.schools, true, 'écoles distinctes contactées')
+      + kpiTile('Appels', yoy.cur.calls, yoy.prevW.calls, true, 'suivis de type appel')
+      + kpiTile('Visites', yoy.cur.visits, yoy.prevW.visits, true, 'suivis de type visite')
+      + kpiTile('Signatures', yoy.cur.signed, yoy.prevW.signed, true, 'deals gagnés sur la période')
+      + kpiTile('Conversion', yoy.cur.conv.toFixed(1) + '%', yoy.prevW.conv ? yoy.prevW.conv.toFixed(1) + '%' : null, true, 'signées ÷ touchées', yoy.cur.conv, yoy.prevW.conv)
+      + '</div></div>';
+
+    if (teamTrust.length) {
+      h += '<div class="c27-card"><h3>🛡 Confiance — classement de l\'équipe</h3><div style="overflow-x:auto"><table class="c27-tbl"><thead><tr><th>#</th><th>Membre</th><th>Score</th><th>Saisies</th><th>Signalées</th></tr></thead><tbody>';
+      teamTrust.forEach(function (r, i) {
+        h += '<tr><td class="c27-muted">' + (i + 1) + '</td><td class="c27-school">' + _esc(r.expert) + '</td><td>' + scoreBadge(r.score) + '</td><td>' + _fmt(r.entries) + '</td><td>' + _fmt(r.flagged) + '</td></tr>';
+      });
+      h += '</tbody></table></div><div class="c27-note">Détail des signaux et exports dans l\'onglet 🛡 Score de confiance.</div></div>';
+    }
+    return h;
   }
 
   function formIndex(yoy) {
@@ -2332,6 +2425,12 @@
   // onglets essentiels ; les admins et le Super Admin gardent tout.
   var EXPERT_HIDDEN_PANES = { metrics: 1, market: 1, playbook: 1, intel: 1, glossary: 1 };
 
+  window.c27PresetMapTab = function () {
+    // Appelé par les boutons 🗺 de la navigation AVANT le basculement de pane :
+    // présélectionne l'onglet Carte du pane 2027.
+    lsSet(LS_KEYS.tab, 'map');
+    if (window._paneDirty) window._paneDirty.c27 = true;
+  };
   window.c27OpenMap = function () {
     lsSet(LS_KEYS.tab, 'map');
     var btn = document.querySelector('.nav-btn[data-pane="c27"]');
@@ -2428,7 +2527,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
