@@ -87,3 +87,5 @@ CREATE TABLE IF NOT EXISTS school_claim_requests (
   KEY scr_campaign_idx (campaign_year),
   KEY scr_requested_by_idx (requested_by_username)
 );
+
+ALTER TABLE followups MODIFY COLUMN notes MEDIUMTEXT NULL;

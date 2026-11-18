@@ -156,6 +156,7 @@
         var secs = Math.round((Date.now() - Date.parse(GEO.formOpenedAt)) / 1000);
         if (isFinite(secs) && secs >= 0) meta.fillSecs = String(secs); // durée de remplissage en secondes
       }
+      if (typeof applyPhotoMeta === 'function') applyPhotoMeta(meta); // photo terrain prise sur place
       GEO.formOpenedAt = null; // réinitialisé pour la prochaine saisie
       geoCapture('post-submit');
     } catch (e) { /* la saisie ne doit jamais échouer à cause du GPS */ }
@@ -997,7 +998,8 @@
   function renderTrustTab() {
     var scope = lsGet(LS_KEYS.trustScope, campaignStarted() ? 'c27' : 'all');
     var trust = computeTrust(scope === 'all');
-    var h = '<div class="c27-card"><div class="c27-klabel">Intégrité des données terrain</div>'
+    var h = renderGpsRefusalReport(scope === 'all');
+    h += '<div class="c27-card"><div class="c27-klabel">Intégrité des données terrain</div>'
       + '<h3>🛡 Score de confiance par prospecteur</h3>'
       + '<p class="c27-sub">Le score démarre à 100 et baisse selon la part de saisies présentant des signaux : GPS manquant sur visite (-' + CFG.TRUST.weights.noGps + ' pts max), écoles multiples au même endroit (-' + CFG.TRUST.weights.cluster + '), déplacement impossible ou position simulée (-' + CFG.TRUST.weights.travel + '), remplissage trop rapide (-' + CFG.TRUST.weights.fast + '), téléphone dupliqué (-' + CFG.TRUST.weights.dupPhone + '), rafales (-' + CFG.TRUST.weights.burst + '), précision faible (-' + CFG.TRUST.weights.lowAcc + '), saisie nocturne (-' + CFG.TRUST.weights.night + '). Chaque pénalité = poids × (saisies concernées ÷ saisies totales). <b>Ce sont des signaux à vérifier, pas des verdicts</b> : une rafale du soir peut être la saisie honnête d\'une tournée hors-ligne.</p>'
       + '<div class="c27-filters">'
@@ -1290,8 +1292,14 @@
     sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     sc.onload = cb;
     sc.onerror = function () {
-      var box = document.getElementById('c27MapBox');
-      if (box) box.innerHTML = '<div class="c27-empty">Impossible de charger la carte (connexion requise la première fois). Réessayez en ligne.</div>';
+      var sc2 = document.createElement('script');
+      sc2.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js';
+      sc2.onload = cb;
+      sc2.onerror = function () {
+        var box = document.getElementById('c27MapBox');
+        if (box) box.innerHTML = '<div class="c27-empty">Impossible de charger la carte (connexion requise la première fois). Réessayez en ligne.</div>';
+      };
+      document.head.appendChild(sc2);
     };
     document.head.appendChild(sc);
   }
@@ -1311,6 +1319,20 @@
     });
     return idx;
   }
+  function schoolPhotoIndex() {
+    // dernière photo terrain par école (vignette compressée stockée dans la saisie)
+    var idx = {};
+    fullFups().forEach(function (f) {
+      if (!f || typeof splitFollowupNotes !== 'function') return;
+      var m = splitFollowupNotes(f.Notes).meta || {};
+      if (!m.photoData) return;
+      var k = schoolKey(f.SchoolName); if (!k) return;
+      var ms = tsMs(f.Timestamp) || 0;
+      if (!idx[k] || idx[k].ts < ms) idx[k] = { data: m.photoData, ts: ms };
+    });
+    return idx;
+  }
+
   function jitterFor(key, span) {
     var hsh = 0; for (var i = 0; i < key.length; i++) { hsh = ((hsh << 5) - hsh + key.charCodeAt(i)) | 0; }
     var a = ((hsh % 1000) / 1000) * Math.PI * 2, r = (((hsh >> 10) % 1000) / 1000) * span;
@@ -1534,8 +1556,10 @@
       return true;
     });
     var bounds = [];
+    var photos = schoolPhotoIndex();
     list.forEach(function (s) {
       var color = STAGE_COLOR[s.stage] || '#2563EB';
+      var photo = photos[s.key] || null;
       var mk = L.circleMarker(s.pos, {
         radius: s.precise ? 9 : 7,
         color: color, weight: s.precise ? 2.5 : 1.5,
@@ -1543,6 +1567,7 @@
         dashArray: s.precise ? null : '3,4'
       });
       var pop = '<div style="font-family:\'DM Sans\',sans-serif;min-width:230px;max-width:280px">'
+        + (photo ? '<img src="' + photo.data + '" style="width:100%;max-height:110px;object-fit:cover;border-radius:10px;margin-bottom:7px" alt="Photo école">' : '')
         + '<div style="font-weight:800;font-size:14px;margin-bottom:3px">' + _esc(s.name) + '</div>'
         + '<div style="font-size:11px;color:#78716C;margin-bottom:8px">' + _esc(s.city) + (s.quartier ? ' · ' + _esc(s.quartier) : '') + (s.location ? ' · ' + _esc(s.location) : '') + (s.precise ? '' : ' · <i>position approximative</i>') + '</div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px;margin-bottom:8px">'
@@ -1652,6 +1677,266 @@
     try { _map.fitBounds(path, { padding: [40, 40], maxZoom: 15 }); } catch (e) { }
   }
 
+  /* ======================= 11. PHOTO TERRAIN OBLIGATOIRE ================== */
+  // Pour toute VISITE terrain : une photo de l'école prise SUR PLACE, avec
+  // l'appareil photo (capture="environment" ouvre directement la caméra sur
+  // mobile). Une image choisie dans la galerie est rejetée : le fichier doit
+  // dater de moins de 5 minutes. La photo est compressée (~560 px) et voyage
+  // dans les métadonnées de la saisie ; l'heure de prise et la position GPS
+  // sont enregistrées avec elle.
+  var PHOTO_MAX_AGE_MS = 5 * 60 * 1000;
+  var PHOTO_MAX_B64 = 45000; // la colonne notes (TEXT, 64 Ko) doit tout contenir avant la migration MEDIUMTEXT
+  var _photoState = null;
+
+  function photoRequired() {
+    var sel = document.getElementById('fuType');
+    if (!sel) return false;
+    if (window.followupEditMode === 'edit') return false; // l'édition garde la photo d'origine
+    return sel.value === 'VISIT';
+  }
+
+  function ensurePhotoField() {
+    try {
+      var notes = document.getElementById('fuNotes');
+      if (!notes || document.getElementById('c27PhotoWrap')) { updatePhotoUi(); return; }
+      var field = notes.closest ? notes.closest('.form-field') : null;
+      if (!field || !field.parentNode) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'form-field full';
+      wrap.id = 'c27PhotoWrap';
+      wrap.innerHTML = '<div style="background:linear-gradient(135deg,#F7F1E3,#FAFAF9);border:1.5px solid #B08D2F;border-radius:12px;padding:14px 16px">'
+        + '<label style="font-weight:800;color:#7A5F1C;text-transform:uppercase;letter-spacing:.06em;font-size:11px">📸 Photo de l\'école <span id="c27PhotoReq" style="color:#B91C1C"></span></label>'
+        + '<div style="font-size:12px;color:#78716C;margin:4px 0 10px">Prise sur place avec l\'appareil photo (façade ou plaque de l\'école). Les images de la galerie sont refusées.</div>'
+        + '<input type="file" id="c27PhotoInput" accept="image/*" capture="environment" style="display:none">'
+        + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+        + '<button type="button" class="c27-ask-btn" style="margin-top:0" onclick="document.getElementById(\'c27PhotoInput\').click()">📸 Prendre la photo</button>'
+        + '<img id="c27PhotoPreview" style="display:none;height:64px;border-radius:9px;border:2px solid #B08D2F">'
+        + '<span id="c27PhotoStatus" style="font-size:12.5px;font-weight:600;color:#78716C"></span>'
+        + '</div></div>';
+      field.parentNode.insertBefore(wrap, field.nextSibling);
+      document.getElementById('c27PhotoInput').addEventListener('change', onPhotoPicked);
+      updatePhotoUi();
+    } catch (e) { }
+  }
+
+  function updatePhotoUi() {
+    var wrap = document.getElementById('c27PhotoWrap');
+    if (!wrap) return;
+    var req = document.getElementById('c27PhotoReq');
+    var needed = photoRequired();
+    wrap.style.display = needed ? '' : 'none';
+    if (req) req.textContent = needed ? '· OBLIGATOIRE pour une visite' : '';
+  }
+
+  function onPhotoPicked(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    var status = document.getElementById('c27PhotoStatus');
+    var preview = document.getElementById('c27PhotoPreview');
+    _photoState = null;
+    if (preview) preview.style.display = 'none';
+    if (!file) { if (status) status.textContent = ''; return; }
+    var age = Date.now() - (file.lastModified || 0);
+    if (!(age >= -120000 && age <= PHOTO_MAX_AGE_MS)) {
+      if (status) { status.textContent = '⛔ Photo refusée : elle doit être prise à l\'instant avec l\'appareil photo, pas choisie dans la galerie.'; status.style.color = '#B91C1C'; }
+      ev.target.value = '';
+      return;
+    }
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function () {
+      try {
+        var quality = 0.55, size = 560, dataUrl = '';
+        for (var attempt = 0; attempt < 4; attempt++) {
+          var scale = Math.min(1, size / Math.max(img.width, img.height));
+          var cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(img.width * scale));
+          cv.height = Math.max(1, Math.round(img.height * scale));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          dataUrl = cv.toDataURL('image/jpeg', quality);
+          if (dataUrl.length <= PHOTO_MAX_B64) break;
+          quality -= 0.12; size -= 90;
+        }
+        var fits = dataUrl.length <= PHOTO_MAX_B64;
+        _photoState = {
+          data: fits ? dataUrl : '',
+          takenAt: new Date().toISOString(),
+          fileAt: new Date(file.lastModified || Date.now()).toISOString(),
+          bytes: file.size || 0
+        };
+        if (preview) { preview.src = dataUrl; preview.style.display = ''; }
+        if (status) { status.textContent = '✅ Photo prise sur place à ' + new Date().toLocaleTimeString('fr-FR') + (fits ? '' : ' (photo lourde : attestation seule enregistrée)'); status.style.color = '#047857'; }
+      } catch (e) {
+        _photoState = { data: '', takenAt: new Date().toISOString(), fileAt: '', bytes: file.size || 0 };
+        if (status) { status.textContent = '✅ Photo enregistrée'; status.style.color = '#047857'; }
+      }
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = function () { if (status) { status.textContent = 'Fichier illisible — reprenez la photo.'; status.style.color = '#B91C1C'; } URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+
+  // Verrou à l'enregistrement : pas de visite sans photo prise sur place.
+  function installPhotoGate() {
+    var orig = window.submitFollowup;
+    if (typeof orig !== 'function' || orig.__c27PhotoGate) return;
+    var wrapped = function () {
+      if (photoRequired() && !_photoState) {
+        ensurePhotoField();
+        var wrap = document.getElementById('c27PhotoWrap');
+        if (wrap) { wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        if (typeof isSuperAdmin === 'function' && isSuperAdmin(window.currentUser)) {
+          _toast('⚠️ Visite sans photo — autorisé pour le Super Admin uniquement');
+        } else {
+          _toast('📸 Photo obligatoire : prenez la photo de l\'école sur place avant d\'enregistrer la visite', true);
+          return;
+        }
+      }
+      return orig.apply(this, arguments);
+    };
+    wrapped.__c27PhotoGate = true;
+    window.submitFollowup = wrapped;
+  }
+
+  function applyPhotoMeta(meta) {
+    if (_photoState) {
+      meta.photoAt = _photoState.takenAt;      // heure de prise de la photo
+      meta.photoFileAt = _photoState.fileAt;   // horodatage du fichier (contrôle anti-galerie)
+      meta.photoBytes = String(_photoState.bytes || 0);
+      if (_photoState.data) meta.photoData = _photoState.data; // vignette JPEG compressée
+      _photoState = null;
+      var preview = document.getElementById('c27PhotoPreview');
+      var status = document.getElementById('c27PhotoStatus');
+      var input = document.getElementById('c27PhotoInput');
+      if (preview) preview.style.display = 'none';
+      if (status) status.textContent = '';
+      if (input) input.value = '';
+    }
+    return meta;
+  }
+
+  /* ======================= 12. RAPPORT « GPS NON AUTORISÉ » =============== */
+  // Qui n'autorise pas la géolocalisation ? Pour chaque prospecteur : combien
+  // de saisies terrain sans position, lesquelles ont explicitement REFUSÉ la
+  // permission, avec dates, heures et écoles — exportable en CSV.
+  function computeGpsRefusals(scopeAll) {
+    var rows = {};
+    fullFups().forEach(function (f) {
+      if (!f || !f.Timestamp || !f.Expert) return;
+      var isField = f.FollowupType === 'VISIT' || f.FollowupType === 'PROSPECTION';
+      if (!isField) return;
+      if (!scopeAll && !inCampaign(f.Timestamp)) return;
+      var name = canonicalPersonName(f.Expert);
+      var r = rows[name] = rows[name] || { expert: name, field: 0, noGps: 0, denied: 0, entries: [], firstAt: null, lastAt: null };
+      r.field++;
+      var geo = readEntryGeo(f);
+      var status = geo ? String(geo.status || '') : '';
+      if (geo && geo.has) return;
+      r.noGps++;
+      var isDenied = status.indexOf('denied') > -1;
+      if (isDenied) r.denied++;
+      var ms = tsMs(f.Timestamp);
+      if (ms != null) {
+        if (r.firstAt == null || ms < r.firstAt) r.firstAt = ms;
+        if (r.lastAt == null || ms > r.lastAt) r.lastAt = ms;
+      }
+      r.entries.push({ ts: ms, school: f.SchoolName || '', type: f.FollowupType || '', status: isDenied ? 'Permission REFUSÉE' : (status.indexOf('none') > -1 ? 'Position indisponible' : 'Aucune position enregistrée') });
+    });
+    return Object.keys(rows).map(function (k) { return rows[k]; })
+      .filter(function (r) { return r.noGps > 0; })
+      .map(function (r) { r.coverage = r.field ? Math.round(100 * (r.field - r.noGps) / r.field) : null; r.entries.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); return r; })
+      .sort(function (a, b) { return b.denied - a.denied || b.noGps - a.noGps; });
+  }
+
+  function renderGpsRefusalReport(scopeAll) {
+    var data = computeGpsRefusals(scopeAll);
+    var h = '<div class="c27-card"><div class="c27-klabel">Permission de géolocalisation</div>'
+      + '<h3>🚫 Prospecteurs sans suivi GPS</h3>'
+      + '<p class="c27-sub">Saisies terrain (visites/descentes) enregistrées SANS position, par prospecteur. « Permission REFUSÉE » = le téléphone a explicitement bloqué la géolocalisation au moment de la saisie ; « Position indisponible » = délai dépassé ou signal absent (tunnel, intérieur). Couverture GPS = saisies terrain avec position ÷ saisies terrain totales.</p>'
+      + '<div class="c27-filters"><button class="c27-act" onclick="c27ExportGpsRefusals()">⬇️ Export CSV (dates & heures)</button></div>';
+    if (!data.length) {
+      h += '<div class="c27-empty">🎉 Aucune saisie terrain sans position sur la période.</div></div>';
+      return h;
+    }
+    h += '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr><th>Prospecteur</th><th>Saisies terrain</th><th>Sans GPS</th><th>Permission refusée</th><th>Couverture GPS</th><th>Du — au</th><th>Détail</th></tr></thead><tbody>';
+    data.forEach(function (r) {
+      h += '<tr><td class="c27-school">' + _esc(r.expert) + '</td>'
+        + '<td>' + _fmt(r.field) + '</td>'
+        + '<td><b>' + _fmt(r.noGps) + '</b> <span class="c27-muted">(' + Math.round(100 * r.noGps / r.field) + '%)</span></td>'
+        + '<td>' + (r.denied ? '<b style="color:var(--red)">' + _fmt(r.denied) + '</b>' : '0') + '</td>'
+        + '<td>' + (r.coverage == null ? '—' : r.coverage + '%') + '</td>'
+        + '<td class="c27-muted">' + (r.firstAt ? new Date(r.firstAt).toLocaleDateString('fr-FR') : '—') + ' — ' + (r.lastAt ? new Date(r.lastAt).toLocaleDateString('fr-FR') : '—') + '</td>'
+        + '<td><details class="c27-det"><summary>' + r.entries.length + ' saisie(s)</summary>'
+        + r.entries.slice(0, 40).map(function (e) {
+          return '<div class="c27-flag">' + (e.ts ? new Date(e.ts).toLocaleDateString('fr-FR') + ' à ' + new Date(e.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—')
+            + ' · <b>' + _esc(e.school) + '</b> · ' + _esc(e.type) + ' · ' + e.status + '</div>';
+        }).join('') + '</details></td></tr>';
+    });
+    h += '</tbody></table></div>'
+      + '<div class="c27-note">À faire appliquer : la géolocalisation doit être autorisée sur le téléphone professionnel pendant les heures de tournée. Un refus répété pèse aussi sur le Score de confiance ci-dessous (-' + CFG.TRUST.weights.noGps + ' pts max).</div></div>';
+    return h;
+  }
+  window.c27ExportGpsRefusals = function () {
+    var scope = lsGet(LS_KEYS.trustScope, campaignStarted() ? 'c27' : 'all');
+    var data = computeGpsRefusals(scope === 'all');
+    var rows = [['Prospecteur', 'Date', 'Heure', 'Ecole', 'Type', 'Statut GPS']];
+    data.forEach(function (r) {
+      r.entries.forEach(function (e) {
+        rows.push([r.expert, e.ts ? new Date(e.ts).toLocaleDateString('fr-FR') : '', e.ts ? new Date(e.ts).toLocaleTimeString('fr-FR') : '', e.school, e.type, e.status]);
+      });
+    });
+    downloadCsv('nateiva-gps-non-autorise.csv', rows);
+  };
+
+  /* ======================= 13. NAVIGATION SIMPLIFIÉE + ACCÈS CARTE ======== */
+  // Un bouton « 🗺 Carte » de premier niveau ouvre directement la carte des
+  // écoles. Pour les prospecteurs (non-admins), la navigation est allégée aux
+  // onglets essentiels ; les admins et le Super Admin gardent tout.
+  var EXPERT_HIDDEN_PANES = { metrics: 1, market: 1, playbook: 1, intel: 1, glossary: 1 };
+
+  window.c27OpenMap = function () {
+    lsSet(LS_KEYS.tab, 'map');
+    var btn = document.querySelector('.nav-btn[data-pane="c27"]');
+    if (btn) btn.click(); else { if (window._paneDirty) window._paneDirty.c27 = true; rC27(); }
+    setTimeout(rC27, 80);
+  };
+
+  function injectMapShortcut() {
+    try {
+      if (!document.getElementById('c27MapNavBtn')) {
+        var ref = document.querySelector('.nav-btn[data-pane="c27"]');
+        if (ref && ref.parentNode) {
+          var b = document.createElement('button');
+          b.className = 'nav-btn'; b.id = 'c27MapNavBtn';
+          b.innerHTML = '<span class="nav-icon">🗺</span><span class="nav-label">Carte</span><span class="nav-desc">Écoles & Terrain</span>';
+          b.onclick = function () { window.c27OpenMap(); };
+          ref.parentNode.insertBefore(b, ref.nextSibling);
+        }
+      }
+      if (!document.getElementById('c27MapTabBtn')) {
+        var refT = document.querySelector('.bottom-tab[data-pane="c27"]');
+        if (refT && refT.parentNode) {
+          var t = document.createElement('button');
+          t.className = 'bottom-tab'; t.id = 'c27MapTabBtn';
+          t.innerHTML = '<span class="bt-icon">🗺</span><span class="bt-label">Carte</span>';
+          t.onclick = function () { window.c27OpenMap(); };
+          refT.parentNode.insertBefore(t, refT.nextSibling);
+        }
+      }
+    } catch (e) { }
+  }
+
+  function applyNavSimplification() {
+    try {
+      var u = window.currentUser;
+      var isAdmin = u && (typeof canSeeAllData === 'function') && canSeeAllData(u);
+      document.querySelectorAll('.nav-btn[data-pane], .bottom-tab[data-pane]').forEach(function (el) {
+        var key = el.dataset ? el.dataset.pane : '';
+        if (!EXPERT_HIDDEN_PANES[key]) return;
+        el.style.display = (u && !isAdmin) ? 'none' : '';
+      });
+    } catch (e) { }
+  }
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
@@ -1672,27 +1957,35 @@
     // 2. Bandeau « cette année vs N-1 » sur les onglets clés.
     wrapPaneRenderers();
     markAllDirty();
+    // 3. Photo terrain obligatoire + raccourci Carte + navigation allégée.
+    installPhotoGate();
+    injectMapShortcut();
+    applyNavSimplification();
+    setInterval(function () { injectMapShortcut(); applyNavSimplification(); }, 4000);
+    document.addEventListener('change', function (ev) {
+      if (ev.target && ev.target.id === 'fuType') { ensurePhotoField(); updatePhotoUi(); }
+    }, true);
     // Capture GPS : au chargement (si connecté), à l'activation du Workspace et du pane 2027.
     if (window.currentUser) geoCapture('boot');
     document.addEventListener('click', function (ev) {
       var btn = ev.target && ev.target.closest ? ev.target.closest('[data-pane]') : null;
       if (!btn) return;
       var pane = btn.dataset ? btn.dataset.pane : '';
-      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); }
+      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(ensurePhotoField, 250); }
       if (pane === 'c27') { geoCapture('c27'); setTimeout(rC27, 50); }
     }, true);
     // Ouverture du panneau « Nouveau suivi » → horodatage du formulaire.
     var _origActivate = window.activateSuiviPanel;
     if (typeof _origActivate === 'function') {
       window.activateSuiviPanel = function (key, opts) {
-        if (key === 'add') markFormOpened();
+        if (key === 'add') { markFormOpened(); setTimeout(ensurePhotoField, 200); }
         return _origActivate(key, opts);
       };
     }
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
