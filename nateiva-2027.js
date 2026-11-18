@@ -54,7 +54,7 @@
       nightStart: 22, nightEnd: 5, // saisies nocturnes (signal faible)
       // Pondérations du score (sur 100) — le score démarre à 100 et chaque
       // signal retire (poids × part des saisies concernées) points.
-      weights: { noGps: 25, lowAcc: 10, cluster: 30, travel: 30, fast: 20, burst: 15, dupPhone: 20, night: 5 }
+      weights: { noGps: 25, lowAcc: 10, cluster: 30, travel: 30, fast: 20, burst: 15, dupPhone: 20, night: 5, photoFlag: 15 }
     }
   };
   var START_MS = Date.parse(CFG.START_ISO);
@@ -462,7 +462,9 @@
         id: f.ID || '', ts: tsMs(f.Timestamp), tsIso: f.Timestamp,
         expert: canonicalPersonName(f.Expert), school: f.SchoolName || '', key: schoolKey(f.SchoolName),
         type: f.FollowupType || '', phone: (typeof digitsOnly === 'function') ? digitsOnly(f.ContactPhone) : String(f.ContactPhone || ''),
-        city: f.City || '', geo: geo, flags: []
+        city: f.City || '', geo: geo, flags: [],
+        photoFlag: (function () { var m = entryMetaOf(f); if (m.photoReview === 'rejected') return 'rejected'; if (m.photoReviewNeeded === '1' && m.photoReview !== 'ok') return 'pending'; return ''; })(),
+        photoBy: (function () { var m = entryMetaOf(f); return m.photoReviewBy || ''; })()
       };
     }).filter(function (e) { return e.ts != null; });
     entries.sort(function (a, b) { return a.ts - b.ts; });
@@ -496,6 +498,7 @@
       }
       var h = new Date(e.ts).getHours();
       if (h >= T.nightStart || h < T.nightEnd) e.flags.push({ t: 'night', m: 'Saisie nocturne (' + h + 'h)' });
+      if (e.photoFlag) e.flags.push({ t: 'photoFlag', m: e.photoFlag === 'rejected' ? 'Photo REJETÉE par ' + (e.photoBy || 'un admin') + ' après vérification' : 'Nom de l\'école non reconnu sur la photo (en attente de vérification)' });
     });
 
     Object.keys(byExpert).forEach(function (name) {
@@ -550,7 +553,7 @@
     var W = T.weights;
     var report = Object.keys(byExpert).map(function (name) {
       var list = byExpert[name];
-      var counts = { noGps: 0, lowAcc: 0, cluster: 0, travel: 0, fast: 0, burst: 0, dupPhone: 0, night: 0 };
+      var counts = { noGps: 0, lowAcc: 0, cluster: 0, travel: 0, fast: 0, burst: 0, dupPhone: 0, night: 0, photoFlag: 0 };
       var flagged = 0;
       list.forEach(function (e) {
         if (e.flags.length) flagged++;
@@ -998,10 +1001,11 @@
   function renderTrustTab() {
     var scope = lsGet(LS_KEYS.trustScope, campaignStarted() ? 'c27' : 'all');
     var trust = computeTrust(scope === 'all');
-    var h = renderGpsRefusalReport(scope === 'all');
+    var h = renderPhotoReviewQueue();
+    h += renderGpsRefusalReport(scope === 'all');
     h += '<div class="c27-card"><div class="c27-klabel">Intégrité des données terrain</div>'
       + '<h3>🛡 Score de confiance par prospecteur</h3>'
-      + '<p class="c27-sub">Le score démarre à 100 et baisse selon la part de saisies présentant des signaux : GPS manquant sur visite (-' + CFG.TRUST.weights.noGps + ' pts max), écoles multiples au même endroit (-' + CFG.TRUST.weights.cluster + '), déplacement impossible ou position simulée (-' + CFG.TRUST.weights.travel + '), remplissage trop rapide (-' + CFG.TRUST.weights.fast + '), téléphone dupliqué (-' + CFG.TRUST.weights.dupPhone + '), rafales (-' + CFG.TRUST.weights.burst + '), précision faible (-' + CFG.TRUST.weights.lowAcc + '), saisie nocturne (-' + CFG.TRUST.weights.night + '). Chaque pénalité = poids × (saisies concernées ÷ saisies totales). <b>Ce sont des signaux à vérifier, pas des verdicts</b> : une rafale du soir peut être la saisie honnête d\'une tournée hors-ligne.</p>'
+      + '<p class="c27-sub">Le score démarre à 100 et baisse selon la part de saisies présentant des signaux : GPS manquant sur visite (-' + CFG.TRUST.weights.noGps + ' pts max), écoles multiples au même endroit (-' + CFG.TRUST.weights.cluster + '), déplacement impossible ou position simulée (-' + CFG.TRUST.weights.travel + '), remplissage trop rapide (-' + CFG.TRUST.weights.fast + '), téléphone dupliqué (-' + CFG.TRUST.weights.dupPhone + '), rafales (-' + CFG.TRUST.weights.burst + '), photo non concordante ou rejetée (-' + CFG.TRUST.weights.photoFlag + '), précision faible (-' + CFG.TRUST.weights.lowAcc + '), saisie nocturne (-' + CFG.TRUST.weights.night + '). Chaque pénalité = poids × (saisies concernées ÷ saisies totales). <b>Ce sont des signaux à vérifier, pas des verdicts</b> : une rafale du soir peut être la saisie honnête d\'une tournée hors-ligne.</p>'
       + '<div class="c27-filters">'
       + '<select onchange="c27SetTrustScope(this.value)">'
       + '<option value="c27"' + (scope === 'c27' ? ' selected' : '') + '>Campagne ' + CFG.YEAR + '</option>'
@@ -1014,7 +1018,7 @@
     }
     h += '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr>'
       + '<th>#</th><th>Prospecteur</th><th>Score</th><th>Saisies</th><th>Signalées</th><th>Couverture GPS</th><th>Signaux principaux</th></tr></thead><tbody>';
-    var FLAG_SHORT = { noGps: 'GPS manquant', lowAcc: 'Précision faible', cluster: 'Même endroit', travel: 'Déplacement impossible', fast: 'Trop rapide', burst: 'Rafales', dupPhone: 'Tél. dupliqué', night: 'Nocturne' };
+    var FLAG_SHORT = { noGps: 'GPS manquant', lowAcc: 'Précision faible', cluster: 'Même endroit', travel: 'Déplacement impossible', fast: 'Trop rapide', burst: 'Rafales', dupPhone: 'Tél. dupliqué', night: 'Nocturne', photoFlag: 'Photo à vérifier/rejetée' };
     trust.report.forEach(function (r, idx) {
       var tops = Object.keys(r.counts).filter(function (k) { return r.counts[k] > 0; })
         .sort(function (a, b) { return r.counts[b] - r.counts[a]; }).slice(0, 3)
@@ -1042,10 +1046,10 @@
   window.c27ExportTrust = function () {
     var scope = lsGet(LS_KEYS.trustScope, campaignStarted() ? 'c27' : 'all');
     var trust = computeTrust(scope === 'all');
-    var rows = [['Rang', 'Prospecteur', 'Score/100', 'Saisies', 'Signalees', 'Couverture GPS %', 'GPS manquant', 'Precision faible', 'Meme endroit', 'Deplacement impossible', 'Trop rapide', 'Rafales', 'Tel duplique', 'Nocturne']];
+    var rows = [['Rang', 'Prospecteur', 'Score/100', 'Saisies', 'Signalees', 'Couverture GPS %', 'GPS manquant', 'Precision faible', 'Meme endroit', 'Deplacement impossible', 'Trop rapide', 'Rafales', 'Tel duplique', 'Nocturne', 'Photo a verifier']];
     trust.report.forEach(function (r, i) {
       rows.push([i + 1, r.expert, r.score, r.entries, r.flagged, r.gpsRate == null ? '' : r.gpsRate,
-        r.counts.noGps || 0, r.counts.lowAcc || 0, r.counts.cluster || 0, r.counts.travel || 0, r.counts.fast || 0, r.counts.burst || 0, r.counts.dupPhone || 0, r.counts.night || 0]);
+        r.counts.noGps || 0, r.counts.lowAcc || 0, r.counts.cluster || 0, r.counts.travel || 0, r.counts.fast || 0, r.counts.burst || 0, r.counts.dupPhone || 0, r.counts.night || 0, r.counts.photoFlag || 0]);
     });
     downloadCsv('nateiva-score-confiance-' + (scope === 'all' ? 'historique' : CFG.YEAR) + '.csv', rows);
   };
@@ -1728,24 +1732,84 @@
     if (req) req.textContent = needed ? '· OBLIGATOIRE pour une visite' : '';
   }
 
+  var _pendingSubmit = false;
+
+  function currentFormSchoolName() {
+    try {
+      var sel = document.getElementById('fuSchool');
+      if (!sel) return '';
+      if (sel.value === '__other__') { var c = document.getElementById('fuSchoolCustom'); return c ? c.value : ''; }
+      return sel.value || '';
+    } catch (e) { return ''; }
+  }
+
+  // --- OCR (Optical Character Recognition) : lire le nom de l'école sur la photo ---
+  function ensureTesseract(cb) {
+    if (window.Tesseract) return cb(true);
+    var sc = document.getElementById('c27-tess-js');
+    if (sc) { sc.addEventListener('load', function () { cb(!!window.Tesseract); }); return; }
+    sc = document.createElement('script');
+    sc.id = 'c27-tess-js';
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    sc.onload = function () { cb(!!window.Tesseract); };
+    sc.onerror = function () { cb(false); };
+    document.head.appendChild(sc);
+  }
+  function ocrMatchSchool(text, schoolName) {
+    var hay = normalizeText(text || '').replace(/[^a-z0-9 ]/g, ' ');
+    var toks = osmNameTokens(schoolName || '');
+    if (!hay.trim()) return { status: 'unreadable', score: 0 };
+    if (!toks.length) return { status: 'unreadable', score: 0 };
+    var found = 0, strong = false;
+    toks.forEach(function (t) { if (hay.indexOf(t) > -1) { found++; if (t.length >= 4) strong = true; } });
+    var score = Math.round(100 * found / toks.length);
+    return { status: (score >= 40 || strong) ? 'match' : 'mismatch', score: score };
+  }
+  function runPhotoOcr(img, schoolName, done) {
+    try {
+      var scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+      var cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * scale));
+      cv.height = Math.max(1, Math.round(img.height * scale));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      var big = cv.toDataURL('image/jpeg', 0.8);
+      ensureTesseract(function (ok) {
+        if (!ok) return done({ status: 'unreadable', score: 0, text: '' });
+        var finished = false;
+        var to = setTimeout(function () { if (!finished) { finished = true; done({ status: 'unreadable', score: 0, text: '' }); } }, 30000);
+        try {
+          window.Tesseract.recognize(big, 'fra+eng').then(function (res) {
+            if (finished) return; finished = true; clearTimeout(to);
+            var text = (res && res.data && res.data.text) || '';
+            var m = ocrMatchSchool(text, schoolName);
+            m.text = text.replace(/\s+/g, ' ').trim().slice(0, 180);
+            done(m);
+          }).catch(function () { if (!finished) { finished = true; clearTimeout(to); done({ status: 'unreadable', score: 0, text: '' }); } });
+        } catch (e) { if (!finished) { finished = true; clearTimeout(to); done({ status: 'unreadable', score: 0, text: '' }); } }
+      });
+    } catch (e) { done({ status: 'unreadable', score: 0, text: '' }); }
+  }
+
   function onPhotoPicked(ev) {
     var file = ev.target.files && ev.target.files[0];
     var status = document.getElementById('c27PhotoStatus');
     var preview = document.getElementById('c27PhotoPreview');
     _photoState = null;
     if (preview) preview.style.display = 'none';
-    if (!file) { if (status) status.textContent = ''; return; }
+    if (!file) { if (status) status.textContent = ''; _pendingSubmit = false; return; }
     var age = Date.now() - (file.lastModified || 0);
     if (!(age >= -120000 && age <= PHOTO_MAX_AGE_MS)) {
       if (status) { status.textContent = '⛔ Photo refusée : elle doit être prise à l\'instant avec l\'appareil photo, pas choisie dans la galerie.'; status.style.color = '#B91C1C'; }
       ev.target.value = '';
+      _pendingSubmit = false;
       return;
     }
     var img = new Image();
     var url = URL.createObjectURL(file);
     img.onload = function () {
+      var dataUrl = '', fits = true;
       try {
-        var quality = 0.55, size = 560, dataUrl = '';
+        var quality = 0.55, size = 560;
         for (var attempt = 0; attempt < 4; attempt++) {
           var scale = Math.min(1, size / Math.max(img.width, img.height));
           var cv = document.createElement('canvas');
@@ -1756,22 +1820,29 @@
           if (dataUrl.length <= PHOTO_MAX_B64) break;
           quality -= 0.12; size -= 90;
         }
-        var fits = dataUrl.length <= PHOTO_MAX_B64;
+        fits = dataUrl.length <= PHOTO_MAX_B64;
+      } catch (e) { dataUrl = ''; }
+      if (preview && dataUrl) { preview.src = dataUrl; preview.style.display = ''; }
+      if (status) { status.textContent = '🔍 Lecture du nom de l\'école sur la photo… (quelques secondes)'; status.style.color = '#B45309'; }
+      var schoolName = currentFormSchoolName();
+      runPhotoOcr(img, schoolName, function (ocr) {
         _photoState = {
           data: fits ? dataUrl : '',
           takenAt: new Date().toISOString(),
           fileAt: new Date(file.lastModified || Date.now()).toISOString(),
-          bytes: file.size || 0
+          bytes: file.size || 0,
+          ocrStatus: ocr.status, ocrScore: ocr.score || 0, ocrText: ocr.text || ''
         };
-        if (preview) { preview.src = dataUrl; preview.style.display = ''; }
-        if (status) { status.textContent = '✅ Photo prise sur place à ' + new Date().toLocaleTimeString('fr-FR') + (fits ? '' : ' (photo lourde : attestation seule enregistrée)'); status.style.color = '#047857'; }
-      } catch (e) {
-        _photoState = { data: '', takenAt: new Date().toISOString(), fileAt: '', bytes: file.size || 0 };
-        if (status) { status.textContent = '✅ Photo enregistrée'; status.style.color = '#047857'; }
-      }
-      URL.revokeObjectURL(url);
+        if (status) {
+          if (ocr.status === 'match') { status.textContent = '✅ Photo vérifiée : le nom de l\'école est reconnu sur la photo (' + ocr.score + '% des mots retrouvés).'; status.style.color = '#047857'; }
+          else if (ocr.status === 'mismatch') { status.textContent = '⚠️ Nom de l\'école non reconnu sur la photo — la visite sera soumise à vérification par votre admin.'; status.style.color = '#B45309'; }
+          else { status.textContent = '📷 Panneau illisible sur la photo — la visite sera soumise à vérification par votre admin.'; status.style.color = '#B45309'; }
+        }
+        URL.revokeObjectURL(url);
+        if (_pendingSubmit) { _pendingSubmit = false; setTimeout(function () { window.submitFollowup(); }, 400); }
+      });
     };
-    img.onerror = function () { if (status) { status.textContent = 'Fichier illisible — reprenez la photo.'; status.style.color = '#B91C1C'; } URL.revokeObjectURL(url); };
+    img.onerror = function () { if (status) { status.textContent = 'Fichier illisible — reprenez la photo.'; status.style.color = '#B91C1C'; } _pendingSubmit = false; URL.revokeObjectURL(url); };
     img.src = url;
   }
 
@@ -1781,15 +1852,20 @@
     if (typeof orig !== 'function' || orig.__c27PhotoGate) return;
     var wrapped = function () {
       if (photoRequired() && !_photoState) {
+        if (typeof isSuperAdmin === 'function' && isSuperAdmin(window.currentUser)) {
+          _toast('⚠️ Visite sans photo — autorisé pour le Super Admin uniquement');
+          return orig.apply(this, arguments);
+        }
+        // Enregistrer → l'appareil photo s'ouvre ; après la photo (et sa
+        // vérification), l'enregistrement repart automatiquement.
         ensurePhotoField();
         var wrap = document.getElementById('c27PhotoWrap');
         if (wrap) { wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-        if (typeof isSuperAdmin === 'function' && isSuperAdmin(window.currentUser)) {
-          _toast('⚠️ Visite sans photo — autorisé pour le Super Admin uniquement');
-        } else {
-          _toast('📸 Photo obligatoire : prenez la photo de l\'école sur place avant d\'enregistrer la visite', true);
-          return;
-        }
+        _pendingSubmit = true;
+        var input = document.getElementById('c27PhotoInput');
+        if (input) { input.click(); }
+        _toast('📸 Prenez la photo de la façade ou de la plaque de l\'école pour enregistrer la visite');
+        return;
       }
       return orig.apply(this, arguments);
     };
@@ -1803,6 +1879,11 @@
       meta.photoFileAt = _photoState.fileAt;   // horodatage du fichier (contrôle anti-galerie)
       meta.photoBytes = String(_photoState.bytes || 0);
       if (_photoState.data) meta.photoData = _photoState.data; // vignette JPEG compressée
+      // Résultat OCR (lecture du nom de l'école sur la photo)
+      meta.photoOcrStatus = _photoState.ocrStatus || 'unreadable';
+      meta.photoOcrScore = String(_photoState.ocrScore || 0);
+      if (_photoState.ocrText) meta.photoOcrText = _photoState.ocrText;
+      if (meta.photoOcrStatus !== 'match') meta.photoReviewNeeded = '1'; // → revue par l'admin
       _photoState = null;
       var preview = document.getElementById('c27PhotoPreview');
       var status = document.getElementById('c27PhotoStatus');
@@ -1812,6 +1893,96 @@
       if (input) input.value = '';
     }
     return meta;
+  }
+
+  /* ======================= 11b. REVUE DES PHOTOS (SUB ADMIN) ============== */
+  // Les visites dont la photo n'a pas permis de reconnaître le nom de l'école
+  // (nom non concordant ou panneau illisible) arrivent dans cette file. Le
+  // Sub Admin / Super Admin assigné voit la photo, le texte lu par l'OCR, et
+  // Valide ou Rejette ; la décision est enregistrée dans la saisie.
+  var PHOTO_REVIEW_LS = 'nateiva_c27_photo_reviews';
+
+  function entryMetaOf(f) {
+    try { return splitFollowupNotes(f.Notes).meta || {}; } catch (e) { return {}; }
+  }
+  function buildPhotoReviewList() {
+    var localDecisions = lsGet(PHOTO_REVIEW_LS, {});
+    return fullVisibleFups().filter(function (f) {
+      if (!f || !f.ID) return false;
+      var m = entryMetaOf(f);
+      return m.photoReviewNeeded === '1' && !m.photoReview && !localDecisions[f.ID];
+    }).map(function (f) {
+      var m = entryMetaOf(f);
+      return {
+        id: f.ID, ts: tsMs(f.Timestamp), expert: canonicalPersonName(f.Expert), school: f.SchoolName || '',
+        city: f.City || '', photo: m.photoData || '', ocrStatus: m.photoOcrStatus || 'unreadable',
+        ocrScore: m.photoOcrScore || '0', ocrText: m.photoOcrText || '', photoAt: m.photoAt || ''
+      };
+    }).sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+  }
+
+  window.c27ReviewPhoto = function (id, decision) {
+    var entry = fullFups().filter(function (f) { return f && String(f.ID) === String(id); })[0];
+    if (!entry) { _toast('Saisie introuvable', true); return; }
+    var split = splitFollowupNotes(entry.Notes);
+    var meta = split.meta || {};
+    meta.photoReview = decision;                       // 'ok' | 'rejected'
+    meta.photoReviewBy = _me();
+    meta.photoReviewAt = new Date().toISOString();
+    var marker = (typeof FOLLOWUP_META_MARKER === 'string') ? FOLLOWUP_META_MARKER : '[NATEIVA_META]';
+    var newNotes = (split.text ? split.text + '\n' : '') + marker + JSON.stringify(meta);
+    var body = {
+      timestamp: entry.Timestamp, expert: entry.Expert, schoolName: entry.SchoolName,
+      contactName: entry.ContactName || '', contactPhone: entry.ContactPhone || '',
+      followupType: entry.FollowupType || 'FOLLOWUP', notes: newNotes,
+      outcome: entry.Outcome || '', nextAction: entry.NextAction || '', nextDate: entry.NextDate || '',
+      cost: entry.Cost || 0, status: entry.Status || 'En cours', city: entry.City || '',
+      sector: entry.Sector || '', schoolType: entry.SchoolType || '', category: entry.Category || '',
+      effectif: entry.Effectif || '', location: entry.Location || '', contactRole: entry.ContactRole || ''
+    };
+    var localDecisions = lsGet(PHOTO_REVIEW_LS, {});
+    localDecisions[id] = { decision: decision, by: _me(), at: new Date().toISOString() };
+    lsSet(PHOTO_REVIEW_LS, localDecisions);
+    if (typeof backendRequest === 'function' && typeof isBackendConfigured === 'function' && isBackendConfigured() && window.nateivaApiToken) {
+      backendRequest('/api/followups/' + encodeURIComponent(id), { method: 'PUT', body: body })
+        .then(function (res) {
+          _toast(res && res.success ? (decision === 'ok' ? 'Visite validée ✓' : 'Visite rejetée — signalée dans le score de confiance') : 'Décision gardée sur cet appareil (synchronisation impossible)', !(res && res.success));
+          repaint();
+        })
+        .catch(function () { _toast('Décision gardée sur cet appareil (hors-ligne)'); repaint(); });
+    } else {
+      _toast('Décision gardée sur cet appareil (hors-ligne)');
+      repaint();
+    }
+  };
+
+  function renderPhotoReviewQueue() {
+    var list = buildPhotoReviewList();
+    var h = '<div class="c27-card"><div class="c27-klabel">Contrôle photo · Sub Admin & Super Admin</div>'
+      + '<h3>📸 Visites à vérifier (' + list.length + ')</h3>'
+      + '<p class="c27-sub">Le système lit le nom de l\'école sur la photo prise sur place (OCR = Optical Character Recognition, lecture automatique du texte). Quand le nom lu ne correspond pas à l\'école saisie, ou que le panneau est illisible, la visite arrive ici pour décision. « % des mots retrouvés » = mots significatifs du nom de l\'école retrouvés dans le texte lu ÷ mots significatifs totaux.</p>';
+    if (!list.length) {
+      h += '<div class="c27-empty">✨ Aucune visite en attente de vérification.</div></div>';
+      return h;
+    }
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">';
+    list.slice(0, 30).forEach(function (r) {
+      h += '<div style="border:1px solid var(--g200);border-radius:14px;overflow:hidden;background:var(--paper)">'
+        + (r.photo ? '<img src="' + r.photo + '" style="width:100%;height:130px;object-fit:cover" alt="Photo école">' : '<div class="c27-empty" style="padding:18px">Pas de vignette (photo lourde — attestation seule)</div>')
+        + '<div style="padding:12px 14px">'
+        + '<div class="c27-school">' + _esc(r.school) + '</div>'
+        + '<div class="c27-muted">' + _esc(r.expert) + ' · ' + (r.ts ? new Date(r.ts).toLocaleDateString('fr-FR') + ' ' + new Date(r.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—') + (r.city ? ' · ' + _esc(r.city) : '') + '</div>'
+        + '<div style="margin:8px 0"><span class="c27-chip ' + (r.ocrStatus === 'mismatch' ? 'pend' : 'froid') + '">' + (r.ocrStatus === 'mismatch' ? '⚠️ Nom non concordant (' + _esc(r.ocrScore) + '%)' : '📷 Panneau illisible') + '</span></div>'
+        + (r.ocrText ? '<div class="c27-flag">Texte lu : « ' + _esc(r.ocrText) + ' »</div>' : '')
+        + '<div style="display:flex;gap:8px;margin-top:10px">'
+        + '<button class="c27-act primary" style="flex:1" onclick="c27ReviewPhoto(' + jsArg(r.id) + ',\'ok\')">✅ Valider</button>'
+        + '<button class="c27-act" style="flex:1" onclick="c27ReviewPhoto(' + jsArg(r.id) + ',\'rejected\')">⛔ Rejeter</button>'
+        + '</div></div></div>';
+    });
+    h += '</div>'
+      + (list.length > 30 ? '<div class="c27-muted" style="margin-top:10px">' + (list.length - 30) + ' autres en attente…</div>' : '')
+      + '<div class="c27-note">Valider = visite authentique (le signal est levé). Rejeter = visite douteuse : elle reste signalée et pèse sur le score de confiance du prospecteur. La décision est enregistrée dans la saisie (nom du décideur + date).</div></div>';
+    return h;
   }
 
   /* ======================= 12. RAPPORT « GPS NON AUTORISÉ » =============== */
@@ -1985,7 +2156,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
