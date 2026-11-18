@@ -1995,6 +1995,97 @@
     return h;
   }
 
+  /* ======================= 11c. FORMULAIRE SIMPLIFIÉ (MODE TERRAIN) ======= */
+  // Le formulaire complet compte ~45 champs : trop pour une saisie sur le
+  // terrain. En mode simple (par défaut pour les prospecteurs/ambassadeurs),
+  // seuls les champs essentiels restent visibles ; le reste est replié sous
+  // « Détails complémentaires » et reste facultatif. Les admins gardent le
+  // formulaire complet par défaut ; chacun peut basculer.
+  var FORM_MODE_LS = 'nateiva_c27_form_mode'; // 'simple' | 'full' | '' (auto)
+  var SIMPLE_HIDE_IDS = ['fuAppMode', 'fuBudgetTiming', 'fuCallDuration', 'fuCallRating', 'fuCallStart', 'fuCampusCount', 'fuCategory', 'fuCurrentSystem', 'fuDaysToAnswer', 'fuDecisionMaker', 'fuDecisionReach', 'fuDeliveryMode', 'fuDepositor', 'fuDepotDate', 'fuDepotLocation', 'fuFollowedUpBy', 'fuInternetQuality', 'fuPowerQuality', 'fuPreferredChannel', 'fuProductType', 'fuProspectionYear', 'fuRecordedAt', 'fuRequestedModules', 'fuResponseDate', 'fuResponseReceived', 'fuSecondCall', 'fuSector', 'fuSupportRequest', 'fuTimesCalled', 'fuToSuperior', 'fuWhatsappDocs'];
+
+  function formModeActive() {
+    var stored = lsGet(FORM_MODE_LS, '');
+    if (stored === 'simple' || stored === 'full') return stored;
+    var isAdmin = window.currentUser && (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
+    return isAdmin ? 'full' : 'simple';
+  }
+  window.c27ToggleFormMode = function () {
+    lsSet(FORM_MODE_LS, formModeActive() === 'simple' ? 'full' : 'simple');
+    applySimpleForm();
+  };
+
+  function applySimpleForm() {
+    try {
+      var notes = document.getElementById('fuNotes');
+      if (!notes) return;
+      var simple = formModeActive() === 'simple';
+      var hidden = 0;
+      SIMPLE_HIDE_IDS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el || !el.closest) return;
+        var field = el.closest('.form-field');
+        if (!field) return;
+        // Jamais replier un bloc spécifique au canal (lettre/email) géré par l'app.
+        if (field.closest && field.closest('#fuLetterEmailFields')) return;
+        field.style.display = simple ? 'none' : '';
+        if (simple) hidden++;
+        field.setAttribute('data-c27-adv', '1');
+      });
+      var btn = document.getElementById('c27FormModeBtn');
+      if (!btn) {
+        var notesField = notes.closest ? notes.closest('.form-field') : null;
+        if (notesField && notesField.parentNode) {
+          var holder = document.createElement('div');
+          holder.className = 'form-field full';
+          holder.id = 'c27FormModeHolder';
+          holder.innerHTML = '<button type="button" id="c27FormModeBtn" class="c27-ask-btn" style="margin-top:0;width:100%" onclick="c27ToggleFormMode()"></button>';
+          notesField.parentNode.insertBefore(holder, notesField);
+          btn = document.getElementById('c27FormModeBtn');
+        }
+      }
+      if (btn) {
+        btn.textContent = simple
+          ? '➕ Détails complémentaires (' + hidden + ' champs facultatifs — appareil, budget, courrier…)'
+          : '➖ Revenir au mode simple (saisie rapide terrain)';
+      }
+    } catch (e) { }
+  }
+
+  /* ======================= 11d. MISE À JOUR AUTOMATIQUE =================== */
+  // Les téléphones du terrain gardent parfois une vieille version en cache.
+  // Toutes les 5 minutes (et au retour sur l'app), on compare la version
+  // affichée avec celle du serveur ; si une nouvelle version existe, un
+  // bandeau « Actualiser » apparaît.
+  function currentPillVersion() {
+    try {
+      var pill = document.querySelector('.meta-pill.red');
+      var m = pill && pill.textContent.match(/v[\d.]+/);
+      return m ? m[0] : '';
+    } catch (e) { return ''; }
+  }
+  var _updateShown = false;
+  function checkForUpdate() {
+    if (_updateShown || !navigator.onLine) return;
+    try {
+      fetch(window.location.pathname + '?update_check=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.text() : ''; })
+        .then(function (t) {
+          var m = t && t.match(/meta-pill red">[^<]*?(v[\d.]+)/);
+          var mine = currentPillVersion();
+          if (m && mine && m[1] !== mine) {
+            _updateShown = true;
+            var bar = document.createElement('div');
+            bar.id = 'c27UpdateBar';
+            bar.style.cssText = 'position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:99999;background:#1C1917;color:#F4EBD6;border:1.5px solid #D4AF37;border-radius:999px;padding:12px 20px;font:700 13.5px "DM Sans",sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;display:flex;align-items:center;gap:10px';
+            bar.innerHTML = '⬆️ Nouvelle version ' + _esc(m[1]) + ' disponible — <u>toucher pour actualiser</u>';
+            bar.onclick = function () { window.location.reload(); };
+            document.body.appendChild(bar);
+          }
+        }).catch(function () { });
+    } catch (e) { }
+  }
+
   /* ======================= 12. RAPPORT « GPS NON AUTORISÉ » =============== */
   // Qui n'autorise pas la géolocalisation ? Pour chaque prospecteur : combien
   // de saisies terrain sans position, lesquelles ont explicitement REFUSÉ la
@@ -2142,7 +2233,11 @@
     installPhotoGate();
     injectMapShortcut();
     applyNavSimplification();
-    setInterval(function () { injectMapShortcut(); applyNavSimplification(); }, 4000);
+    setInterval(function () { injectMapShortcut(); applyNavSimplification(); applySimpleForm(); }, 4000);
+    // 4. Mise à jour automatique : vérification 5 min + au retour sur l'app.
+    setInterval(checkForUpdate, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) checkForUpdate(); });
+    setTimeout(checkForUpdate, 20000);
     document.addEventListener('change', function (ev) {
       if (ev.target && ev.target.id === 'fuType') { ensurePhotoField(); updatePhotoUi(); }
     }, true);
@@ -2152,14 +2247,14 @@
       var btn = ev.target && ev.target.closest ? ev.target.closest('[data-pane]') : null;
       if (!btn) return;
       var pane = btn.dataset ? btn.dataset.pane : '';
-      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(ensurePhotoField, 250); }
+      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(function () { ensurePhotoField(); applySimpleForm(); }, 250); }
       if (pane === 'c27') { geoCapture('c27'); setTimeout(rC27, 50); }
     }, true);
     // Ouverture du panneau « Nouveau suivi » → horodatage du formulaire.
     var _origActivate = window.activateSuiviPanel;
     if (typeof _origActivate === 'function') {
       window.activateSuiviPanel = function (key, opts) {
-        if (key === 'add') { markFormOpened(); setTimeout(ensurePhotoField, 200); }
+        if (key === 'add') { markFormOpened(); setTimeout(function () { ensurePhotoField(); applySimpleForm(); }, 200); }
         return _origActivate(key, opts);
       };
     }
