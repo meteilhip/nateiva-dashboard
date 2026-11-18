@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
@@ -61,6 +61,38 @@ function canDeleteFollowup(viewer) {
   return !!viewer && viewer.role === "SuperAdmin" && String(viewer.username || "").trim().toLowerCase() === "noah";
 }
 
+// === Campagne 2027 — fresh start + attribution exclusive ===
+// CAMPAIGN_START_ISO: every saisie dated on/after this instant belongs to the 2027
+// campaign. The FIRST member to log a note on a school in 2027 owns that school for
+// the campaign; anyone else must hold an approved claim request (demande validée par
+// le Super Admin) before the server accepts their saisie on it.
+const CAMPAIGN_YEAR = Number(process.env.NATEIVA_CAMPAIGN_YEAR || 2027);
+const CAMPAIGN_START_ISO = process.env.NATEIVA_CAMPAIGN_START || `${CAMPAIGN_YEAR}-01-01T00:00:00`;
+
+function isCampaignTimestamp(ts) {
+  const ms = Date.parse(String(ts || ""));
+  const startMs = Date.parse(CAMPAIGN_START_ISO);
+  return Number.isFinite(ms) && Number.isFinite(startMs) && ms >= startMs;
+}
+
+function isSuperAdminViewer(viewer) {
+  return !!viewer && viewer.role === "SuperAdmin";
+}
+
+// Returns null when allowed, or an error message when the 2027 lock blocks the save.
+async function checkCampaignLock(viewer, schoolName, timestamp) {
+  if (!isCampaignTimestamp(timestamp)) return null; // pre-2027 entries follow the old rules
+  if (isSuperAdminViewer(viewer)) return null; // Super Admin bypasses the lock
+  const claim = await findCampaignClaimForSchool(CAMPAIGN_START_ISO, schoolName);
+  if (!claim) return null; // unclaimed school — this save claims it
+  const sameExpert = String(claim.owner || "").trim().toLowerCase() === String(viewer.fullName || "").trim().toLowerCase();
+  const sameCreator = String(claim.ownerUsername || "").trim().toLowerCase() === String(viewer.username || "").trim().toLowerCase();
+  if (sameExpert || sameCreator) return null; // the 2027 owner
+  const approved = await hasApprovedClaimRequest(CAMPAIGN_YEAR, schoolName, viewer.username);
+  if (approved) return null; // Super Admin already granted access
+  return `École déjà attribuée à ${claim.owner} pour la campagne ${CAMPAIGN_YEAR}. Envoyez une demande d'attribution au Super Admin.`;
+}
+
 app.get("/health", function healthHandler(req, res) {
   res.json({
     success: true,
@@ -98,7 +130,7 @@ app.post("/api/auth/login", async function loginHandler(req, res) {
 app.get("/api/bootstrap", authRequired, async function bootstrapHandler(req, res) {
   try {
     const viewer = await loadViewer(req);
-    const payload = await getBootstrapPayload(viewer, { callsDefault: defaultCallCount });
+    const payload = await getBootstrapPayload(viewer, { callsDefault: defaultCallCount, campaignYear: CAMPAIGN_YEAR, campaignStartIso: CAMPAIGN_START_ISO });
     return res.json({ success: true, ...payload });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -108,6 +140,14 @@ app.get("/api/bootstrap", authRequired, async function bootstrapHandler(req, res
 app.post("/api/followups", authRequired, async function createFollowupHandler(req, res) {
   try {
     const viewer = await loadViewer(req);
+    const lockError = await checkCampaignLock(
+      viewer,
+      req.body.schoolName || req.body.SchoolName || "",
+      req.body.timestamp || req.body.Timestamp || new Date().toISOString()
+    );
+    if (lockError) {
+      return res.status(403).json({ success: false, error: lockError, code: "SCHOOL_LOCKED" });
+    }
     const followup = await upsertFollowup({
       ...req.body,
       Timestamp: req.body.timestamp || req.body.Timestamp || new Date().toISOString(),
@@ -239,6 +279,62 @@ app.post("/api/users/access", authRequired, async function updateAccessHandler(r
       return res.status(404).json({ success: false, error: "Utilisateur introuvable" });
     }
     return res.json({ success: true, user });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// === Campagne 2027 — demandes d'attribution d'école ===
+app.get("/api/claims/requests", authRequired, async function listClaimRequestsHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const requests = await listClaimRequests(viewer, CAMPAIGN_YEAR);
+    return res.json({ success: true, requests, campaign: { year: CAMPAIGN_YEAR, startIso: CAMPAIGN_START_ISO } });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/claims/requests", authRequired, async function createClaimRequestHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const schoolName = String(req.body.schoolName || "").trim();
+    if (!schoolName) {
+      return res.status(400).json({ success: false, error: "Nom d'école requis" });
+    }
+    const claim = await findCampaignClaimForSchool(CAMPAIGN_START_ISO, schoolName);
+    const request = await createClaimRequest({
+      campaignYear: CAMPAIGN_YEAR,
+      schoolName,
+      requestedByUsername: viewer.username,
+      requestedByFullName: viewer.fullName,
+      currentOwnerFullName: claim ? claim.owner : "",
+      message: String(req.body.message || "").trim()
+    });
+    if (!request) {
+      return res.status(400).json({ success: false, error: "Demande invalide" });
+    }
+    return res.json({ success: true, request });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/claims/requests/:id/decision", authRequired, async function decideClaimRequestHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    if (!isSuperAdminViewer(viewer)) {
+      return res.status(403).json({ success: false, error: "Seul le Super Admin peut décider d'une demande d'attribution" });
+    }
+    const decision = String(req.body.decision || "").trim().toLowerCase();
+    if (decision !== "approved" && decision !== "denied") {
+      return res.status(400).json({ success: false, error: "Décision invalide (approved | denied)" });
+    }
+    const request = await decideClaimRequest(Number(req.params.id), viewer, decision, String(req.body.note || "").trim());
+    if (!request) {
+      return res.status(404).json({ success: false, error: "Demande introuvable" });
+    }
+    return res.json({ success: true, request });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

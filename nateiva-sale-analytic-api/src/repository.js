@@ -383,11 +383,168 @@ async function logSyncEvent(entry) {
   );
 }
 
+// === Campagne 2027 — attribution d'écoles (claims) et demandes de réattribution ===
+// schoolKeyNormalize mirrors the frontend schoolKey()/normalizeText() exactly so that the
+// same school name always maps to the same key on both sides (accents stripped, lowercased,
+// whitespace collapsed).
+function schoolKeyNormalize(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function mapClaimRequest(row) {
+  return {
+    id: row.id,
+    campaignYear: row.campaign_year,
+    schoolName: row.school_name,
+    schoolKey: row.school_key,
+    requestedByUsername: row.requested_by_username,
+    requestedByFullName: row.requested_by_fullname,
+    currentOwnerFullName: row.current_owner_fullname,
+    message: row.message || "",
+    status: row.status,
+    decidedByUsername: row.decided_by_username || "",
+    decisionNote: row.decision_note || "",
+    decidedAt: row.decided_at,
+    createdAt: row.created_at
+  };
+}
+
+// First (earliest) author of a saisie per school within the campaign window =
+// the 2027 owner of that school. Computed live from the followups table so it
+// can never drift from reality.
+async function listCampaignClaims(campaignStartIso) {
+  const rows = await query(
+    `SELECT school_name, expert, created_by_username, event_timestamp
+     FROM followups
+     WHERE deleted_at IS NULL
+       AND event_timestamp >= ?
+     ORDER BY event_timestamp ASC, id ASC`,
+    [campaignStartIso]
+  );
+  const map = new Map();
+  for (const row of rows) {
+    const key = schoolKeyNormalize(row.school_name);
+    if (!key || map.has(key)) continue;
+    map.set(key, {
+      schoolKey: key,
+      schoolName: row.school_name,
+      owner: row.expert,
+      ownerUsername: row.created_by_username || "",
+      firstAt: row.event_timestamp
+    });
+  }
+  return Array.from(map.values());
+}
+
+async function findCampaignClaimForSchool(campaignStartIso, schoolName) {
+  const key = schoolKeyNormalize(schoolName);
+  if (!key) return null;
+  const claims = await listCampaignClaims(campaignStartIso);
+  return claims.find((claim) => claim.schoolKey === key) || null;
+}
+
+async function hasApprovedClaimRequest(campaignYear, schoolName, username) {
+  const key = schoolKeyNormalize(schoolName);
+  const rows = await query(
+    `SELECT id FROM school_claim_requests
+     WHERE campaign_year = ?
+       AND school_key = ?
+       AND LOWER(requested_by_username) = LOWER(?)
+       AND status = 'approved'
+     LIMIT 1`,
+    [campaignYear, key, username || ""]
+  );
+  return rows.length > 0;
+}
+
+async function createClaimRequest(input) {
+  const key = schoolKeyNormalize(input.schoolName);
+  if (!key) return null;
+  // One live (pending or approved) request per user+school+campaign — no duplicates.
+  const existingRows = await query(
+    `SELECT * FROM school_claim_requests
+     WHERE campaign_year = ?
+       AND school_key = ?
+       AND LOWER(requested_by_username) = LOWER(?)
+       AND status IN ('pending', 'approved')
+     ORDER BY id DESC
+     LIMIT 1`,
+    [input.campaignYear, key, input.requestedByUsername || ""]
+  );
+  if (existingRows.length) return mapClaimRequest(existingRows[0]);
+  const result = await query(
+    `INSERT INTO school_claim_requests
+      (campaign_year, school_name, school_key, requested_by_username, requested_by_fullname, current_owner_fullname, message)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.campaignYear,
+      String(input.schoolName || "").trim(),
+      key,
+      input.requestedByUsername || "",
+      input.requestedByFullName || "",
+      input.currentOwnerFullName || "",
+      input.message || ""
+    ]
+  );
+  const rows = await query(`SELECT * FROM school_claim_requests WHERE id = ? LIMIT 1`, [result.insertId]);
+  return rows.length ? mapClaimRequest(rows[0]) : null;
+}
+
+async function listClaimRequests(viewer, campaignYear) {
+  const seesAll = !!(viewer && viewer.permissions && viewer.permissions.dataScope === "all") || (viewer && viewer.role === "SuperAdmin");
+  const rows = seesAll
+    ? await query(
+        `SELECT * FROM school_claim_requests WHERE campaign_year = ? ORDER BY FIELD(status,'pending','approved','denied'), id DESC`,
+        [campaignYear]
+      )
+    : await query(
+        `SELECT * FROM school_claim_requests
+         WHERE campaign_year = ? AND LOWER(requested_by_username) = LOWER(?)
+         ORDER BY id DESC`,
+        [campaignYear, viewer ? viewer.username : ""]
+      );
+  return rows.map(mapClaimRequest);
+}
+
+async function decideClaimRequest(id, viewer, decision, note) {
+  const rows = await query(`SELECT * FROM school_claim_requests WHERE id = ? LIMIT 1`, [id]);
+  if (!rows.length) return null;
+  const status = decision === "approved" ? "approved" : "denied";
+  await query(
+    `UPDATE school_claim_requests
+     SET status = ?, decided_by_username = ?, decision_note = ?, decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [status, viewer ? viewer.username : "", note || "", id]
+  );
+  const updated = await query(`SELECT * FROM school_claim_requests WHERE id = ? LIMIT 1`, [id]);
+  return updated.length ? mapClaimRequest(updated[0]) : null;
+}
+
 async function getBootstrapPayload(viewer, extra) {
+  const campaignStartIso = (extra && extra.campaignStartIso) || "2027-01-01T00:00:00";
+  const campaignYear = (extra && extra.campaignYear) || 2027;
+  let campaignClaims = [];
+  let claimRequests = [];
+  try {
+    campaignClaims = await listCampaignClaims(campaignStartIso);
+    claimRequests = await listClaimRequests(viewer, campaignYear);
+  } catch (e) {
+    // Claims table not migrated yet — bootstrap must keep working.
+    campaignClaims = [];
+    claimRequests = [];
+  }
   return {
     user: viewer,
     users: await listUsers(),
     followups: await listVisibleFollowups(viewer),
+    campaignClaims,
+    claimRequests,
+    campaign: { year: campaignYear, startIso: campaignStartIso },
     meta: Object.assign(
       {
         backendProject: "nateiva-sale-analytic-api",
@@ -408,5 +565,12 @@ module.exports = {
   updateFollowup,
   deleteFollowup,
   logSyncEvent,
-  getBootstrapPayload
+  getBootstrapPayload,
+  schoolKeyNormalize,
+  listCampaignClaims,
+  findCampaignClaimForSchool,
+  hasApprovedClaimRequest,
+  createClaimRequest,
+  listClaimRequests,
+  decideClaimRequest
 };

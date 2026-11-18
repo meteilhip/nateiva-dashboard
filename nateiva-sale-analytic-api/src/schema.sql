@@ -65,3 +65,25 @@ CREATE TABLE IF NOT EXISTS sync_events (
   PRIMARY KEY (id),
   KEY sync_events_username_idx (username)
 );
+
+CREATE TABLE IF NOT EXISTS school_claim_requests (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  campaign_year INT NOT NULL DEFAULT 2027,
+  school_name VARCHAR(255) NOT NULL,
+  school_key VARCHAR(255) NOT NULL,
+  requested_by_username VARCHAR(120) NOT NULL,
+  requested_by_fullname VARCHAR(255) NOT NULL DEFAULT '',
+  current_owner_fullname VARCHAR(255) NOT NULL DEFAULT '',
+  message TEXT NULL,
+  status ENUM('pending','approved','denied') NOT NULL DEFAULT 'pending',
+  decided_by_username VARCHAR(120) NOT NULL DEFAULT '',
+  decision_note TEXT NULL,
+  decided_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY scr_school_key_idx (school_key),
+  KEY scr_status_idx (status),
+  KEY scr_campaign_idx (campaign_year),
+  KEY scr_requested_by_idx (requested_by_username)
+);
