@@ -73,6 +73,13 @@
   function _attr(v) { return (typeof attrEsc === 'function') ? attrEsc(v) : _esc(v); }
   function _fmt(v) { return (typeof fmt === 'function') ? fmt(v) : String(Math.round(v || 0)); }
   function _me() { return (window.currentUser && window.currentUser.fullName) || ''; }
+  // Accès aux données COMPLÈTES (toutes années), même quand le dashboard est
+  // filtré sur une campagne : les moteurs internes (attributions, confiance,
+  // comparaisons annuelles, carte) ont besoin de tout l'historique.
+  var ORIG_FN = {};
+  function fullRows() { var f = ORIG_FN.getAllRawRows || window.getAllRawRows; return typeof f === 'function' ? f() : []; }
+  function fullFups() { var f = ORIG_FN.getAllFollowups || window.getAllFollowups; return typeof f === 'function' ? f() : []; }
+  function fullVisibleFups() { var f = ORIG_FN.getVisibleFollowups || window.getVisibleFollowups; return typeof f === 'function' ? f() : []; }
   function _toast(msg, bad) { if (typeof showToast === 'function') showToast(msg, !!bad); }
   function dayDiff(a, b) { return Math.max(0, Math.round((a - b) / 86400000)); }
 
@@ -193,7 +200,7 @@
     (c27State.serverClaims || []).forEach(function (c) {
       if (c && c.schoolKey) map[c.schoolKey] = { owner: c.owner, ownerUsername: c.ownerUsername || '', firstAt: c.firstAt, schoolName: c.schoolName, src: 'server' };
     });
-    var fups = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+    var fups = fullFups();
     fups.forEach(function (f) {
       if (!f || !inCampaign(f.Timestamp)) return;
       var k = schoolKey(f.SchoolName); if (!k) return;
@@ -371,8 +378,8 @@
   var STAGE_LABEL = { chaud: '🔥 Chaud', tiede: '🌤 Tiède', nouveau: '✨ Nouveau', froid: '❄️ Froid', perdu: '⛔ Perdu' };
 
   function buildPriorityList() {
-    if (typeof buildSchoolRecords !== 'function' || typeof getAllRawRows !== 'function' || typeof getAllFollowups !== 'function') return [];
-    var raws = getAllRawRows(), fups = getAllFollowups();
+    if (typeof buildSchoolRecords !== 'function') return [];
+    var raws = fullRows(), fups = fullFups();
     var recs = buildSchoolRecords(raws, fups);
     var claims = getClaimsMap();
     // Écoles ayant eu de l'activité AVANT la campagne 2027 : elles restent dans
@@ -444,7 +451,7 @@
 
   /* ======================= 4. MOTEUR SCORE DE CONFIANCE =================== */
   function computeTrust(scopeAll) {
-    var fups = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
+    var fups = fullFups();
     var entries = fups.filter(function (f) {
       if (!f || !f.Timestamp || !f.Expert) return false;
       return scopeAll ? true : inCampaign(f.Timestamp);
@@ -573,9 +580,9 @@
   }
 
   /* ======================= 5. PILOTAGE — KPI YoY + INSIGHTS IA ============ */
-  function computeYoY() {
-    var fups = (typeof getAllFollowups === 'function') ? getAllFollowups() : [];
-    var raws = (typeof getAllRawRows === 'function') ? getAllRawRows() : [];
+  function computeYoY(fupsIn, rawsIn) {
+    var fups = fupsIn || fullFups();
+    var raws = rawsIn || fullRows();
     var prevFups = fups.filter(function (f) { return !inCampaign(f.Timestamp); });
     var curFups = fups.filter(function (f) { return inCampaign(f.Timestamp); });
     var prevRaws = raws.filter(function (r) { var m = tsMs(r.t); return m != null && m < START_MS; });
@@ -781,18 +788,21 @@
 
     h += '<div class="c27-tabs">'
       + tabBtn('list', '📞 Liste prioritaire', tab)
+      + tabBtn('map', '🗺 Carte des écoles', tab)
       + tabBtn('claims', '👑 Attributions & demandes', tab)
       + (admin ? tabBtn('pilot', '📊 Pilotage & IA', tab) : '')
       + (admin ? tabBtn('trust', '🛡 Score de confiance', tab) : '')
       + '</div>';
 
     if (tab === 'list') h += renderPriorityTab(priority, admin);
+    else if (tab === 'map') h += renderMapTab(admin);
     else if (tab === 'claims') h += renderClaimsTab(myClaims, superA, admin);
     else if (tab === 'pilot') h += renderPilotTab(priority);
     else if (tab === 'trust') h += renderTrustTab();
 
     h += '</div>';
     el.innerHTML = h;
+    if (tab === 'map') setTimeout(initMap, 60);
   }
   window.rC27 = rC27;
 
@@ -1038,9 +1048,454 @@
     downloadCsv('nateiva-score-confiance-' + (scope === 'all' ? 'historique' : CFG.YEAR) + '.csv', rows);
   };
 
+  /* ======================= 8. PÉRIMÈTRE ANNUEL (YEAR SCOPE) ============== */
+  // Dès le 1er janvier 2027, TOUT le dashboard démarre sur la campagne en
+  // cours : les autres onglets ne voient que les données de l'année. Le
+  // sélecteur d'année dans l'en-tête permet de consulter les campagnes
+  // passées (« Campagne 2026 & avant » regroupe tout l'historique pré-2027).
+  var SCOPE_KEY = 'nateiva_c27_year_scope';
+
+  function activeCampaignYear() {
+    var y = new Date(Date.now()).getFullYear();
+    return y >= CFG.YEAR ? Math.max(y, CFG.YEAR) : null; // null = campagne pas commencée
+  }
+  function scopeWindow(year) {
+    if (year <= CFG.YEAR - 1) return [-Infinity, START_MS]; // 2026 & avant = tout le pré-2027
+    return [Date.parse(year + '-01-01T00:00:00'), Date.parse((year + 1) + '-01-01T00:00:00')];
+  }
+  function scopeActive() {
+    var s = lsGet(SCOPE_KEY, 'auto');
+    if (s === 'auto') { var y = activeCampaignYear(); return y ? String(y) : 'all'; }
+    return s; // 'all' ou une année en chaîne
+  }
+  function inActiveScope(ms) {
+    if (ms == null) return true; // jamais masquer une saisie sans date lisible
+    var s = scopeActive();
+    if (s === 'all') return true;
+    var w = scopeWindow(Number(s));
+    return ms >= w[0] && ms < w[1];
+  }
+  function scopeYears() {
+    var years = {};
+    fullRows().forEach(function (r) { var m = tsMs(r.t); if (m != null) years[new Date(m).getFullYear()] = 1; });
+    fullFups().forEach(function (f) { var m = tsMs(f.Timestamp); if (m != null) years[new Date(m).getFullYear()] = 1; });
+    var cy = activeCampaignYear(); if (cy) years[cy] = 1;
+    years[CFG.YEAR - 1] = 1; // l'option « Campagne 2026 & avant » existe toujours
+    // Les années pré-2027 sont regroupées sous une seule option (CFG.YEAR - 1).
+    var out = {};
+    Object.keys(years).map(Number).forEach(function (y) { out[y >= CFG.YEAR ? y : (CFG.YEAR - 1)] = 1; });
+    return Object.keys(out).map(Number).sort(function (a, b) { return b - a; });
+  }
+  function markAllDirty() {
+    try { Object.keys(window._paneDirty || {}).forEach(function (k) { window._paneDirty[k] = true; }); } catch (e) { }
+  }
+  window.c27SetScope = function (v) {
+    lsSet(SCOPE_KEY, v);
+    markAllDirty();
+    injectScopePill();
+    if (typeof window.renderAll === 'function') { try { window.renderAll(); } catch (e) { } }
+    repaint();
+  };
+
+  function installScopeWrappers() {
+    if (ORIG_FN.getAllRawRows) return;
+    if (typeof window.getAllRawRows === 'function') {
+      ORIG_FN.getAllRawRows = window.getAllRawRows;
+      window.getAllRawRows = function () { return ORIG_FN.getAllRawRows().filter(function (r) { return inActiveScope(tsMs(r && r.t)); }); };
+    }
+    if (typeof window.getAllFollowups === 'function') {
+      ORIG_FN.getAllFollowups = window.getAllFollowups;
+      window.getAllFollowups = function () { return ORIG_FN.getAllFollowups().filter(function (f) { return inActiveScope(tsMs(f && f.Timestamp)); }); };
+    }
+    if (typeof window.getVisibleFollowups === 'function') {
+      ORIG_FN.getVisibleFollowups = window.getVisibleFollowups;
+      window.getVisibleFollowups = function () { return ORIG_FN.getVisibleFollowups().filter(function (f) { return inActiveScope(tsMs(f && f.Timestamp)); }); };
+    }
+  }
+
+  function scopeLabel(s) {
+    if (s === 'all') return 'Tout l\'historique';
+    var y = Number(s);
+    return y <= CFG.YEAR - 1 ? 'Campagne ' + (CFG.YEAR - 1) + ' & avant' : 'Campagne ' + y;
+  }
+  function injectScopePill() {
+    try {
+      var block = document.querySelector('.meta-block');
+      if (!block) return;
+      var pill = document.getElementById('c27ScopePill');
+      if (!pill) {
+        pill = document.createElement('span');
+        pill.id = 'c27ScopePill';
+        pill.className = 'meta-pill';
+        pill.style.cssText = 'background:#1C1917;color:#F4EBD6;border:1px solid #B08D2F;display:inline-flex;align-items:center;gap:7px;cursor:pointer';
+        block.insertBefore(pill, block.firstChild);
+      }
+      var s = scopeActive();
+      var stored = lsGet(SCOPE_KEY, 'auto');
+      var years = scopeYears();
+      var opts = '';
+      years.forEach(function (y) {
+        var val = String(y <= CFG.YEAR - 1 ? (CFG.YEAR - 1) : y);
+        if (opts.indexOf('value="' + val + '"') > -1) return;
+        opts += '<option value="' + val + '"' + (stored !== 'all' && s === val ? ' selected' : '') + '>' + scopeLabel(val) + '</option>';
+      });
+      opts += '<option value="all"' + (stored === 'all' ? ' selected' : '') + '>Tout l\'historique</option>';
+      pill.innerHTML = '📅 <select id="c27ScopeSel" style="background:transparent;color:#F4EBD6;border:none;font:inherit;font-weight:700;outline:none;cursor:pointer" onchange="c27SetScope(this.value)">' + opts + '</select>';
+      var sel = document.getElementById('c27ScopeSel');
+      if (sel) { for (var i = 0; i < sel.options.length; i++) sel.options[i].style.color = '#1C1917'; }
+    } catch (e) { }
+  }
+
+  /* ======================= 9. BANDEAU « CETTE ANNÉE VS N-1 » ============== */
+  // Injecté en tête des onglets Dashboard, Analytics, Équipe, Activité et
+  // Marché dès que la campagne 2027 est ouverte : les KPI clés de l'année en
+  // cours comparés à la campagne précédente À PÉRIODE ÉQUIVALENTE, avec un
+  // Indice de forme global. En consultation d'une année passée, le bandeau
+  // devient un marqueur « Archive ».
+  var STRIP_PANES = { home: 1, metrics: 1, team: 1, market: 1, activity: 1 };
+
+  function visibleDataForStrip() {
+    var fups = fullVisibleFups();
+    var rows = fullRows();
+    var seeAll = (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
+    if (!seeAll && window.currentUser) {
+      rows = rows.filter(function (r) { return samePerson(r.e, _me()); });
+      // fullVisibleFups est déjà restreint aux saisies de l'utilisateur côté données
+    }
+    return { rows: rows, fups: fups };
+  }
+
+  function formIndex(yoy) {
+    // Indice de forme = moyenne des variations (%) vs N-1 à période équivalente
+    // sur 4 KPI : saisies, écoles touchées, visites, signatures. Borné à ±100.
+    var pairs = [[yoy.cur.entries, yoy.prevW.entries], [yoy.cur.schools, yoy.prevW.schools], [yoy.cur.visits, yoy.prevW.visits], [yoy.cur.signed, yoy.prevW.signed]];
+    var ds = [];
+    pairs.forEach(function (p) {
+      if (p[1] > 0) ds.push(Math.max(-100, Math.min(100, 100 * (p[0] - p[1]) / p[1])));
+      else if (p[0] > 0) ds.push(100);
+    });
+    if (!ds.length) return null;
+    return Math.round(ds.reduce(function (a, b) { return a + b; }, 0) / ds.length);
+  }
+
+  function buildStripHtml() {
+    var s = scopeActive();
+    if (s === 'all' && !campaignStarted()) return '';
+    if (s !== 'all' && Number(s) <= CFG.YEAR - 1) {
+      return '<div class="c27-strip c27-strip-archive">📦 <b>Archive — ' + scopeLabel(s) + '</b> · lecture des données passées. '
+        + '<a href="javascript:void(0)" onclick="c27SetScope(\'auto\')">Revenir à la campagne en cours →</a></div>';
+    }
+    if (!campaignStarted()) return '';
+    var data = visibleDataForStrip();
+    var yoy = computeYoY(data.fups, data.rows);
+    var fi = formIndex(yoy);
+    var mood = fi == null ? ['⚪', 'Pas encore de référence', 'c27-fi-na'] : fi >= 10 ? ['🟢', 'En avance sur ' + (CFG.YEAR - 1), 'c27-fi-good'] : fi >= -10 ? ['🟡', 'Au niveau de ' + (CFG.YEAR - 1), 'c27-fi-mid'] : ['🔴', 'En retard sur ' + (CFG.YEAR - 1), 'c27-fi-bad'];
+    function chip(label, cur, prev, goodUp) {
+      return '<span class="c27-chipk"><i>' + label + '</i><b>' + _fmt(cur) + '</b>' + deltaChip(cur, prev, goodUp) + '</span>';
+    }
+    return '<div class="c27-strip">'
+      + '<span class="c27-fi ' + mood[2] + '" title="Indice de forme = moyenne des variations en % vs campagne précédente à période équivalente (J+' + yoy.windowDays + ') sur 4 KPI : saisies, écoles touchées, visites, signatures. Borné à ±100.">' + mood[0] + ' <b>' + (fi == null ? '—' : (fi > 0 ? '+' : '') + fi) + '</b><em>' + mood[1] + '</em></span>'
+      + chip('Saisies', yoy.cur.entries, yoy.prevW.entries, true)
+      + chip('Écoles', yoy.cur.schools, yoy.prevW.schools, true)
+      + chip('Visites', yoy.cur.visits, yoy.prevW.visits, true)
+      + chip('Signatures', yoy.cur.signed, yoy.prevW.signed, true)
+      + chip('Conversion %', Math.round(yoy.cur.conv * 10) / 10, Math.round(yoy.prevW.conv * 10) / 10, true)
+      + '<span class="c27-chipk"><i>vs ' + (CFG.YEAR - 1) + ' à J+' + yoy.windowDays + '</i><b>📅</b></span>'
+      + '</div>';
+  }
+
+  var STRIP_CSS = ''
+    + '.c27-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px;padding:13px 16px;border:1px solid #E7E5E4;border-radius:14px;background:linear-gradient(135deg,#FAFAF9,#F7F1E3);box-shadow:0 1px 2px rgba(0,0,0,.03);font-size:12.5px}'
+    + '.c27-strip-archive{background:#1C1917;color:#F4EBD6;border-color:#B08D2F;font-size:13px}'
+    + '.c27-strip-archive a{color:#D4AF37;font-weight:700;text-decoration:none}'
+    + '.c27-chipk{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #E7E5E4;border-radius:999px;padding:6px 12px}'
+    + '.c27-chipk i{font-style:normal;font-family:"JetBrains Mono",monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#78716C}'
+    + '.c27-chipk b{font-family:"Fraunces",serif;font-size:16px}'
+    + '.c27-chipk .c27-delta{margin-top:0}'
+    + '.c27-fi{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:7px 14px;font-size:13px;border:1px solid transparent}'
+    + '.c27-fi b{font-family:"Fraunces",serif;font-size:17px}.c27-fi em{font-style:normal;font-size:11.5px;font-weight:600}'
+    + '.c27-fi-good{background:#ECFDF5;color:#047857;border-color:#A7F3D0}.c27-fi-mid{background:#FFFBEB;color:#B45309;border-color:#FDE68A}'
+    + '.c27-fi-bad{background:#FEF2F2;color:#B91C1C;border-color:#FECACA}.c27-fi-na{background:#F5F5F4;color:#78716C}'
+    + '.c27-delta{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:10.5px;padding:2px 7px;border-radius:6px}'
+    + '.c27-d-up{background:#ECFDF5;color:#047857}.c27-d-down{background:#FEF2F2;color:#B91C1C}.c27-d-na{background:#F5F5F4;color:#78716C}';
+
+  function injectStripCss() {
+    if (document.getElementById('c27-strip-style')) return;
+    var st = document.createElement('style');
+    st.id = 'c27-strip-style';
+    st.textContent = STRIP_CSS;
+    document.head.appendChild(st);
+  }
+
+  function prependStrip(paneKey) {
+    try {
+      if (!window.currentUser) return;
+      injectStripCss();
+      var pane = document.getElementById('p-' + paneKey);
+      if (!pane) return;
+      var old = pane.querySelector('.c27-strip'); if (old) old.remove();
+      var html = buildStripHtml();
+      if (!html) return;
+      var div = document.createElement('div');
+      div.innerHTML = html;
+      pane.insertBefore(div.firstChild, pane.firstChild);
+    } catch (e) { }
+  }
+
+  function wrapPaneRenderers() {
+    try {
+      if (typeof window._getPaneRenderers !== 'function') return;
+      var m = window._getPaneRenderers();
+      Object.keys(STRIP_PANES).forEach(function (key) {
+        var orig = m[key];
+        if (typeof orig !== 'function' || orig.__c27Wrapped) return;
+        var wrapped = function () { var r = orig.apply(this, arguments); prependStrip(key); return r; };
+        wrapped.__c27Wrapped = true;
+        m[key] = wrapped;
+      });
+    } catch (e) { }
+  }
+
+  /* ======================= 10. CARTE DES ÉCOLES + TERRAIN ================= */
+  // Carte Leaflet (bibliothèque libre) + fonds OpenStreetMap (gratuit, sans
+  // clé API). Position précise = meilleure position GPS des saisies 2027 ;
+  // sinon position approximative au centre-ville (dispersée de façon stable)
+  // en attendant la première visite géolocalisée.
+  var CITY_COORDS = {
+    'DOUALA': [4.0511, 9.7679], 'YAOUNDE': [3.8480, 11.5021], 'BAFOUSSAM': [5.4781, 10.4179],
+    'BAMENDA': [5.9631, 10.1591], 'GAROUA': [9.3265, 13.3958], 'MAROUA': [10.5956, 14.3247],
+    'NGAOUNDERE': [7.3167, 13.5833], 'BERTOUA': [4.5776, 13.6846], 'EBOLOWA': [2.9000, 11.1500],
+    'BUEA': [4.1527, 9.2920], 'LIMBE': [4.0215, 9.2125], 'KUMBA': [4.6363, 9.4469],
+    'KRIBI': [2.9404, 9.9098], 'EDEA': [3.8000, 10.1333], 'NKONGSAMBA': [4.9547, 9.9404],
+    'DSCHANG': [5.4437, 10.0533], 'FOUMBAN': [5.7287, 10.8984], 'MBALMAYO': [3.5167, 11.5000],
+    'SANGMELIMA': [2.9333, 11.9833], 'BAFIA': [4.7500, 11.2333], 'KUMBO': [6.2000, 10.6667],
+    'MBOUDA': [5.6264, 10.2542], 'LOUM': [4.7182, 9.7351], 'YAGOUA': [10.3428, 15.2406], 'MEIGANGA': [6.5167, 14.3000]
+  };
+  var STAGE_COLOR = { gagne: '#047857', chaud: '#DC2626', tiede: '#D97706', nouveau: '#2563EB', froid: '#78716C', perdu: '#44403C' };
+  var _map = null, _mapLayer = null, _trackLayer = null;
+  var _mapState = { city: '', q: '', stage: '', precise: '', expert: '', period: 'c27' };
+
+  function ensureLeaflet(cb) {
+    if (window.L && window.L.map) return cb();
+    if (!document.getElementById('c27-leaflet-css')) {
+      var link = document.createElement('link');
+      link.id = 'c27-leaflet-css'; link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    var sc = document.getElementById('c27-leaflet-js');
+    if (sc) { sc.addEventListener('load', cb); return; }
+    sc = document.createElement('script');
+    sc.id = 'c27-leaflet-js';
+    sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    sc.onload = cb;
+    sc.onerror = function () {
+      var box = document.getElementById('c27MapBox');
+      if (box) box.innerHTML = '<div class="c27-empty">Impossible de charger la carte (connexion requise la première fois). Réessayez en ligne.</div>';
+    };
+    document.head.appendChild(sc);
+  }
+
+  function schoolGpsIndex() {
+    // meilleure position GPS par école : priorité visites, puis précision
+    var idx = {};
+    fullFups().forEach(function (f) {
+      if (!f) return;
+      var geo = readEntryGeo(f);
+      if (!geo || !geo.has) return;
+      var k = schoolKey(f.SchoolName); if (!k) return;
+      var isVisit = f.FollowupType === 'VISIT' || f.FollowupType === 'PROSPECTION';
+      var cur = idx[k];
+      var better = !cur || (isVisit && !cur.isVisit) || (isVisit === !!cur.isVisit && (geo.acc || 9999) < (cur.acc || 9999));
+      if (better) idx[k] = { lat: geo.lat, lng: geo.lng, acc: geo.acc, at: f.Timestamp, isVisit: isVisit };
+    });
+    return idx;
+  }
+  function jitterFor(key, span) {
+    var hsh = 0; for (var i = 0; i < key.length; i++) { hsh = ((hsh << 5) - hsh + key.charCodeAt(i)) | 0; }
+    var a = ((hsh % 1000) / 1000) * Math.PI * 2, r = (((hsh >> 10) % 1000) / 1000) * span;
+    return [Math.sin(a) * r, Math.cos(a) * r];
+  }
+
+  function buildMapSchools() {
+    var recs = (typeof buildSchoolRecords === 'function') ? buildSchoolRecords(fullRows(), fullFups()) : [];
+    var gps = schoolGpsIndex();
+    var claims = getClaimsMap();
+    return recs.filter(function (r) { return r && r.schoolName; }).map(function (r) {
+      var k = r.key || schoolKey(r.schoolName);
+      var g = gps[k] || null;
+      var city = String(r.city || '').toUpperCase().trim();
+      var cc = CITY_COORDS[city] || null;
+      var pos = null, precise = false;
+      if (g) { pos = [g.lat, g.lng]; precise = true; }
+      else if (cc) { var j = jitterFor(k, 0.025); pos = [cc[0] + j[0], cc[1] + j[1]]; }
+      return {
+        key: k, name: r.schoolName, city: city, stage: r.stage || 'nouveau',
+        effectif: (r.effectif && r.effectif > 0) ? r.effectif : null,
+        standing: r.standing || '', type: r.type || '', quartier: r.quartier || r.zone || '',
+        location: r.location || '', phone: r.phone || '', contact: r.contactName || '',
+        rate: r.rate != null ? r.rate : null, lastTouch: r.lastTouch || null,
+        owner: claims[k] ? claims[k].owner : '', pos: pos, precise: precise, gpsAt: g ? g.at : null
+      };
+    }).filter(function (s) { return !!s.pos; });
+  }
+
+  window.c27MapFilter = function (k, v) { _mapState[k] = v; refreshMapMarkers(); };
+  window.c27MapTrack = function (k, v) { _mapState[k] = v; refreshTrack(); };
+
+  function renderMapTab(admin) {
+    var schools = buildMapSchools();
+    var cities = {}; schools.forEach(function (s) { if (s.city) cities[s.city] = (cities[s.city] || 0) + 1; });
+    var experts = {};
+    if (admin) fullFups().forEach(function (f) { if (f && f.Expert) { var g = readEntryGeo(f); if (g && g.has) experts[canonicalPersonName(f.Expert)] = 1; } });
+    var nPrecise = schools.filter(function (s) { return s.precise; }).length;
+    var h = '<div class="c27-card">'
+      + '<div class="c27-klabel">Carte interactive · OpenStreetMap</div>'
+      + '<h3>Écoles sur la carte</h3>'
+      + '<p class="c27-sub">Recherchez une école par son nom ou sa zone. Marqueur plein = position GPS réelle (relevée lors d\'une saisie) ; marqueur pâle = position approximative au centre de la ville, précisée automatiquement à la première visite géolocalisée. ' + _fmt(nPrecise) + ' position(s) précise(s) sur ' + _fmt(schools.length) + ' écoles cartographiées.</p>'
+      + '<div class="c27-filters">'
+      + '<input type="search" placeholder="🔎 École, quartier, repère…" value="' + _attr(_mapState.q) + '" oninput="c27MapFilter(\'q\',this.value)">'
+      + '<select onchange="c27MapFilter(\'city\',this.value)"><option value="">Toutes les villes</option>' + Object.keys(cities).sort().map(function (c) { return '<option' + (_mapState.city === c ? ' selected' : '') + ' value="' + _attr(c) + '">' + _esc(c) + ' (' + cities[c] + ')</option>'; }).join('') + '</select>'
+      + '<select onchange="c27MapFilter(\'stage\',this.value)"><option value="">Tous les statuts</option><option value="gagne"' + (_mapState.stage === 'gagne' ? ' selected' : '') + '>🏆 Signées</option>' + Object.keys(STAGE_LABEL).map(function (s) { return '<option' + (_mapState.stage === s ? ' selected' : '') + ' value="' + s + '">' + STAGE_LABEL[s] + '</option>'; }).join('') + '</select>'
+      + '<select onchange="c27MapFilter(\'precise\',this.value)"><option value="">GPS + approximatives</option><option value="1"' + (_mapState.precise === '1' ? ' selected' : '') + '>📍 Positions GPS seulement</option></select>'
+      + '</div>'
+      + '<div id="c27MapBox" style="height:480px;border-radius:16px;overflow:hidden;border:1px solid var(--g200);background:var(--g50)"><div class="c27-empty">Chargement de la carte…</div></div>'
+      + '<div id="c27MapCount" class="c27-muted" style="margin-top:10px"></div>'
+      + '<div class="c27-note">Légende : <b style="color:#047857">●</b> signée · <b style="color:#DC2626">●</b> chaude · <b style="color:#D97706">●</b> tiède · <b style="color:#2563EB">●</b> nouvelle · <b style="color:#78716C">●</b> froide · <b style="color:#44403C">●</b> perdue. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute).</div>'
+      + '</div>';
+    if (admin) {
+      h += '<div class="c27-card"><div class="c27-klabel">Suivi terrain · Super Admin & Admins</div>'
+        + '<h3>🥾 Tournées des prospecteurs</h3>'
+        + '<p class="c27-sub">Affiche sur la carte les points GPS des saisies d\'un prospecteur, numérotés dans l\'ordre chronologique et reliés par son parcours : vous voyez où il est réellement passé, quand, et la distance parcourue (calculée à vol d\'oiseau entre points successifs — distance de Haversine).</p>'
+        + '<div class="c27-filters">'
+        + '<select onchange="c27MapTrack(\'expert\',this.value)"><option value="">— Choisir un prospecteur —</option>' + Object.keys(experts).sort().map(function (e2) { return '<option' + (_mapState.expert === e2 ? ' selected' : '') + ' value="' + _attr(e2) + '">' + _esc(e2) + '</option>'; }).join('') + '</select>'
+        + '<select onchange="c27MapTrack(\'period\',this.value)">'
+        + '<option value="today"' + (_mapState.period === 'today' ? ' selected' : '') + '>Aujourd\'hui</option>'
+        + '<option value="7d"' + (_mapState.period === '7d' ? ' selected' : '') + '>7 derniers jours</option>'
+        + '<option value="30d"' + (_mapState.period === '30d' ? ' selected' : '') + '>30 derniers jours</option>'
+        + '<option value="c27"' + (_mapState.period === 'c27' ? ' selected' : '') + '>Toute la campagne</option></select>'
+        + '</div>'
+        + '<div id="c27TrackInfo" class="c27-muted"></div>'
+        + '</div>';
+    }
+    return h;
+  }
+
+  function initMap() {
+    var box = document.getElementById('c27MapBox');
+    if (!box) return;
+    ensureLeaflet(function () {
+      box.innerHTML = '';
+      var center = CITY_COORDS['DOUALA'];
+      _map = L.map(box, { scrollWheelZoom: true }).setView(center, 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(_map);
+      _mapLayer = L.layerGroup().addTo(_map);
+      _trackLayer = L.layerGroup().addTo(_map);
+      refreshMapMarkers();
+      refreshTrack();
+    });
+  }
+
+  function refreshMapMarkers() {
+    if (!_map || !_mapLayer) return;
+    _mapLayer.clearLayers();
+    var q = normalizeText(_mapState.q || '');
+    var list = buildMapSchools().filter(function (s) {
+      if (_mapState.city && s.city !== _mapState.city) return false;
+      if (_mapState.stage && s.stage !== _mapState.stage) return false;
+      if (_mapState.precise === '1' && !s.precise) return false;
+      if (q) {
+        var hay = normalizeText([s.name, s.quartier, s.location, s.city].join(' '));
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    var bounds = [];
+    list.forEach(function (s) {
+      var color = STAGE_COLOR[s.stage] || '#2563EB';
+      var mk = L.circleMarker(s.pos, {
+        radius: s.precise ? 9 : 7,
+        color: color, weight: s.precise ? 2.5 : 1.5,
+        fillColor: color, fillOpacity: s.precise ? 0.85 : 0.3,
+        dashArray: s.precise ? null : '3,4'
+      });
+      var pop = '<div style="font-family:\'DM Sans\',sans-serif;min-width:230px;max-width:280px">'
+        + '<div style="font-weight:800;font-size:14px;margin-bottom:3px">' + _esc(s.name) + '</div>'
+        + '<div style="font-size:11px;color:#78716C;margin-bottom:8px">' + _esc(s.city) + (s.quartier ? ' · ' + _esc(s.quartier) : '') + (s.location ? ' · ' + _esc(s.location) : '') + (s.precise ? '' : ' · <i>position approximative</i>') + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px;margin-bottom:8px">'
+        + '<div>📶 <b>' + (STAGE_LABEL[s.stage] || (s.stage === 'gagne' ? '🏆 Signée' : s.stage)) + '</b></div>'
+        + '<div>🎯 Taux : <b>' + (s.rate != null ? s.rate + '%' : '—') + '</b></div>'
+        + '<div>👩‍🎓 Élèves : <b>' + (s.effectif ? _fmt(s.effectif) : '—') + '</b></div>'
+        + '<div>🏷 Standing : <b>' + (s.standing ? _esc(s.standing) : '—') + '</b></div>'
+        + '<div>🏫 ' + (s.type ? _esc(s.type) : '—') + '</div>'
+        + '<div>👑 ' + (s.owner ? _esc(s.owner) : 'Libre') + '</div>'
+        + '</div>'
+        + (s.contact || s.phone ? '<div style="font-size:12px;margin-bottom:8px">' + _esc(s.contact || '') + (s.phone ? ' · <a href="tel:' + _attr(s.phone) + '">' + _esc(s.phone) + '</a>' : '') + '</div>' : '')
+        + '<div style="display:flex;gap:6px">'
+        + '<button onclick="c27StartEntry(' + jsArg(s.name) + ',' + jsArg(s.city) + ',' + jsArg(s.contact) + ',' + jsArg(s.phone) + ')" style="flex:1;background:#1C1917;color:#F4EBD6;border:none;border-radius:8px;padding:7px;font-weight:700;cursor:pointer">✍️ Saisir</button>'
+        + (s.phone ? '<a href="tel:' + _attr(s.phone) + '" style="flex:1;text-align:center;border:1px solid #E7E5E4;border-radius:8px;padding:7px;text-decoration:none;color:#1C1917;font-weight:700">📞</a>' : '')
+        + '</div></div>';
+      mk.bindPopup(pop);
+      mk.addTo(_mapLayer);
+      bounds.push(s.pos);
+    });
+    var count = document.getElementById('c27MapCount');
+    if (count) count.textContent = list.length + ' école(s) affichée(s)' + (_mapState.q ? ' pour « ' + _mapState.q + ' »' : '');
+    if (bounds.length) { try { _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 }); } catch (e) { } }
+  }
+
+  function refreshTrack() {
+    if (!_map || !_trackLayer) return;
+    _trackLayer.clearLayers();
+    var info = document.getElementById('c27TrackInfo');
+    if (!_mapState.expert) { if (info) info.textContent = ''; return; }
+    var now = Date.now();
+    var from = _mapState.period === 'today' ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+      : _mapState.period === '7d' ? now - 7 * 86400000
+        : _mapState.period === '30d' ? now - 30 * 86400000
+          : START_MS;
+    var pts = fullFups().filter(function (f) {
+      if (!f || !samePerson(f.Expert, _mapState.expert)) return false;
+      var m = tsMs(f.Timestamp);
+      if (m == null || m < from) return false;
+      var g = readEntryGeo(f);
+      return g && g.has;
+    }).map(function (f) {
+      var g = readEntryGeo(f);
+      return { lat: g.lat, lng: g.lng, ts: tsMs(f.Timestamp), school: f.SchoolName || '', type: f.FollowupType || '' };
+    }).sort(function (a, b) { return a.ts - b.ts; });
+    if (!pts.length) { if (info) info.textContent = 'Aucun point GPS pour ' + _mapState.expert + ' sur cette période.'; return; }
+    var km = 0, path = [];
+    pts.forEach(function (p, i) {
+      path.push([p.lat, p.lng]);
+      if (i > 0) km += kmBetween(pts[i - 1], p);
+      var mk = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="background:#B08D2F;color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font:700 12px \'DM Sans\',sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.3)">' + (i + 1) + '</div>',
+          iconSize: [26, 26], iconAnchor: [13, 13]
+        })
+      });
+      mk.bindPopup('<b>' + (i + 1) + '. ' + _esc(p.school) + '</b><br>' + new Date(p.ts).toLocaleString('fr-FR') + ' · ' + _esc(p.type));
+      mk.addTo(_trackLayer);
+    });
+    L.polyline(path, { color: '#B08D2F', weight: 3, dashArray: '6,8', opacity: 0.8 }).addTo(_trackLayer);
+    if (info) info.innerHTML = '<b>' + _esc(_mapState.expert) + '</b> : ' + pts.length + ' point(s) GPS · ~' + km.toFixed(1) + ' km parcourus (vol d\'oiseau entre points successifs) · du ' + new Date(pts[0].ts).toLocaleString('fr-FR') + ' au ' + new Date(pts[pts.length - 1].ts).toLocaleString('fr-FR');
+    try { _map.fitBounds(path, { padding: [40, 40], maxZoom: 15 }); } catch (e) { }
+  }
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
+    injectStripCss();
+    // 1. Périmètre annuel : filtre global des données + sélecteur d'année.
+    installScopeWrappers();
+    injectScopePill();
+    // Le pill doit survivre aux re-rendus de l'en-tête (login/logout).
+    setInterval(injectScopePill, 4000);
     // Enregistrement du pane dans le registre des rendus + état « à rafraîchir ».
     try {
       if (window._paneDirty) window._paneDirty.c27 = true;
@@ -1049,6 +1504,9 @@
         if (m && !m.c27) m.c27 = rC27;
       }
     } catch (e) { }
+    // 2. Bandeau « cette année vs N-1 » sur les onglets clés.
+    wrapPaneRenderers();
+    markAllDirty();
     // Capture GPS : au chargement (si connecté), à l'activation du Workspace et du pane 2027.
     if (window.currentUser) geoCapture('boot');
     document.addEventListener('click', function (ev) {
@@ -1068,6 +1526,9 @@
     }
     flushPendingRequests();
   }
+  // Points d'entrée internes pour les tests automatisés (sans effet en prod).
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive };
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
