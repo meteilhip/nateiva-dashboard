@@ -1907,10 +1907,15 @@
   }
   function buildPhotoReviewList() {
     var localDecisions = lsGet(PHOTO_REVIEW_LS, {});
+    var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser);
     return fullVisibleFups().filter(function (f) {
       if (!f || !f.ID) return false;
       var m = entryMetaOf(f);
-      return m.photoReviewNeeded === '1' && !m.photoReview && !localDecisions[f.ID];
+      if (!(m.photoReviewNeeded === '1' && !m.photoReview && !localDecisions[f.ID])) return false;
+      // Un Sub Admin prospecte aussi : il ne peut pas valider SES PROPRES
+      // visites — elles remontent au Super Admin.
+      if (!superA && samePerson(f.Expert, _me())) return false;
+      return true;
     }).map(function (f) {
       var m = entryMetaOf(f);
       return {
@@ -1924,6 +1929,11 @@
   window.c27ReviewPhoto = function (id, decision) {
     var entry = fullFups().filter(function (f) { return f && String(f.ID) === String(id); })[0];
     if (!entry) { _toast('Saisie introuvable', true); return; }
+    // Garde-fou : on ne décide jamais sur sa propre visite (sauf Super Admin).
+    if (samePerson(entry.Expert, _me()) && !((typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser))) {
+      _toast('Vos propres visites sont vérifiées par le Super Admin', true);
+      return;
+    }
     var split = splitFollowupNotes(entry.Notes);
     var meta = split.meta || {};
     meta.photoReview = decision;                       // 'ok' | 'rejected'
@@ -1960,7 +1970,7 @@
     var list = buildPhotoReviewList();
     var h = '<div class="c27-card"><div class="c27-klabel">Contrôle photo · Sub Admin & Super Admin</div>'
       + '<h3>📸 Visites à vérifier (' + list.length + ')</h3>'
-      + '<p class="c27-sub">Le système lit le nom de l\'école sur la photo prise sur place (OCR = Optical Character Recognition, lecture automatique du texte). Quand le nom lu ne correspond pas à l\'école saisie, ou que le panneau est illisible, la visite arrive ici pour décision. « % des mots retrouvés » = mots significatifs du nom de l\'école retrouvés dans le texte lu ÷ mots significatifs totaux.</p>';
+      + '<p class="c27-sub">Le système lit le nom de l\'école sur la photo prise sur place (OCR = Optical Character Recognition, lecture automatique du texte). Quand le nom lu ne correspond pas à l\'école saisie, ou que le panneau est illisible, la visite arrive ici pour décision. « % des mots retrouvés » = mots significatifs du nom de l\'école retrouvés dans le texte lu ÷ mots significatifs totaux. Un Sub Admin qui prospecte ne voit jamais ses propres visites ici : elles sont vérifiées par le Super Admin.</p>';
     if (!list.length) {
       h += '<div class="c27-empty">✨ Aucune visite en attente de vérification.</div></div>';
       return h;
