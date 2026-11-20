@@ -1428,17 +1428,20 @@
 
   function ensureLeaflet(cb) {
     if (window.L && window.L.map) return cb();
+    // Bibliothèque de carte LIVRÉE AVEC L'APPLICATION (même serveur que le
+    // dashboard) : plus aucune dépendance à un CDN externe, souvent lent ou
+    // bloqué sur les réseaux locaux. CDN uniquement en tout dernier recours.
     if (!document.getElementById('c27-leaflet-css')) {
       var link = document.createElement('link');
       link.id = 'c27-leaflet-css'; link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.href = 'vendor-leaflet.css?v=1';
       document.head.appendChild(link);
     }
     var sc = document.getElementById('c27-leaflet-js');
     if (sc) { sc.addEventListener('load', cb); return; }
     sc = document.createElement('script');
     sc.id = 'c27-leaflet-js';
-    sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    sc.src = 'vendor-leaflet.js?v=1';
     sc.onload = cb;
     sc.onerror = function () {
       var sc2 = document.createElement('script');
@@ -1446,11 +1449,20 @@
       sc2.onload = cb;
       sc2.onerror = function () {
         var box = document.getElementById('c27MapBox');
-        if (box) box.innerHTML = '<div class="c27-empty">Impossible de charger la carte (connexion requise la première fois). Réessayez en ligne.</div>';
+        if (box) box.innerHTML = '<div class="c27-empty">Impossible de charger la carte. <button class="c27-act primary" onclick="rC27()">🔄 Réessayer</button></div>';
       };
       document.head.appendChild(sc2);
     };
     document.head.appendChild(sc);
+    // Garde-fou : si la carte n'est pas prête en 12 s, proposer de réessayer.
+    setTimeout(function () {
+      if (!(window.L && window.L.map) && document.getElementById('c27MapBox') && !_map) {
+        var box = document.getElementById('c27MapBox');
+        if (box && box.innerHTML.indexOf('Chargement') > -1) {
+          box.innerHTML = '<div class="c27-empty">La carte met trop de temps à charger. <button class="c27-act primary" onclick="rC27()">🔄 Réessayer</button></div>';
+      }
+      }
+    }, 12000);
   }
 
   function schoolGpsIndex() {
