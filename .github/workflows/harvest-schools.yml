@@ -1,0 +1,23 @@
+name: Récolte écoles (OpenStreetMap)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'   # chaque lundi 03h17 UTC — mise à jour hebdomadaire du répertoire
+permissions:
+  contents: write
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/harvest-schools.js
+      - name: Commit du répertoire
+        run: |
+          git config user.name "nateiva-harvest-bot"
+          git config user.email "noreply@nateiva.com"
+          git add nateiva-schools-directory.generated.js
+          git diff --cached --quiet || git commit -m "Répertoire écoles: récolte OpenStreetMap automatique"
+          git push
