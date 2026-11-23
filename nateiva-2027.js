@@ -1452,6 +1452,37 @@
     } catch (e) { }
   }
 
+  // 📜 Historique du portefeuille replié par défaut : le titre reste visible,
+  // le contenu (pastilles + liste des suivis) s'ouvre d'un toucher ; l'état
+  // ouvert/fermé est mémorisé par appareil.
+  function collapseHistory() {
+    try {
+      var panel = document.getElementById('stab-history');
+      if (!panel || panel.querySelector('#c27HistFold')) return;
+      var card = panel.querySelector('.form-card');
+      if (!card) return;
+      var title = card.querySelector('h3');
+      var count = card.querySelectorAll('.followup-list > *').length;
+      var fold = document.createElement('details');
+      fold.id = 'c27HistFold';
+      fold.className = 'c27-det';
+      fold.open = lsGet('nateiva_c27_hist_fold', '0') === '1';
+      var sum = document.createElement('summary');
+      sum.style.cssText = 'padding:12px 16px;border:1px solid var(--g200);border-radius:12px;background:var(--g50);font-weight:700;font-size:13.5px;margin:6px 0 12px;cursor:pointer';
+      sum.textContent = '📜 ' + count + ' suivi(s) dans votre portefeuille — toucher pour ' + (fold.open ? 'replier' : 'afficher');
+      fold.appendChild(sum);
+      fold.addEventListener('toggle', function () {
+        lsSet('nateiva_c27_hist_fold', fold.open ? '1' : '0');
+        sum.textContent = '📜 ' + count + ' suivi(s) dans votre portefeuille — toucher pour ' + (fold.open ? 'replier' : 'afficher');
+      });
+      Array.prototype.slice.call(card.childNodes).forEach(function (n) {
+        if (n === title) return;
+        fold.appendChild(n);
+      });
+      card.appendChild(fold);
+    } catch (e) { }
+  }
+
   function wrapPaneRenderers() {
     try {
       if (typeof window._getPaneRenderers !== 'function') return;
@@ -1465,7 +1496,7 @@
       });
       var origSuivi = m.suivi;
       if (typeof origSuivi === 'function' && !origSuivi.__c27Wrapped) {
-        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(ensurePhotoField, 120); setTimeout(applySimpleForm, 150); return r; };
+        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(collapseHistory, 40); setTimeout(ensurePhotoField, 120); setTimeout(applySimpleForm, 150); return r; };
         wrappedSuivi.__c27Wrapped = true;
         m.suivi = wrappedSuivi;
       }
