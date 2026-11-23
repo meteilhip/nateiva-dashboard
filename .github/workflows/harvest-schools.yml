@@ -2,7 +2,10 @@ name: Récolte écoles (OpenStreetMap)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 3 * * 1'   # chaque lundi 03h17 UTC — mise à jour hebdomadaire du répertoire
+    # Le 1er février, puis le 1er de chaque mois jusqu'au 1er mai (03h17 UTC).
+    # Note : ce calendrier se répète chaque année (fév→mai) ; lançable à la
+    # main à tout moment via l'onglet Actions de GitHub.
+    - cron: '17 3 1 2-5 *'
 permissions:
   contents: write
 jobs:

@@ -88,9 +88,12 @@ async function harvestCity(city, cc) {
   return null; // tous les serveurs ont échoué pour cette ville
 }
 
+const normKey = (city, name) => city + '|' + String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
 (async () => {
   let manual = [];
   const previous = {};
+  const knownKeys = {}; // clé → addedAt éventuel, pour marquer les VRAIES nouveautés
   try {
     const cur = fs.readFileSync(OUT, 'utf-8');
     const m = cur.match(/window\.NATEIVA_DIRECTORY\s*=\s*(\[[\s\S]*\]);/);
@@ -98,11 +101,13 @@ async function harvestCity(city, cc) {
       const arr = JSON.parse(m[1]);
       manual = arr.filter(e => e && e.source && e.source !== 'OSM');
       arr.filter(e => e && e.source === 'OSM').forEach(e => { (previous[e.city] = previous[e.city] || []).push(e); });
+      arr.forEach(e => { if (e && e.name) knownKeys[normKey(e.city, e.name)] = e.addedAt || ''; });
     }
   } catch (e) { /* premier passage */ }
 
+  const today = new Date().toISOString().slice(0, 10);
   const all = [...manual];
-  let ok = 0;
+  let ok = 0, fresh = 0;
   const failed = [];
   for (const [city, cc] of Object.entries(CITIES)) {
     const items = await harvestCity(city, cc);
@@ -110,12 +115,21 @@ async function harvestCity(city, cc) {
       failed.push(city);
       if (previous[city]) all.push(...previous[city]); // échec → on garde l'ancienne récolte
     } else {
+      // Marquage des nouveautés : une école absente de la récolte précédente
+      // reçoit addedAt = date du jour (mise en avant ✨ sur la carte) ; une
+      // école déjà connue garde son addedAt d'origine (ou aucun).
+      items.forEach(i => {
+        const k = normKey(i.city, i.name);
+        if (k in knownKeys) { if (knownKeys[k]) i.addedAt = knownKeys[k]; }
+        else { i.addedAt = today; fresh++; }
+      });
       all.push(...items);
       ok++;
       console.log(city, items.length, 'écoles');
     }
     await new Promise(r => setTimeout(r, 3000)); // politesse envers les serveurs Overpass
   }
+  console.log('Nouveautés de cette récolte:', fresh);
   const header = fs.readFileSync(OUT, 'utf-8').split('window.NATEIVA_DIRECTORY')[0];
   fs.writeFileSync(OUT, header + 'window.NATEIVA_DIRECTORY = ' + JSON.stringify(all) + ';\n');
   console.log('TOTAL', all.length, 'écoles ·', ok, 'villes récoltées ·', manual.length, 'entrées manuelles conservées', failed.length ? '· échecs: ' + failed.join(',') : '');

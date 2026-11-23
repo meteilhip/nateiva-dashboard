@@ -1693,6 +1693,26 @@
     tryEndpoint(0);
   };
 
+  var _dirLoading = false;
+  function ensureDirectory(cb) {
+    // Le répertoire (~4 000 écoles) n'est plus chargé au démarrage de l'app
+    // mais à la première ouverture de la carte : démarrage bien plus rapide.
+    if (Array.isArray(window.NATEIVA_DIRECTORY)) return cb();
+    if (_dirLoading) return;
+    _dirLoading = true;
+    var sc = document.createElement('script');
+    sc.src = 'nateiva-schools-directory.generated.js?v=' + (Date.now() - Date.now() % 3600000); // cache 1 h
+    sc.onload = function () { _dirLoading = false; cb(); };
+    sc.onerror = function () { _dirLoading = false; window.NATEIVA_DIRECTORY = window.NATEIVA_DIRECTORY || []; cb(); };
+    document.head.appendChild(sc);
+  }
+  function entryIsNew(d) {
+    // ✨ Nouveauté = ajoutée au répertoire depuis moins de 45 jours (champ
+    // addedAt posé par la récolte quand une école apparaît pour la 1re fois).
+    if (!d || !d.addedAt) return false;
+    var ms = Date.parse(d.addedAt);
+    return isFinite(ms) && (Date.now() - ms) < 45 * 86400000;
+  }
   function directoryForCity(city) {
     // Répertoire préchargé livré avec l'application (nateiva-schools-directory
     // .generated.js) : disponible sur tous les appareils, même sans réseau.
@@ -1768,6 +1788,7 @@
       + '<span><b style="color:#6B7280;font-size:17px">●</b> École prospectée NATEIVA</span>'
       + '<span><b style="color:#DC2626;font-size:17px">●</b> École SIGNÉE NATEIVA</span>'
       + '<span><b style="color:#F59E0B;font-size:17px">●</b> École Internet (pas encore prospectée)</span>'
+      + '<span><b style="color:#FBBF24;font-size:19px">●</b> ✨ Nouvelle au dernier répertoire (< 45 jours)</span>'
       + '</div>'
       + '<div class="c27-note">Une école Internet prospectée par l\'équipe passe automatiquement du jaune au gris (puis au rouge si elle signe). Le statut détaillé du pipeline (chaud, tiède, froid…) reste visible en touchant le marqueur. « Effectif » = nombre d\'élèves déclaré lors de la prospection ; « Standing » = niveau de frais de scolarité estimé par le prospecteur (de Très basse à Très haute). Les écoles Internet (maternelles, primaires, secondaires, universités) proviennent d\'OpenStreetMap, la base cartographique mondiale communautaire — les pages Facebook ne peuvent pas être aspirées automatiquement : une école repérée sur Facebook s\'ajoute en la saisissant une fois, elle apparaîtra ensuite sur la carte.</div>'
       + '</div>';
@@ -1796,6 +1817,7 @@
       box.innerHTML = '';
       var center = CITY_COORDS['DOUALA'];
       _map = L.map(box, { scrollWheelZoom: true, preferCanvas: true }).setView(center, 12);
+      ensureDirectory(function () { refreshMapMarkers(); });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -1881,7 +1903,7 @@
           if (known) {
             // École Internet déjà prospectée par NATEIVA : elle est passée du
             // jaune au gris — notre marqueur gris la représente, pas de doublon.
-            _osmFiltered.push({ name: d.name, kind: d.kind, quartier: d.quartier || '', phone: d.phone || '', capacity: d.capacity || '', operator: d.operator || '', known: known, lat: d.lat, lng: d.lng });
+            _osmFiltered.push({ name: d.name, kind: d.kind, quartier: d.quartier || '', phone: d.phone || '', capacity: d.capacity || '', operator: d.operator || '', known: known, lat: d.lat, lng: d.lng, isNew: false, addedAt: '' });
             osmShown++;
             return;
           }
@@ -1891,16 +1913,18 @@
           }
           osmShown++;
           osmNew++;
-          _osmFiltered.push({ name: d.name, kind: d.kind, quartier: d.quartier || '', phone: d.phone || '', capacity: d.capacity || '', operator: d.operator || '', known: '', lat: d.lat, lng: d.lng });
-          // 🟡 jaune = école Internet pas encore prospectée
-          var col = '#F59E0B';
+          _osmFiltered.push({ name: d.name, kind: d.kind, quartier: d.quartier || '', phone: d.phone || '', capacity: d.capacity || '', operator: d.operator || '', known: '', lat: d.lat, lng: d.lng, isNew: isNew, addedAt: d.addedAt || '' });
+          // 🟡 jaune = Internet pas prospectée · ✨ nouveauté = jaune vif + anneau
+          var isNew = entryIsNew(d);
+          var col = isNew ? '#FBBF24' : '#F59E0B';
           var mk2 = L.circleMarker([d.lat, d.lng], {
-            radius: 8, color: '#B45309', weight: 1.5,
-            fillColor: col, fillOpacity: 0.85
+            radius: isNew ? 11 : 8, color: isNew ? '#92400E' : '#B45309', weight: isNew ? 3 : 1.5,
+            fillColor: col, fillOpacity: isNew ? 0.95 : 0.85
           });
           var pop2 = '<div style="font-family:\'DM Sans\',sans-serif;min-width:220px;max-width:270px">'
             + '<div style="font-weight:800;font-size:14px;margin-bottom:3px">' + _esc(d.name) + '</div>'
-            + '<div style="font-size:11px;color:#57534E;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet (OpenStreetMap) — ' + _esc(d.kind) + '</div>'
+            + (entryIsNew(d) ? '<div style="background:#FEF3C7;color:#92400E;font-weight:800;font-size:11px;border-radius:7px;padding:4px 8px;margin-bottom:6px">✨ NOUVELLE — ajoutée au répertoire le ' + _esc(d.addedAt) + '</div>' : '')
+            + '<div style="font-size:11px;color:#57534E;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet — ' + _esc(d.kind) + '</div>'
             + '<div style="font-size:12px;line-height:1.7;margin-bottom:8px">'
             + (known ? '🔗 Correspond à notre école « <b>' + _esc(known) + '</b> »' : '🆕 <b>Pas encore prospectée par NATEIVA</b>')
             + (d.quartier ? '<br>📍 ' + _esc(d.quartier) : '')
@@ -1934,10 +1958,12 @@
             + '<span style="font-family:Fraunces,serif;font-size:21px;font-weight:600">' + _fmt(val) + '</span>'
             + '<span style="font-size:11.5px;color:var(--g500);max-width:130px;line-height:1.3">' + label + '</span></span>';
         }
+        var nNew = _osmFiltered.filter(function (x) { return x.isNew && !x.known; }).length;
         statsEl.innerHTML = statChip('#6B7280', 'écoles prospectées<br>(' + _esc(_mapState.city) + ')', list.length)
           + statChip('#DC2626', 'signées campagne<br>précédente', signedPrev)
           + statChip('#DC2626', 'signées cette<br>année (' + CFG.YEAR + ')', signedCur)
-          + statChip('#F59E0B', 'Internet — pas<br>encore prospectées', osmNew);
+          + statChip('#F59E0B', 'Internet — pas<br>encore prospectées', osmNew)
+          + (nNew ? statChip('#FBBF24', '✨ nouvelles au<br>dernier répertoire', nNew) : '');
       }
     } catch (eS) { }
     var count = document.getElementById('c27MapCount');
@@ -2140,14 +2166,18 @@
       else if (e && e.standing) { fees = '≈ ' + e.standing; feesSrc = 'est. : standing le plus fréquent des écoles ' + b + ' connues à ' + city + ' (' + e.standingN + '/' + e.total + ')'; }
       else { fees = '—'; feesSrc = 'aucune donnée de référence'; }
       var phone = d.phone || (ours && ours.phone) || '';
-      return { name: d.name, kind: d.kind, quartier: d.quartier, phone: phone, students: students, studentsSrc: studentsSrc, fees: fees, feesSrc: feesSrc, status: d.known ? 'Connue (' + d.known + ')' : 'À prospecter', known: !!d.known, lat: d.lat, lng: d.lng };
-    }).sort(function (a, b2) { return (a.known === b2.known) ? a.name.localeCompare(b2.name) : (a.known ? 1 : -1); });
+      return { name: d.name, kind: d.kind, quartier: d.quartier, phone: phone, students: students, studentsSrc: studentsSrc, fees: fees, feesSrc: feesSrc, status: d.known ? 'Connue (' + d.known + ')' : 'À prospecter', known: !!d.known, isNew: !!d.isNew, addedAt: d.addedAt || '', lat: d.lat, lng: d.lng };
+    }).sort(function (a, b2) {
+      if (a.isNew !== b2.isNew) return a.isNew ? -1 : 1;     // ✨ nouveautés d'abord
+      if (a.known !== b2.known) return a.known ? 1 : -1;      // puis à prospecter
+      return a.name.localeCompare(b2.name);
+    });
     _lastOsmRows = rows;
     if (!rows.length) { box.innerHTML = '<div class="c27-note">Aucune école Internet pour ces filtres.</div>'; return; }
     var h = '<details class="c27-det" open><summary style="font-size:13px;font-weight:700;color:var(--g700)">🌐 Liste des écoles trouvées sur Internet (' + rows.length + ') <button class="c27-act" style="margin-left:10px" onclick="event.preventDefault();c27ExportOsm()">⬇️ CSV</button></summary>'
       + '<div style="overflow-x:auto;margin-top:10px"><table class="c27-tbl"><thead><tr><th>École</th><th>Type</th><th>Quartier</th><th>📞 Téléphone</th><th>👩‍🎓 Élèves</th><th>🏷 Frais (standing)</th><th>Statut</th><th></th></tr></thead><tbody>';
     rows.slice(0, 120).forEach(function (r) {
-      h += '<tr><td class="c27-school">' + _esc(r.name) + '</td>'
+      h += '<tr' + (r.isNew ? ' style="background:#FFFBEB"' : '') + '><td class="c27-school">' + (r.isNew ? '✨ ' : '') + _esc(r.name) + (r.isNew ? '<div class="c27-muted">nouvelle — ajoutée le ' + _esc(r.addedAt) + '</div>' : '') + '</td>'
         + '<td>' + _esc(r.kind) + '</td>'
         + '<td>' + (r.quartier ? _esc(r.quartier) : '<span class="c27-muted">—</span>') + '</td>'
         + '<td>' + (r.phone ? '<a href="tel:' + _attr(r.phone) + '">' + _esc(r.phone) + '</a>' : '<span class="c27-muted">non publié</span>') + '</td>'
@@ -2928,7 +2958,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
