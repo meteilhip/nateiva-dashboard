@@ -3512,7 +3512,7 @@ button,select,input,textarea{outline:none}
       <h1>Nateiva Sales <span class="accent">Analytic</span></h1>
     </div>
     <div class="meta-block">
-      <span class="meta-pill red">v12.15 · Démarrage accéléré (répertoire chargé à l'ouverture de la carte) · ✨ nouvelles écoles mises en avant · récoltes le 1er du mois (fév→mai)</span>
+      <span class="meta-pill red">v12.16 · 🗺 Carte = page à part entière · Workspace réorganisé (Actions en tête, analyses repliées) · quartiers estimés des écoles Internet</span>
       <span class="meta-pill saffron" id="headerDate">12 JUIN 2026</span>
       <span class="meta-live">SYNCHRONISÉ TEMPS RÉEL</span>
     </div>
@@ -3547,7 +3547,7 @@ button,select,input,textarea{outline:none}
     <span class="nav-label">2027</span>
     <span class="nav-desc">Campagne · Fresh Start</span>
   </button>
-  <button class="nav-btn" id="c27MapNavBtn" data-pane="c27" onclick="if(window.c27PresetMapTab)c27PresetMapTab()">
+  <button class="nav-btn" id="c27MapNavBtn" data-pane="carte">
     <span class="nav-icon">🗺</span>
     <span class="nav-label">Carte</span>
     <span class="nav-desc">Écoles & Terrain</span>
@@ -3587,7 +3587,7 @@ button,select,input,textarea{outline:none}
     <button class="bottom-tab" data-pane="market"><span class="bt-icon">🗺️</span><span class="bt-label">Marché</span></button>
     <button class="bottom-tab act" data-pane="suivi"><span class="bt-icon">📋</span><span class="bt-label">Workspace</span></button>
     <button class="bottom-tab" data-pane="c27"><span class="bt-icon">🚀</span><span class="bt-label">2027</span></button>
-    <button class="bottom-tab" id="c27MapTabBtn" data-pane="c27" onclick="if(window.c27PresetMapTab)c27PresetMapTab()"><span class="bt-icon">🗺</span><span class="bt-label">Carte</span></button>
+    <button class="bottom-tab" id="c27MapTabBtn" data-pane="carte"><span class="bt-icon">🗺</span><span class="bt-label">Carte</span></button>
     <button class="bottom-tab" data-pane="activity"><span class="bt-icon">🗒️</span><span class="bt-label">Activité</span></button>
     <button class="bottom-tab" data-pane="metrics"><span class="bt-icon">📊</span><span class="bt-label">BI</span></button>
     <button class="bottom-tab" data-pane="team"><span class="bt-icon">👥</span><span class="bt-label">Équipe</span></button>
@@ -3649,6 +3649,7 @@ button,select,input,textarea{outline:none}
 <div class="pane" id="p-glossary"></div>
 <div class="pane act" id="p-suivi"></div>
 <div class="pane" id="p-c27"></div>
+<div class="pane" id="p-carte"></div>
 <div class="pane" id="p-activity"></div>
 
 <div id="loginOverlay" class="login-overlay" style="display:none">
@@ -10327,11 +10328,11 @@ function rActivity(){
 }
 
 var _paneRenderers = null;
-var _paneDirty = { home:true, metrics:true, team:true, market:true, playbook:true, intel:true, glossary:true, suivi:true, activity:true, c27:true };
+var _paneDirty = { home:true, metrics:true, team:true, market:true, playbook:true, intel:true, glossary:true, suivi:true, activity:true, c27:true, carte:true };
 function _getPaneRenderers(){
   if (_paneRenderers) return _paneRenderers;
   // c27 est rendu par nateiva-2027.js (chargé après ce script) — référence paresseuse.
-  _paneRenderers = { home:rHome, metrics:rMetrics, team:rTeam, market:rMarket, playbook:rPlaybook, intel:rIntel, glossary:rGlossary, suivi:rSuivi, activity:rActivity, c27:function(){ if (typeof window.rC27 === 'function') window.rC27(); } };
+  _paneRenderers = { home:rHome, metrics:rMetrics, team:rTeam, market:rMarket, playbook:rPlaybook, intel:rIntel, glossary:rGlossary, suivi:rSuivi, activity:rActivity, c27:function(){ if (typeof window.rC27 === 'function') window.rC27(); }, carte:function(){ if (typeof window.rCarte === 'function') window.rCarte(); } };
   return _paneRenderers;
 }
 function _getActivePaneKey(){
@@ -10627,6 +10628,7 @@ var PANE_ACCESS_CONFIG = [
   { key: 'market', label: 'Marché' },
   { key: 'suivi', label: 'Workspace' },
   { key: 'c27', label: 'Campagne 2027' },
+  { key: 'carte', label: 'Carte des écoles' },
   { key: 'activity', label: 'Activité' },
   { key: 'metrics', label: 'BI & KPI' },
   { key: 'team', label: 'Équipe' },
@@ -10877,7 +10879,7 @@ function getDefaultPermissions(user) {
     // Admins : tout. Prospecteurs/Ambassadeurs : navigation allégée par défaut —
     // le Super Admin accorde ou retire des onglets par personne via l'éditeur
     // d'accès (Workspace → Gestion des utilisateurs).
-    panes: elevated ? allPaneKeys() : ['home', 'suivi', 'c27', 'activity'],
+    panes: elevated ? allPaneKeys() : ['home', 'suivi', 'c27', 'carte', 'activity'],
     // Only SuperAdmin + SubAdmin see team-wide ('all'). Experts (and everyone else)
     // are strictly scoped to their OWN data — no team totals or overall numbers.
     dataScope: globalData ? 'all' : 'own',
@@ -10897,7 +10899,7 @@ function normalizePermissions(user) {
     var valid = allPaneKeys();
     var custom = stored.filter(function(k) { return valid.indexOf(k) > -1; });
     if (custom.length) panes = custom;
-    ['suivi', 'c27'].forEach(function(k) { if (panes.indexOf(k) === -1) panes.push(k); });
+    ['suivi', 'c27', 'carte'].forEach(function(k) { if (panes.indexOf(k) === -1) panes.push(k); });
   }
   if (!panes.length) panes = ['home'];
   if (panes.indexOf('home') === -1) panes.unshift('home');
@@ -15871,6 +15873,6 @@ setInterval(updateVercelToolbarVisibility, 60000);
   safety();
 })();
 </script>
-<script src="nateiva-2027.js?v=20261123-1"></script>
+<script src="nateiva-2027.js?v=20261123-2"></script>
 </body>
 </html>

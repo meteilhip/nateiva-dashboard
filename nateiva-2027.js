@@ -710,7 +710,7 @@
 
   /* ======================= 6. INTERFACE — PANE « 2027 » =================== */
   var CSS = ''
-    + '#p-c27{--c27-gold:#B08D2F;--c27-gold-soft:#F7F1E3;}'
+    + '#p-c27,#p-carte{--c27-gold:#B08D2F;--c27-gold-soft:#F7F1E3;}'
     + '#p-c27 .c27-wrap{max-width:1180px;margin:0 auto;padding:8px 4px 64px}'
     + '#p-c27 .c27-hero{padding:34px 36px;border-radius:20px;background:linear-gradient(135deg,var(--g950),#2A2419 70%,#3B301A);color:#FAF7EF;position:relative;overflow:hidden;margin-bottom:22px}'
     + '#p-c27 .c27-hero:before{content:"";position:absolute;inset:0;background:radial-gradient(600px 220px at 85% -20%,rgba(176,141,47,.35),transparent 70%)}'
@@ -776,7 +776,8 @@
     if (document.getElementById('c27-style')) return;
     var st = document.createElement('style');
     st.id = 'c27-style';
-    st.textContent = CSS;
+    // Les mêmes styles s'appliquent à la page 🚀 2027 et à la page 🗺 Carte.
+    st.textContent = CSS + CSS.split('#p-c27').join('#p-carte');
     document.head.appendChild(st);
   }
 
@@ -786,6 +787,9 @@
     var pane = document.getElementById('p-c27');
     if (pane && pane.classList.contains('act')) rC27();
     else if (window._paneDirty) window._paneDirty.c27 = true;
+    var paneC = document.getElementById('p-carte');
+    if (paneC && paneC.classList.contains('act') && typeof window.rCarte === 'function') window.rCarte();
+    else if (window._paneDirty) window._paneDirty.carte = true;
   }
 
   function currentTab() { return lsGet(LS_KEYS.tab, 'list'); }
@@ -821,7 +825,6 @@
     if (myDay) h += '<div style="margin:-6px 0 14px">' + dayTypeChip(myDay) + '</div>';
     h += '<div class="c27-tabs">'
       + tabBtn('list', '📞 Liste prioritaire', tab)
-      + tabBtn('map', '🗺 Carte des écoles', tab)
       + tabBtn('claims', '👑 Attributions & demandes', tab)
       + (admin ? tabBtn('team', '👥 Mon équipe', tab) : '')
       + (admin ? tabBtn('plan', '🗓 Planning', tab) : '')
@@ -829,8 +832,8 @@
       + (admin ? tabBtn('trust', '🛡 Score de confiance', tab) : '')
       + '</div>';
 
+    if (tab === 'map') tab = 'list'; // la carte est désormais sa propre page 🗺
     if (tab === 'list') h += renderPriorityTab(priority, admin);
-    else if (tab === 'map') h += renderMapTab(admin);
     else if (tab === 'claims') h += renderClaimsTab(myClaims, superA, admin);
     else if (tab === 'team') h += renderTeamTab();
     else if (tab === 'plan') h += renderPlanningTab();
@@ -839,9 +842,32 @@
 
     h += '</div>';
     el.innerHTML = h;
-    if (tab === 'map') setTimeout(initMap, 60);
   }
   window.rC27 = rC27;
+
+  // 🗺 Page Carte — distincte de 🚀 2027 : ici la GÉOGRAPHIE (toutes les
+  // écoles — les nôtres + Internet —, zones de prospection, tournées GPS).
+  // 🚀 2027 reste la CAMPAGNE : qui appelle quelle école, attributions,
+  // planning, pilotage, confiance.
+  function rCarte() {
+    injectCss();
+    var el = document.getElementById('p-carte');
+    if (!el) return;
+    if (!window.currentUser) {
+      el.innerHTML = '<div class="c27-wrap"><div class="c27-card c27-empty">Connectez-vous pour accéder à la carte des écoles.</div></div>';
+      return;
+    }
+    var admin = (typeof canSeeAllData === 'function') && canSeeAllData(window.currentUser);
+    var h = '<div class="c27-wrap" id="p-c27-carte-scope">'
+      + '<div class="c27-hero" style="padding:22px 26px;margin-bottom:16px"><div class="k">NATEIVA · Géographie</div>'
+      + '<h2 style="font-size:clamp(22px,3vw,32px)">🗺 Carte des <span style="color:#D4AF37">écoles</span></h2>'
+      + '<p>Toutes les écoles sur le terrain : <b style="color:#9CA3AF">● grises</b> prospectées par NATEIVA, <b style="color:#F87171">● rouges</b> signées, <b style="color:#FCD34D">● jaunes</b> trouvées sur Internet. Zones de prospection, tournées GPS et répertoire par quartier. Pour les appels, attributions et le pilotage, voyez la page 🚀 2027.</p></div>';
+    h += renderMapTab(admin);
+    h += '</div>';
+    el.innerHTML = h;
+    setTimeout(initMap, 60);
+  }
+  window.rCarte = rCarte;
 
   function tabBtn(key, label, act) {
     return '<button class="c27-tab' + (act === key ? ' act' : '') + '" onclick="c27SetTab(\'' + key + '\')">' + label + '</button>';
@@ -860,7 +886,7 @@
       return true;
     });
     var shown = list.slice(0, 250);
-    var h = '<div style="margin:0 0 16px"><button class="c27-act primary" style="width:100%;justify-content:center;padding:14px;font-size:14.5px" onclick="c27SetTab(\'map\')">🗺 Ouvrir la carte des écoles — voir les écoles autour de vous</button></div>';
+    var h = '<div style="margin:0 0 16px"><button class="c27-act primary" style="width:100%;justify-content:center;padding:14px;font-size:14.5px" onclick="c27OpenMap()">🗺 Ouvrir la carte des écoles — voir les écoles autour de vous</button></div>';
     h += '<div class="c27-card">'
       + '<div class="c27-klabel">À appeler · à visiter en premier</div>'
       + '<h3>Écoles non signées des campagnes précédentes</h3>'
@@ -1384,6 +1410,48 @@
     } catch (e) { }
   }
 
+  // 🧹 Workspace réorganisé : 🎯 Actions principales tout en haut (au-dessus
+  // des Objectifs), puis Objectifs, puis 📊 Mon activité ; tout ce qui suit
+  // Mon activité est replié sous « 📂 Analyses détaillées » (les panneaux de
+  // saisie restent fonctionnels, hors du pli).
+  function reorganizeWorkspace() {
+    try {
+      var pane = document.getElementById('p-suivi');
+      if (!pane || !window.currentUser || pane.querySelector('#c27WsFold')) return;
+      var kids = function () { return Array.prototype.slice.call(pane.children); };
+      // 1. Actions principales (+ note) remontées sous l'intro de page
+      var action = pane.querySelector('.workspace-action-center');
+      if (action) {
+        var actionTop = action; while (actionTop.parentElement && actionTop.parentElement !== pane) actionTop = actionTop.parentElement;
+        var note = actionTop.nextElementSibling && actionTop.nextElementSibling.classList && actionTop.nextElementSibling.classList.contains('workspace-action-note') ? actionTop.nextElementSibling : null;
+        var intro = pane.querySelector('.page-intro');
+        var anchor = intro && intro.parentElement === pane ? intro.nextSibling : pane.firstChild;
+        pane.insertBefore(actionTop, anchor);
+        if (note) pane.insertBefore(note, actionTop.nextSibling);
+      }
+      // 2. Repli de tout ce qui suit « 📊 Mon activité »
+      var monAct = null;
+      kids().forEach(function (el) { if (!monAct && el.textContent && el.textContent.indexOf('📊 Mon activité') > -1) monAct = el; });
+      if (!monAct) return;
+      var fold = document.createElement('details');
+      fold.id = 'c27WsFold';
+      fold.className = 'c27-det';
+      fold.open = lsGet('nateiva_c27_ws_fold', '0') === '1';
+      fold.innerHTML = '<summary style="padding:14px 18px;border:1px solid var(--g200);border-radius:14px;background:var(--g50);font-weight:700;font-size:13.5px;margin:14px 0">📂 Analyses détaillées — vue d\'ensemble, communication, conversion, qualification… (toucher pour ' + (fold.open ? 'replier' : 'ouvrir') + ')</summary>';
+      fold.addEventListener('toggle', function () { lsSet('nateiva_c27_ws_fold', fold.open ? '1' : '0'); });
+      pane.insertBefore(fold, monAct.nextSibling);
+      var after = false;
+      kids().forEach(function (el) {
+        if (el === monAct) { after = true; return; }
+        if (!after || el === fold) return;
+        var cls = el.className || '';
+        // restent visibles / fonctionnels : panneaux de saisie, formulaires, bandeaux
+        if (/suivi-panel|workspace-action|c27-strip|page-intro/.test(cls) || el.id === 'c27WsFold' || el.querySelector && el.querySelector('.suivi-panel, #followupForm')) return;
+        fold.appendChild(el);
+      });
+    } catch (e) { }
+  }
+
   function wrapPaneRenderers() {
     try {
       if (typeof window._getPaneRenderers !== 'function') return;
@@ -1395,6 +1463,12 @@
         wrapped.__c27Wrapped = true;
         m[key] = wrapped;
       });
+      var origSuivi = m.suivi;
+      if (typeof origSuivi === 'function' && !origSuivi.__c27Wrapped) {
+        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(ensurePhotoField, 120); setTimeout(applySimpleForm, 150); return r; };
+        wrappedSuivi.__c27Wrapped = true;
+        m.suivi = wrappedSuivi;
+      }
     } catch (e) { }
   }
 
@@ -1481,6 +1555,24 @@
     });
     _mapCaches.gps = idx; _mapCaches.gpsAt = Date.now();
     return idx;
+  }
+  function quartierAnchors() {
+    // Points de référence quartier : nos écoles géolocalisées avec quartier
+    // connu + écoles Internet qui publient leur quartier.
+    var anchors = [];
+    buildMapSchools().forEach(function (sch) {
+      if (sch.quartier && sch.pos) anchors.push({ lat: sch.pos[0], lng: sch.pos[1], q: String(sch.quartier).toUpperCase() });
+    });
+    return anchors;
+  }
+  function nearestQuartier(lat, lng, extraAnchors) {
+    var best = null, bd = Infinity;
+    quartierAnchors().concat(extraAnchors || []).forEach(function (a) {
+      var d = kmBetween({ lat: lat, lng: lng }, a);
+      if (d < bd) { bd = d; best = a; }
+    });
+    if (!best || bd > 3) return null; // au-delà de 3 km, trop incertain
+    return { q: best.q, km: bd };
   }
   function schoolPhotoIndex() {
     if (_mapCaches.photos && (Date.now() - _mapCaches.photosAt) < 60000) return _mapCaches.photos;
@@ -1810,14 +1902,21 @@
     return h;
   }
 
+  function mapFail(msg, err) {
+    var box = document.getElementById('c27MapBox');
+    if (box) box.innerHTML = '<div class="c27-empty">⚠️ ' + _esc(msg) + (err ? '<br><code style="font-size:11px;color:var(--red)">' + _esc(String(err && err.message || err).slice(0, 180)) + '</code>' : '') + '<br><button class="c27-act primary" style="margin-top:10px" onclick="c27OpenMap()">🔄 Réessayer</button></div>';
+  }
   function initMap() {
     var box = document.getElementById('c27MapBox');
     if (!box) return;
+    box.innerHTML = '<div class="c27-empty">Chargement de la carte… <span class="c27-muted">(1/3 bibliothèque)</span></div>';
     ensureLeaflet(function () {
+      try {
+      if (_map) { try { _map.remove(); } catch (eR) { } _map = null; _mapLayer = null; _trackLayer = null; _zonesLayer = null; }
       box.innerHTML = '';
       var center = CITY_COORDS['DOUALA'];
       _map = L.map(box, { scrollWheelZoom: true, preferCanvas: true }).setView(center, 12);
-      ensureDirectory(function () { refreshMapMarkers(); });
+      ensureDirectory(function () { try { refreshMapMarkers(); } catch (eD) { mapFail('Erreur à l\'affichage du répertoire', eD); } });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -1833,6 +1932,7 @@
         var cty = (_mapState.city || 'DOUALA').toUpperCase();
         if (!_osmData[cty] && !localStorage.getItem(osmCacheKey(cty))) setTimeout(function () { window.c27LoadOsm(); }, 800);
       } catch (eA) { }
+      } catch (eInit) { mapFail('Erreur à l\'initialisation de la carte', eInit); }
     });
   }
 
@@ -1927,7 +2027,7 @@
             + '<div style="font-size:11px;color:#57534E;font-weight:700;margin-bottom:6px">🌐 Trouvée sur Internet — ' + _esc(d.kind) + '</div>'
             + '<div style="font-size:12px;line-height:1.7;margin-bottom:8px">'
             + (known ? '🔗 Correspond à notre école « <b>' + _esc(known) + '</b> »' : '🆕 <b>Pas encore prospectée par NATEIVA</b>')
-            + (d.quartier ? '<br>📍 ' + _esc(d.quartier) : '')
+            + (d.quartier ? '<br>📍 ' + _esc(d.quartier) : (function () { var nq = nearestQuartier(d.lat, d.lng); return nq ? '<br>📍 près de ' + _esc(nq.q) + ' (≈ ' + nq.km.toFixed(1) + ' km, estimé)' : ''; })())
             + (d.operator ? '<br>🏛 ' + _esc(d.operator) : '')
             + (d.capacity ? '<br>👩‍🎓 Capacité estimée : ' + _esc(d.capacity) : '')
             + (d.phone ? '<br>📞 <a href="tel:' + _attr(d.phone) + '">' + _esc(d.phone) + '</a>' : '')
@@ -2179,7 +2279,7 @@
     rows.slice(0, 120).forEach(function (r) {
       h += '<tr' + (r.isNew ? ' style="background:#FFFBEB"' : '') + '><td class="c27-school">' + (r.isNew ? '✨ ' : '') + _esc(r.name) + (r.isNew ? '<div class="c27-muted">nouvelle — ajoutée le ' + _esc(r.addedAt) + '</div>' : '') + '</td>'
         + '<td>' + _esc(r.kind) + '</td>'
-        + '<td>' + (r.quartier ? _esc(r.quartier) : '<span class="c27-muted">—</span>') + '</td>'
+        + '<td>' + (r.quartier ? _esc(r.quartier) : (function () { var nq = nearestQuartier(r.lat, r.lng); return nq ? '<span class="c27-muted" title="Quartier estimé : école connue la plus proche avec quartier renseigné, à ' + nq.km.toFixed(1) + ' km">≈ près de ' + _esc(nq.q) + '</span>' : '<span class="c27-muted">—</span>'; })()) + '</td>'
         + '<td>' + (r.phone ? '<a href="tel:' + _attr(r.phone) + '">' + _esc(r.phone) + '</a>' : '<span class="c27-muted">non publié</span>') + '</td>'
         + '<td title="' + _attr(r.studentsSrc) + '">' + _esc(r.students) + '</td>'
         + '<td title="' + _attr(r.feesSrc) + '">' + _esc(r.fees) + '</td>'
@@ -2862,17 +2962,11 @@
   // onglets essentiels ; les admins et le Super Admin gardent tout.
   var EXPERT_HIDDEN_PANES = { metrics: 1, market: 1, playbook: 1, intel: 1, glossary: 1 };
 
-  window.c27PresetMapTab = function () {
-    // Appelé par les boutons 🗺 de la navigation AVANT le basculement de pane :
-    // présélectionne l'onglet Carte du pane 2027.
-    lsSet(LS_KEYS.tab, 'map');
-    if (window._paneDirty) window._paneDirty.c27 = true;
-  };
+  window.c27PresetMapTab = function () { window.c27OpenMap(); };
   window.c27OpenMap = function () {
-    lsSet(LS_KEYS.tab, 'map');
-    var btn = document.querySelector('.nav-btn[data-pane="c27"]');
-    if (btn) btn.click(); else { if (window._paneDirty) window._paneDirty.c27 = true; rC27(); }
-    setTimeout(rC27, 80);
+    var btn = document.querySelector('.nav-btn[data-pane="carte"]');
+    if (btn) btn.click();
+    else { if (window._paneDirty) window._paneDirty.carte = true; if (typeof window.rCarte === 'function') window.rCarte(); }
   };
 
   function injectMapShortcut() {
@@ -2946,6 +3040,7 @@
       var pane = btn.dataset ? btn.dataset.pane : '';
       if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(function () { ensurePhotoField(); applySimpleForm(); }, 250); }
       if (pane === 'c27') { geoCapture('c27'); setTimeout(rC27, 50); }
+      if (pane === 'carte') { geoCapture('carte'); setTimeout(function () { if (typeof window.rCarte === 'function') window.rCarte(); }, 50); }
     }, true);
     // Ouverture du panneau « Nouveau suivi » → horodatage du formulaire.
     var _origActivate = window.activateSuiviPanel;

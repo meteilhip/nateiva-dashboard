@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
-const ALL_PANES = ["home", "suivi", "metrics", "team", "market", "playbook", "intel", "glossary", "activity", "c27"];
+const ALL_PANES = ["home", "suivi", "metrics", "team", "market", "playbook", "intel", "glossary", "activity", "c27", "carte"];
 
 function normalizeRole(role) {
   const value = String(role || "Expert").trim().toLowerCase();
@@ -23,7 +23,7 @@ function defaultPermissionsForRole(userLike) {
   return {
     dataScope: normalized === "SuperAdmin" && isNoah ? "all" : "own",
     manageUsers: normalized === "SuperAdmin" && isNoah,
-    panes: normalized === "Expert" ? ["home", "suivi", "c27", "activity"] : ALL_PANES.slice()
+    panes: normalized === "Expert" ? ["home", "suivi", "c27", "carte", "activity"] : ALL_PANES.slice()
   };
 }
 
