@@ -132,6 +132,16 @@
   // le GPS d'une visite passée avec la position du bureau au moment de l'édition).
   window.nateivaApplyGeoMeta = function (meta, editableExisting) {
     try {
+      var rs = document.getElementById('c27RemarkSel');
+      if (rs && rs.value) { meta.remark = rs.value; rs.value = ''; } // remarque rapide choisie
+      else if (editableExisting && typeof splitFollowupNotes === 'function') {
+        var prevM = splitFollowupNotes(editableExisting.Notes).meta || {};
+        if (prevM.remark) meta.remark = prevM.remark;
+      }
+      var cxM = getDayCx();
+      if (cxM && !editableExisting) { meta.dayCity = cxM.city; meta.dayQuartier = cxM.quartier; }
+    } catch (eR) { }
+    try {
       if (editableExisting && typeof splitFollowupNotes === 'function') {
         var stored = splitFollowupNotes(editableExisting.Notes).meta || {};
         ['gpsLat', 'gpsLng', 'gpsAcc', 'gpsAt', 'gpsMock', 'gpsStatus', 'formOpenedAt', 'fillSecs'].forEach(function (k) {
@@ -1496,7 +1506,7 @@
       });
       var origSuivi = m.suivi;
       if (typeof origSuivi === 'function' && !origSuivi.__c27Wrapped) {
-        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(collapseHistory, 40); setTimeout(ensurePhotoField, 120); setTimeout(applySimpleForm, 150); return r; };
+        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(collapseHistory, 40); setTimeout(function () { ensureGeo(enhanceForm); }, 120); setTimeout(applySimpleForm, 150); return r; };
         wrappedSuivi.__c27Wrapped = true;
         m.suivi = wrappedSuivi;
       }
@@ -2397,13 +2407,15 @@
     try {
       var notes = document.getElementById('fuNotes');
       if (!notes || document.getElementById('c27PhotoWrap')) { updatePhotoUi(); return; }
-      var field = notes.closest ? notes.closest('.form-field') : null;
+      var locEl = document.getElementById('fuLocation');
+      var field = (locEl && locEl.closest ? locEl.closest('.form-field') : null) || (notes.closest ? notes.closest('.form-field') : null);
       if (!field || !field.parentNode) return;
       var wrap = document.createElement('div');
       wrap.className = 'form-field full';
+      wrap.style.gridColumn = '1/-1';
       wrap.id = 'c27PhotoWrap';
       wrap.innerHTML = '<div style="background:linear-gradient(135deg,#F7F1E3,#FAFAF9);border:1.5px solid #B08D2F;border-radius:12px;padding:14px 16px">'
-        + '<label style="font-weight:800;color:#7A5F1C;text-transform:uppercase;letter-spacing:.06em;font-size:11px">📸 Photo de l\'école <span id="c27PhotoReq" style="color:#B91C1C"></span></label>'
+        + '<label style="font-weight:800;color:#7A5F1C;text-transform:uppercase;letter-spacing:.06em;font-size:11px">📸 Photo des lieux <span id="c27PhotoReq" style="color:#B91C1C"></span></label>'
         + '<div style="font-size:12px;color:#78716C;margin:4px 0 10px">Prise sur place avec l\'appareil photo (façade ou plaque de l\'école). Les images de la galerie sont refusées.</div>'
         + '<input type="file" id="c27PhotoInput" accept="image/*" capture="environment" style="display:none">'
         + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
@@ -2422,8 +2434,8 @@
     if (!wrap) return;
     var req = document.getElementById('c27PhotoReq');
     var needed = photoRequired();
-    wrap.style.display = needed ? '' : 'none';
-    if (req) req.textContent = needed ? '· OBLIGATOIRE (première visite de cette école)' : '';
+    wrap.style.display = ''; // toujours disponible : photo des lieux prise depuis l'application
+    if (req) { req.textContent = needed ? '· OBLIGATOIRE (première visite de cette école)' : '· facultative'; req.style.color = needed ? '#B91C1C' : '#78716C'; }
   }
 
   var _pendingSubmit = false;
@@ -2554,6 +2566,17 @@
           return;
         }
       } catch (e2) { }
+      // Ville + quartier du jour appliqués si le champ est resté vide.
+      try {
+        var qIn = document.getElementById('fuQuartier');
+        var cxNow = getDayCx();
+        if (qIn && !qIn.value && cxNow) qIn.value = cxNow.quartier;
+      } catch (e3) { }
+      // Contrôle de périmètre du quartier (visites terrain).
+      try {
+        var g = geofenceCheck();
+        if (g) { showGeoNotice(g); _toast('📍 Vous êtes hors du quartier ' + g.q + ' — indiquez le quartier où vous êtes', true); return; }
+      } catch (e4) { }
       if (photoRequired() && !_photoState) {
         if (typeof isSuperAdmin === 'function' && isSuperAdmin(window.currentUser)) {
           _toast('⚠️ Visite sans photo — autorisé pour le Super Admin uniquement');
@@ -2731,6 +2754,8 @@
         if (!field) return;
         // Jamais replier un bloc spécifique au canal (lettre/email) géré par l'app.
         if (field.closest && field.closest('#fuLetterEmailFields')) return;
+        // Champs retirés définitivement (v12.18) : jamais réaffichés.
+        if (field.getAttribute('data-c27-removed') === '1' || HARD_HIDE_IDS.indexOf(id) > -1) { field.style.display = 'none'; return; }
         field.style.display = simple ? 'none' : '';
         if (simple) hidden++;
         field.setAttribute('data-c27-adv', '1');
@@ -3031,6 +3056,438 @@
     // normalizePermissions / applyNavigationAccess dans index.html).
   }
 
+  /* ======================= 15. TERRAIN : PROFIL, JOURNÉE, FORMULAIRE ====== */
+  // 15a. Référentiel géographique (régions → villes → quartiers), chargé à la
+  //      demande (nateiva-geo.generated.js) + quartiers vus dans nos données.
+  var _geoLoading = false;
+  function ensureGeo(cb) {
+    if (window.NATEIVA_GEO && window.NATEIVA_GEO.regions) return cb();
+    if (_geoLoading) { setTimeout(function () { ensureGeo(cb); }, 300); return; }
+    _geoLoading = true;
+    var sc = document.createElement('script');
+    sc.src = 'nateiva-geo.generated.js?v=' + (Date.now() - Date.now() % 3600000);
+    sc.onload = function () { _geoLoading = false; cb(); };
+    sc.onerror = function () { _geoLoading = false; window.NATEIVA_GEO = window.NATEIVA_GEO || { regions: [] }; cb(); };
+    document.head.appendChild(sc);
+  }
+  function geoKey(x) { return String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim(); }
+  function geoRegions() { return (window.NATEIVA_GEO && window.NATEIVA_GEO.regions) || []; }
+  function geoCity(cityKey) {
+    var k = geoKey(cityKey), found = null;
+    geoRegions().forEach(function (r) { r.cities.forEach(function (c) { if (!found && (c.key === k || geoKey(c.name) === k)) found = Object.assign({ region: r.name, regionCode: r.code }, c); }); });
+    return found;
+  }
+  function geoQuartiers(cityKey) {
+    // Quartiers du référentiel + quartiers déjà saisis par l'équipe pour cette ville.
+    var c = geoCity(cityKey), map = {};
+    (c ? c.quartiers : []).forEach(function (q) { map[geoKey(q.n)] = { n: geoKey(q.n), lat: q.lat, lng: q.lng }; });
+    try {
+      buildMapSchools().forEach(function (s) {
+        if (geoKey(s.city) !== geoKey(cityKey) || !s.quartier) return;
+        var k = geoKey(s.quartier);
+        if (!map[k]) map[k] = { n: k };
+      });
+    } catch (e) { }
+    return Object.keys(map).sort().map(function (k) { return map[k]; });
+  }
+  function quartierCoords(cityKey, q) {
+    var k = geoKey(q), hit = null;
+    geoQuartiers(cityKey).forEach(function (x) { if (x.n === k && x.lat != null) hit = x; });
+    return hit;
+  }
+
+  // 15b. Profil de l'utilisateur : jusqu'à 5 provinces et 5 villes (par appareil).
+  var MAX_PICK = 5;
+  function profKey() { return 'nateiva_c27_profile_' + String((window.currentUser && window.currentUser.username) || '').toLowerCase(); }
+  function getProfile() { return lsGet(profKey(), { regions: [], cities: [] }); }
+  function setProfile(p) { lsSet(profKey(), p); }
+
+  // 15c. Contexte du jour : ville + quartier choisis à l'entrée dans le système.
+  function dayKey() { return 'nateiva_c27_daycx_' + String((window.currentUser && window.currentUser.username) || '').toLowerCase(); }
+  function getDayCx() {
+    var cx = lsGet(dayKey(), null);
+    return (cx && cx.date === todayStr()) ? cx : null;
+  }
+  function setDayCx(city, quartier) {
+    lsSet(dayKey(), { date: todayStr(), city: geoKey(city), quartier: geoKey(quartier) });
+    renderDayPill();
+    applyDayCxToForm(true);
+  }
+
+  // ---- Fenêtre « Ma journée » (ville + quartier) et « Mes zones » (profil) ----
+  var _cxDismissed = false;
+  function modalShell(inner) {
+    var ov = document.getElementById('c27Modal');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'c27Modal';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(28,25,23,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML = '<div style="background:#FFFDF8;border:1.5px solid #B08D2F;border-radius:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:24px 22px;box-shadow:0 24px 60px rgba(0,0,0,.35);font-family:\'DM Sans\',sans-serif">' + inner + '</div>';
+    ov.style.display = 'flex';
+    return ov;
+  }
+  function closeModal() { var ov = document.getElementById('c27Modal'); if (ov) ov.style.display = 'none'; }
+  window.c27CloseModal = function () { _cxDismissed = true; closeModal(); };
+
+  function cityOptionsForUser(selected) {
+    var prof = getProfile();
+    var keys = prof.cities && prof.cities.length ? prof.cities : null;
+    var opts = '';
+    geoRegions().forEach(function (r) {
+      var cs = r.cities.filter(function (c) { return !keys || keys.indexOf(c.key) > -1; });
+      if (!cs.length) return;
+      opts += '<optgroup label="' + _attr(r.name) + '">' + cs.map(function (c) { return '<option value="' + _attr(c.key) + '"' + (c.key === selected ? ' selected' : '') + '>' + _esc(c.name) + '</option>'; }).join('') + '</optgroup>';
+    });
+    return opts;
+  }
+  function quartierOptions(cityKey, selected) {
+    var qs = geoQuartiers(cityKey);
+    var sel = geoKey(selected);
+    var o = '<option value="">— Choisir le quartier —</option>' + qs.map(function (q) { return '<option value="' + _attr(q.n) + '"' + (q.n === sel ? ' selected' : '') + '>' + _esc(q.n) + (q.lat != null ? ' 📍' : '') + '</option>'; }).join('');
+    if (sel && !qs.some(function (q) { return q.n === sel; })) o += '<option value="' + _attr(sel) + '" selected>' + _esc(sel) + '</option>';
+    return o + '<option value="__autre__">✏️ Autre quartier (saisir)…</option>';
+  }
+
+  window.c27OpenDayCx = function () {
+    ensureGeo(function () {
+      var cx = getDayCx() || {};
+      var prof = getProfile();
+      var city = cx.city || (prof.cities && prof.cities[0]) || 'DOUALA';
+      var h = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#B08D2F">Ma journée · ' + new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'
+        + '<h3 style="font-family:Fraunces,serif;font-size:24px;margin:6px 0 4px">📍 Où travaillez-vous aujourd\'hui ?</h3>'
+        + '<p style="font-size:13px;color:#78716C;margin:0 0 16px;line-height:1.55">La ville et le quartier choisis s\'appliquent automatiquement à toutes vos saisies de la journée. Vous pouvez les changer à tout moment.</p>'
+        + '<label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#57534E">Ville</label>'
+        + '<select id="c27CxCity" style="width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:5px 0 12px;font-size:14px" onchange="c27CxCityChanged(this.value)">' + cityOptionsForUser(city) + '</select>'
+        + '<label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#57534E">Quartier</label>'
+        + '<select id="c27CxQ" style="width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:5px 0 6px;font-size:14px" onchange="document.getElementById(\'c27CxQOther\').style.display=this.value===\'__autre__\'?\'\':\'none\'">' + quartierOptions(city, cx.quartier) + '</select>'
+        + '<input id="c27CxQOther" placeholder="Nom du quartier" style="display:none;width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:4px 0 6px;font-size:14px">'
+        + '<div style="font-size:11.5px;color:#A8A29E;margin-bottom:16px">📍 = quartier géolocalisé : vos visites y seront contrôlées par GPS.</div>'
+        + '<button onclick="c27CxSave()" style="width:100%;background:#1C1917;color:#F4EBD6;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14.5px;cursor:pointer">Commencer ma journée</button>'
+        + '<div style="display:flex;justify-content:space-between;margin-top:12px;font-size:12.5px">'
+        + '<a href="javascript:void(0)" onclick="c27OpenProfile()" style="color:#7A5F1C;font-weight:700">⚙️ Mes provinces & villes</a>'
+        + '<a href="javascript:void(0)" onclick="c27CloseModal()" style="color:#78716C">Plus tard</a></div>';
+      modalShell(h);
+    });
+  };
+  window.c27CxCityChanged = function (city) {
+    var q = document.getElementById('c27CxQ');
+    if (q) q.innerHTML = quartierOptions(city, '');
+  };
+  window.c27CxSave = function () {
+    var city = (document.getElementById('c27CxCity') || {}).value || '';
+    var qSel = (document.getElementById('c27CxQ') || {}).value || '';
+    var q = qSel === '__autre__' ? ((document.getElementById('c27CxQOther') || {}).value || '') : qSel;
+    if (!city || !q) { _toast('Choisissez la ville ET le quartier', true); return; }
+    setDayCx(city, q);
+    closeModal();
+    _toast('📍 Journée : ' + (geoCity(city) ? geoCity(city).name : city) + ' · ' + geoKey(q));
+  };
+
+  window.c27OpenProfile = function () {
+    ensureGeo(function () {
+      var prof = getProfile();
+      var h = '<h3 style="font-family:Fraunces,serif;font-size:22px;margin:0 0 4px">⚙️ Mes provinces & villes</h3>'
+        + '<p style="font-size:13px;color:#78716C;margin:0 0 14px">Choisissez jusqu\'à ' + MAX_PICK + ' provinces, puis jusqu\'à ' + MAX_PICK + ' villes : ce sont les seules proposées dans « Ma journée ».</p>'
+        + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#57534E;margin-bottom:6px">Provinces (' + MAX_PICK + ' max)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">';
+      geoRegions().forEach(function (r) {
+        var on = prof.regions.indexOf(r.code) > -1;
+        h += '<button onclick="c27ProfToggle(\'regions\',\'' + r.code + '\')" style="border:1.5px solid ' + (on ? '#B08D2F' : '#D6D3D1') + ';background:' + (on ? '#F7F1E3' : '#fff') + ';border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer">' + (on ? '✓ ' : '') + _esc(r.name) + '</button>';
+      });
+      h += '</div><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#57534E;margin-bottom:6px">Villes (' + MAX_PICK + ' max) — de vos provinces</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">';
+      var any = false;
+      geoRegions().forEach(function (r) {
+        if (prof.regions.indexOf(r.code) === -1) return;
+        r.cities.forEach(function (c) {
+          any = true;
+          var on = prof.cities.indexOf(c.key) > -1;
+          h += '<button onclick="c27ProfToggle(\'cities\',\'' + _attr(c.key) + '\')" style="border:1.5px solid ' + (on ? '#1C1917' : '#D6D3D1') + ';background:' + (on ? '#1C1917' : '#fff') + ';color:' + (on ? '#F4EBD6' : '#1C1917') + ';border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer">' + _esc(c.name) + '</button>';
+        });
+      });
+      if (!any) h += '<span style="font-size:12.5px;color:#A8A29E">Choisissez d\'abord une ou plusieurs provinces.</span>';
+      h += '</div><button onclick="c27OpenDayCx()" style="width:100%;background:#1C1917;color:#F4EBD6;border:none;border-radius:12px;padding:13px;font-weight:800;cursor:pointer">✓ Enregistrer et revenir à ma journée</button>';
+      modalShell(h);
+    });
+  };
+  window.c27ProfToggle = function (kind, val) {
+    var p = getProfile();
+    var arr = p[kind] || [];
+    var i = arr.indexOf(val);
+    if (i > -1) arr.splice(i, 1);
+    else {
+      if (arr.length >= MAX_PICK) { _toast('Maximum ' + MAX_PICK + ' ' + (kind === 'regions' ? 'provinces' : 'villes'), true); return; }
+      arr.push(val);
+    }
+    p[kind] = arr;
+    if (kind === 'regions') { // retirer les villes des provinces désélectionnées
+      var allowed = {};
+      geoRegions().forEach(function (r) { if (p.regions.indexOf(r.code) > -1) r.cities.forEach(function (c) { allowed[c.key] = 1; }); });
+      p.cities = (p.cities || []).filter(function (c) { return allowed[c]; });
+    }
+    setProfile(p);
+    window.c27OpenProfile();
+  };
+
+  function renderDayPill() {
+    try {
+      var block = document.querySelector('.meta-block');
+      if (!block || !window.currentUser) return;
+      var pill = document.getElementById('c27DayPill');
+      if (!pill) {
+        pill = document.createElement('span');
+        pill.id = 'c27DayPill';
+        pill.className = 'meta-pill';
+        pill.style.cssText = 'background:#F7F1E3;color:#7A5F1C;border:1px solid #B08D2F;cursor:pointer;font-weight:700';
+        pill.onclick = function () { window.c27OpenDayCx(); };
+        block.insertBefore(pill, block.firstChild);
+      }
+      var cx = getDayCx();
+      var c = cx ? geoCity(cx.city) : null;
+      pill.textContent = cx ? ('📍 ' + (c ? c.name : cx.city) + ' · ' + cx.quartier + ' — changer') : '📍 Choisir ma ville et mon quartier du jour';
+    } catch (e) { }
+  }
+  function maybeAskDayCx() {
+    if (!window.currentUser || _cxDismissed || getDayCx()) return;
+    if (document.getElementById('c27Modal') && document.getElementById('c27Modal').style.display === 'flex') return;
+    window.c27OpenDayCx();
+  }
+
+  // 15d. Formulaire de saisie : champs retirés, note de localisation, rôle et
+  //      remarque en listes, quartier en liste, ville/quartier du jour auto.
+  var HARD_HIDE_IDS = ['fuInternetQuality', 'fuPowerQuality', 'fuCampusCount', 'fuRequestedModules', 'fuSupportRequest'];
+  var ROLES = ['DIRECTEUR (TRICE)', 'FONDATEUR / PROMOTEUR', 'PRINCIPAL', 'PROVISEUR', 'VICE DIRECTEUR', 'VICE PRINCIPAL', 'CENSEUR', 'PREFET DES ETUDES', 'DIRECTEUR DES ETUDES', 'SURVEILLANT GENERAL', 'SECRETAIRE', 'ECONOME / INTENDANT', 'COMPTABLE', 'INFORMATICIEN', 'ENSEIGNANT(E)', 'PDG', 'RECTEUR', 'VICE-RECTEUR', 'DOYEN', 'CHEF DE DEPARTEMENT', 'PRESIDENT APEE'];
+  // Remarques prédéfinies : thèmes les plus fréquents des remarques, commentaires
+  // et résumés d'appels historiques (392 textes analysés, 78 % couverts),
+  // classés par fréquence ; + statuts d'appel courants.
+  var REMARKS = ['Voir fondateur', 'Intéressé', 'Docs WhatsApp', 'Déjà un logiciel', 'Responsable absent', 'Occupé / examens', 'Pas intéressé', 'Ambassadeur', 'École fermée', 'Rappeler plus tard', 'Rendez-vous', 'Formations', 'Budget / paiement', 'Nouvelle école', 'Anglophone', 'Injoignable', 'Aucune réponse'];
+
+  function hookValue(el, onSet) {
+    if (!el || el.__c27Hooked) return;
+    var proto = el.tagName === 'SELECT' ? HTMLSelectElement.prototype : (el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype);
+    var desc = Object.getOwnPropertyDescriptor(proto, 'value');
+    if (!desc) return;
+    Object.defineProperty(el, 'value', { configurable: true, get: function () { return desc.get.call(this); }, set: function (v) { desc.set.call(this, v); try { onSet(v); } catch (e) { } } });
+    el.__c27Hooked = true;
+  }
+  function fieldOf(id) { var el = document.getElementById(id); return el && el.closest ? el.closest('.form-field') : null; }
+
+  function selectFor(input, id, options, placeholder) {
+    // Liste déroulante devant un champ texte existant (qui reste la source de
+    // vérité pour l'enregistrement) ; « Autre » révèle le champ libre.
+    if (document.getElementById(id)) return document.getElementById(id);
+    var sel = document.createElement('select');
+    sel.id = id;
+    sel.style.marginBottom = '6px';
+    input.parentNode.insertBefore(sel, input);
+    function fill(cur) {
+      var v = geoKey(cur), list = options();
+      var inList = list.some(function (o) { return geoKey(o) === v; });
+      sel.innerHTML = '<option value="">' + placeholder + '</option>' + list.map(function (o) { return '<option value="' + _attr(o) + '"' + (geoKey(o) === v && v ? ' selected' : '') + '>' + _esc(o) + '</option>'; }).join('')
+        + (v && !inList ? '<option value="__cur__" selected>' + _esc(cur) + '</option>' : '')
+        + '<option value="__autre__">✏️ Autre (saisir)…</option>';
+      input.style.display = (v && !inList) ? '' : 'none';
+    }
+    sel.__fill = fill;
+    sel.addEventListener('change', function () {
+      if (sel.value === '__autre__') { input.style.display = ''; input.__c27Silent = true; input.value = ''; input.__c27Silent = false; input.focus(); return; }
+      if (sel.value === '__cur__') return;
+      input.__c27Silent = true; input.value = sel.value; input.__c27Silent = false;
+      input.style.display = 'none';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    hookValue(input, function (v) { if (!input.__c27Silent) fill(v); });
+    fill(input.value);
+    return sel;
+  }
+
+  function enhanceForm() {
+    try {
+      var notes = document.getElementById('fuNotes');
+      if (!notes) return;
+      // a) champs retirés : Qualité internet / électricité, campus, modules, support
+      HARD_HIDE_IDS.forEach(function (id) { var f = fieldOf(id); if (f) { f.style.display = 'none'; f.setAttribute('data-c27-removed', '1'); } });
+      // b) Localisation : une simple note facultative
+      var loc = document.getElementById('fuLocation');
+      if (loc) {
+        var lf = fieldOf('fuLocation');
+        var lab = lf && lf.querySelector('label');
+        if (lab) lab.textContent = '📝 Note sur la localisation / repère (facultatif)';
+        loc.placeholder = 'Ex : en face de la pharmacie, portail bleu après le carrefour';
+      }
+      // c) Rôle du contact : liste déroulante (+ Autre)
+      var role = document.getElementById('fuContactRole');
+      if (role) selectFor(role, 'c27RoleSel', function () { return ROLES; }, '— Choisir le poste —');
+      // d) Quartier : liste des quartiers de la ville (+ Autre)
+      var q = document.getElementById('fuQuartier');
+      var city = document.getElementById('fuCity');
+      if (q && city) {
+        var qs = selectFor(q, 'c27QuartierSel', function () { return geoQuartiers(city.value).map(function (x) { return x.n; }); }, '— Choisir le quartier —');
+        if (!city.__c27CityHooked) {
+          city.__c27CityHooked = true;
+          ensureCityOption(city);
+          city.addEventListener('change', function () { qs.__fill(q.value); });
+          // la liste se recalcule aussi à l'ouverture (ville changée par le code)
+          qs.addEventListener('focus', function () { qs.__fill(q.value); });
+          qs.addEventListener('mousedown', function () { qs.__fill(q.value); });
+        }
+      }
+      // e) Remarque : liste prédéfinie + champ libre éditable (Notes)
+      if (!document.getElementById('c27RemarkSel')) {
+        var nf = fieldOf('fuNotes');
+        var wrap = document.createElement('div');
+        wrap.className = 'form-field';
+        wrap.id = 'c27RemarkWrap';
+        wrap.innerHTML = '<label>💬 Remarque (choix rapide)</label><select id="c27RemarkSel"><option value="">— Choisir une remarque —</option>'
+          + REMARKS.map(function (r) { return '<option value="' + _attr(r) + '">' + _esc(r) + '</option>'; }).join('') + '</select>';
+        nf.parentNode.insertBefore(wrap, nf);
+        var nl = nf.querySelector('label');
+        if (nl) nl.textContent = '✍️ Remarque libre / détails (à saisir ou éditer)';
+      }
+      // f) photo des lieux, juste sous la note de localisation
+      ensurePhotoField();
+      // g) ville + quartier du jour appliqués aux nouvelles saisies
+      applyDayCxToForm(false);
+    } catch (e) { }
+  }
+
+  function ensureCityOption(sel) {
+    // Les villes du référentiel absentes de la liste d'origine y sont ajoutées.
+    try {
+      var have = {};
+      Array.prototype.forEach.call(sel.options, function (o) { have[geoKey(o.value)] = 1; });
+      geoRegions().forEach(function (r) {
+        r.cities.forEach(function (c) {
+          if (have[c.key]) return;
+          var o = document.createElement('option');
+          o.value = c.key; o.textContent = c.name + ' (' + r.name + ')';
+          sel.appendChild(o);
+          have[c.key] = 1;
+        });
+      });
+    } catch (e) { }
+  }
+
+  function applyDayCxToForm(force) {
+    try {
+      if (window.followupEditMode === 'edit') return;
+      var cx = getDayCx();
+      if (!cx) return;
+      var city = document.getElementById('fuCity'), q = document.getElementById('fuQuartier');
+      var school = document.getElementById('fuSchool');
+      var isNewSchool = !school || !school.value || school.value === '__other__';
+      if (city && (force || isNewSchool)) { ensureCityOption(city); city.value = cx.city; }
+      if (q && (force || isNewSchool || !q.value)) q.value = cx.quartier;
+    } catch (e) { }
+  }
+
+  // 15e. Contrôle de périmètre : une visite terrain doit être faite DANS le
+  //      quartier choisi ; hors périmètre → choisir le nouveau quartier.
+  var QUARTIER_RADIUS_KM = 2;
+  function nearestGeoQuartier(cityKey, p) {
+    var best = null, bd = Infinity;
+    geoQuartiers(cityKey).forEach(function (x) { if (x.lat == null) return; var d = kmBetween(p, x); if (d < bd) { bd = d; best = x; } });
+    return best ? { n: best.n, km: bd } : null;
+  }
+  function geofenceCheck() {
+    // Renvoie null si OK, sinon { msg, suggest }.
+    var type = (document.getElementById('fuType') || {}).value;
+    if (type !== 'VISIT' && type !== 'PROSPECTION') return null;
+    if ((typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser)) return null;
+    var fix = bestRecentFix();
+    if (!fix) return null; // sans position, la saisie reste possible (signalée dans le score de confiance)
+    var city = (document.getElementById('fuCity') || {}).value || '';
+    var q = (document.getElementById('fuQuartier') || {}).value || '';
+    var qc = quartierCoords(city, q);
+    if (!qc) return null; // quartier non géolocalisé : contrôle impossible
+    var d = kmBetween({ lat: fix.lat, lng: fix.lng }, qc);
+    if (d <= QUARTIER_RADIUS_KM) return null;
+    var near = nearestGeoQuartier(city, { lat: fix.lat, lng: fix.lng });
+    return { km: d, q: geoKey(q), suggest: near && near.n !== geoKey(q) ? near.n : '' };
+  }
+  window.c27UseQuartier = function (q) {
+    var input = document.getElementById('fuQuartier');
+    if (input) input.value = q;
+    var cx = getDayCx();
+    if (cx) setDayCx(cx.city, q);
+    var box = document.getElementById('c27GeoNotice'); if (box) box.remove();
+    _toast('📍 Quartier mis à jour : ' + q);
+  };
+  function showGeoNotice(g) {
+    var old = document.getElementById('c27GeoNotice'); if (old) old.remove();
+    var anchor = fieldOf('fuQuartier'); if (!anchor) return;
+    var div = document.createElement('div');
+    div.id = 'c27GeoNotice';
+    div.className = 'form-field full';
+    div.style.cssText = 'grid-column:1/-1;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.55;color:#7F1D1D';
+    div.innerHTML = '📍 <b>Hors du périmètre de ' + _esc(g.q) + '</b> : votre position est à ' + g.km.toFixed(1) + ' km de ce quartier (rayon accepté ' + QUARTIER_RADIUS_KM + ' km). Indiquez le quartier où vous êtes réellement.'
+      + (g.suggest ? '<br><button type="button" class="c27-ask-btn" onclick="c27UseQuartier(\'' + _attr(g.suggest) + '\')">✓ Je suis à ' + _esc(g.suggest) + '</button>' : '');
+    anchor.parentNode.insertBefore(div, anchor.nextSibling);
+    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // 15f. Option Suivi : historique complet de l'école sélectionnée.
+  function schoolHistory(name) {
+    var k = schoolKey(name);
+    var items = [];
+    fullFups().forEach(function (f) {
+      if (!f || schoolKey(f.SchoolName) !== k) return;
+      var m = entryMetaOf(f);
+      var txt = (typeof splitFollowupNotes === 'function') ? splitFollowupNotes(f.Notes).text : String(f.Notes || '');
+      items.push({ ts: tsMs(f.Timestamp), type: f.FollowupType || '', who: f.ContactName || '', role: f.ContactRole || '', said: txt || f.Outcome || '', outcome: f.Outcome || '', remark: m.remark || '', next: f.NextAction || '', nextDate: f.NextDate || '', expert: canonicalPersonName(f.Expert) });
+    });
+    fullRows().forEach(function (r) {
+      if (!r || schoolKey(r.n) !== k) return;
+      items.push({ ts: tsMs(r.t), type: 'PROSPECTION', who: r.rn || '', role: r.rp || '', said: [r.re, r.co].filter(Boolean).join(' — '), outcome: '', remark: '', next: '', nextDate: '', expert: canonicalPersonName(r.e) });
+    });
+    items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    return items;
+  }
+  var CHANNEL_LABEL = { CALL: '📞 Appel', WHATSAPP: '💬 WhatsApp', SMS: '📱 SMS', VISIT: '🚶 Visite', PROSPECTION: '🚶 Descente terrain', EMAIL: '📧 Email', LETTER: '📨 Courrier', FOLLOWUP: '🔁 Suivi' };
+  function renderSchoolHistory() {
+    try {
+      var sel = document.getElementById('fuSchool');
+      var old = document.getElementById('c27SchoolHist');
+      if (!sel || !sel.value || sel.value === '__other__') { if (old) old.remove(); return; }
+      var items = schoolHistory(sel.value);
+      if (!old) {
+        old = document.createElement('div');
+        old.id = 'c27SchoolHist';
+        old.className = 'form-field full';
+        old.style.gridColumn = '1/-1';
+        var anchor = sel.closest ? sel.closest('.form-field') : null;
+        if (!anchor) return;
+        anchor.parentNode.insertBefore(old, anchor.nextSibling);
+      }
+      if (!items.length) { old.innerHTML = '<div class="note teal" style="margin:0">🆕 Aucun échange enregistré avec cette école pour l\'instant.</div>'; return; }
+      var visits = items.filter(function (x) { return x.type === 'VISIT' || x.type === 'PROSPECTION'; }).length;
+      var calls = items.filter(function (x) { return x.type === 'CALL'; }).length;
+      var people = {};
+      items.forEach(function (x) { if (x.who) people[x.who.trim()] = x.role || people[x.who.trim()] || ''; });
+      var rdv = items.filter(function (x) { return /rendez|rdv/i.test([x.next, x.said, x.outcome, x.remark].join(' ')); });
+      var nextRdv = items.filter(function (x) { return x.nextDate; }).map(function (x) { return x.nextDate; }).sort().reverse()[0] || '';
+      var h = '<div style="border:1.5px solid #B08D2F;border-radius:14px;background:linear-gradient(135deg,#F7F1E3,#FFFDF8);padding:14px 16px">'
+        + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#B08D2F;margin-bottom:8px">Historique de l\'école · informations reprises automatiquement</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+        + chipH('🚶 Visites terrain', visits) + chipH('📞 Appels', calls) + chipH('👥 Personnes jointes', Object.keys(people).length) + chipH('🤝 Rendez-vous', rdv.length)
+        + (nextRdv ? '<span style="background:#1C1917;color:#F4EBD6;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700">📅 Prochaine action : ' + _esc(nextRdv) + '</span>' : '')
+        + '</div>'
+        + (Object.keys(people).length ? '<div style="font-size:12.5px;margin-bottom:10px"><b>Personnes jointes :</b> ' + Object.keys(people).map(function (p) { return _esc(p) + (people[p] ? ' <span class="c27-muted">(' + _esc(people[p]) + ')</span>' : ''); }).join(' · ') + '</div>' : '')
+        + '<div style="overflow-x:auto"><table class="c27-tbl" style="width:100%;font-size:12.5px;border-collapse:collapse"><thead><tr>'
+        + '<th style="text-align:left;padding:6px">Date</th><th style="text-align:left;padding:6px">Canal</th><th style="text-align:left;padding:6px">Personne</th><th style="text-align:left;padding:6px">Ce qui a été dit</th><th style="text-align:left;padding:6px">Remarque</th></tr></thead><tbody>';
+      items.slice(0, 10).forEach(function (x) {
+        h += '<tr style="border-top:1px solid #E7E5E4"><td style="padding:6px;white-space:nowrap">' + (x.ts ? new Date(x.ts).toLocaleDateString('fr-FR') : '—') + '</td>'
+          + '<td style="padding:6px;white-space:nowrap">' + (CHANNEL_LABEL[x.type] || _esc(x.type)) + '</td>'
+          + '<td style="padding:6px">' + _esc(x.who || '—') + (x.expert ? '<div class="c27-muted">par ' + _esc(x.expert) + '</div>' : '') + '</td>'
+          + '<td style="padding:6px">' + _esc(String(x.said || '—').slice(0, 220)) + (x.next ? '<div class="c27-muted">➡ ' + _esc(x.next) + (x.nextDate ? ' (' + _esc(x.nextDate) + ')' : '') + '</div>' : '') + '</td>'
+          + '<td style="padding:6px">' + (x.remark ? '<span style="background:#F7F1E3;border-radius:999px;padding:3px 9px;font-weight:700;color:#7A5F1C">' + _esc(x.remark) + '</span>' : '<span class="c27-muted">—</span>') + '</td></tr>';
+      });
+      h += '</tbody></table></div>' + (items.length > 10 ? '<div class="c27-muted" style="margin-top:6px">+ ' + (items.length - 10) + ' échange(s) plus ancien(s) dans l\'historique du portefeuille.</div>' : '') + '</div>';
+      old.innerHTML = h;
+    } catch (e) { }
+  }
+  function chipH(label, n) { return '<span style="background:#fff;border:1px solid #E7E5E4;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700">' + label + ' : <b style="font-family:Fraunces,serif;font-size:15px">' + n + '</b></span>'; }
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
@@ -3055,13 +3512,23 @@
     installPhotoGate();
     injectMapShortcut();
     applyNavSimplification();
-    setInterval(function () { injectMapShortcut(); applySimpleForm(); }, 10000);
+    setInterval(function () { injectMapShortcut(); applySimpleForm(); renderDayPill(); maybeAskDayCx(); if (document.getElementById('fuNotes') && !document.getElementById('c27RemarkSel')) ensureGeo(enhanceForm); }, 10000);
+    // 5. Journée (ville + quartier) : référentiel chargé, pastille, demande du jour.
+    ensureGeo(function () { renderDayPill(); setTimeout(maybeAskDayCx, 1500); });
     // 4. Mise à jour automatique : vérification 5 min + au retour sur l'app.
     setInterval(checkForUpdate, 5 * 60 * 1000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) checkForUpdate(); });
     setTimeout(checkForUpdate, 20000);
     document.addEventListener('change', function (ev) {
       if (ev.target && ev.target.id === 'fuType') { ensurePhotoField(); updatePhotoUi(); }
+      if (ev.target && ev.target.id === 'fuSchool') {
+        // après le pré-remplissage d'origine : historique + quartier du jour si vide
+        setTimeout(function () {
+          renderSchoolHistory(); applyDayCxToForm(false); updatePhotoUi();
+          var qs = document.getElementById('c27QuartierSel'), qi = document.getElementById('fuQuartier');
+          if (qs && qs.__fill && qi) qs.__fill(qi.value);
+        }, 80);
+      }
     }, true);
     // Capture GPS : au chargement (si connecté), à l'activation du Workspace et du pane 2027.
     if (window.currentUser) geoCapture('boot');
@@ -3069,7 +3536,7 @@
       var btn = ev.target && ev.target.closest ? ev.target.closest('[data-pane]') : null;
       if (!btn) return;
       var pane = btn.dataset ? btn.dataset.pane : '';
-      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(function () { ensurePhotoField(); applySimpleForm(); }, 250); }
+      if (pane === 'suivi') { geoCapture('workspace'); markFormOpened(); setTimeout(function () { ensureGeo(enhanceForm); applySimpleForm(); }, 250); }
       if (pane === 'c27') { geoCapture('c27'); setTimeout(rC27, 50); }
       if (pane === 'carte') { geoCapture('carte'); setTimeout(function () { if (typeof window.rCarte === 'function') window.rCarte(); }, 50); }
     }, true);
@@ -3077,14 +3544,14 @@
     var _origActivate = window.activateSuiviPanel;
     if (typeof _origActivate === 'function') {
       window.activateSuiviPanel = function (key, opts) {
-        if (key === 'add') { markFormOpened(); setTimeout(function () { ensurePhotoField(); applySimpleForm(); }, 200); }
+        if (key === 'add') { markFormOpened(); setTimeout(function () { ensureGeo(enhanceForm); applySimpleForm(); renderSchoolHistory(); }, 200); }
         return _origActivate(key, opts);
       };
     }
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

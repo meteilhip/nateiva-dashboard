@@ -90,7 +90,77 @@ async function harvestCity(city, cc) {
 
 const normKey = (city, name) => city + '|' + String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+// ---------------------------------------------------------------------------
+// Phase GEO : villes (place=city|town) et quartiers (suburb|quarter|
+// neighbourhood) de chaque région, avec coordonnées, fusionnés dans
+// nateiva-geo.generated.js (le référentiel de départ est conservé).
+// ---------------------------------------------------------------------------
+const GEO_OUT = 'nateiva-geo.generated.js';
+const REGION_ISO = { AD: 'CM-AD', CE: 'CM-CE', ES: 'CM-ES', EN: 'CM-EN', LT: 'CM-LT', NO: 'CM-NO', NW: 'CM-NW', OU: 'CM-OU', SU: 'CM-SU', SW: 'CM-SW' };
+const nk = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+const kmB = (a, b) => { const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lng - a.lng) * Math.PI / 180; const s = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s)); };
+async function overpass(q) {
+  for (const ep of ENDPOINTS) {
+    try { return JSON.parse(await post(ep, 'data=' + encodeURIComponent(q))); } catch (e) { console.error('geo', ep, e.message); }
+  }
+  return null;
+}
+async function harvestGeo() {
+  const cur = fs.readFileSync(GEO_OUT, 'utf-8');
+  const m = cur.match(/window\.NATEIVA_GEO\s*=\s*(\{[\s\S]*\});/);
+  const geo = JSON.parse(m[1]);
+  let towns = 0, quarters = 0;
+  for (const region of geo.regions) {
+    const iso = REGION_ISO[region.code];
+    const jt = await overpass(`[out:json][timeout:120];area["ISO3166-2"="${iso}"]->.a;(node(area.a)["place"~"^(city|town)$"];);out tags;`);
+    await new Promise(r => setTimeout(r, 3000));
+    const jq = await overpass(`[out:json][timeout:150];area["ISO3166-2"="${iso}"]->.a;(node(area.a)["place"~"^(suburb|quarter|neighbourhood)$"];);out tags;`);
+    await new Promise(r => setTimeout(r, 3000));
+    if (jt) {
+      (jt.elements || []).forEach(el => {
+        const name = el.tags && (el.tags['name:fr'] || el.tags.name);
+        if (!name || el.lat == null) return;
+        const key = nk(name);
+        let city = region.cities.find(c => c.key === key || nk(c.name) === key);
+        if (!city) { city = { key, name, quartiers: [] }; region.cities.push(city); }
+        if (city.lat == null) { city.lat = Math.round(el.lat * 1e4) / 1e4; city.lng = Math.round(el.lon * 1e4) / 1e4; }
+        towns++;
+      });
+    }
+    if (jq) {
+      const withCoords = region.cities.filter(c => c.lat != null);
+      (jq.elements || []).forEach(el => {
+        const name = el.tags && (el.tags['name:fr'] || el.tags.name);
+        if (!name || el.lat == null || !withCoords.length) return;
+        const p = { lat: el.lat, lng: el.lon };
+        let best = null, bd = Infinity;
+        withCoords.forEach(c => { const d = kmB(p, c); if (d < bd) { bd = d; best = c; } });
+        if (!best || bd > 25) return; // quartier rural isolé : ignoré
+        const qn = nk(name);
+        const existing = best.quartiers.find(q => nk(q.n) === qn);
+        if (existing) { if (existing.lat == null) { existing.lat = Math.round(el.lat * 1e5) / 1e5; existing.lng = Math.round(el.lon * 1e5) / 1e5; } }
+        else best.quartiers.push({ n: qn, lat: Math.round(el.lat * 1e5) / 1e5, lng: Math.round(el.lon * 1e5) / 1e5 });
+        quarters++;
+      });
+    }
+    region.cities.sort((a, b) => (b.quartiers.length - a.quartiers.length) || a.name.localeCompare(b.name));
+    region.cities.forEach(c => c.quartiers.sort((a, b) => a.n.localeCompare(b.n)));
+    console.log('GEO', region.name, region.cities.length, 'villes');
+  }
+  geo.generatedAt = new Date().toISOString().slice(0, 10);
+  geo.source = 'seed+osm';
+  const header = cur.split('window.NATEIVA_GEO')[0];
+  fs.writeFileSync(GEO_OUT, header + 'window.NATEIVA_GEO = ' + JSON.stringify(geo) + ';\n');
+  console.log('GEO TOTAL', towns, 'villes OSM,', quarters, 'quartiers géolocalisés');
+}
+
+const TARGET = (process.env.TARGET || 'all').toLowerCase();
+
 (async () => {
+  if (TARGET === 'geo' || TARGET === 'all') {
+    try { await harvestGeo(); } catch (e) { console.error('GEO échec', e.message); }
+    if (TARGET === 'geo') return;
+  }
   let manual = [];
   const previous = {};
   const knownKeys = {}; // clé → addedAt éventuel, pour marquer les VRAIES nouveautés
