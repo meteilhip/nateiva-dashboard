@@ -1,6 +1,11 @@
 name: Récolte écoles (OpenStreetMap)
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Quoi récolter : all (écoles + quartiers), schools, geo"
+        required: false
+        default: "all"
   schedule:
     # Le 1er février, puis le 1er de chaque mois jusqu'au 1er mai (03h17 UTC).
     # Note : ce calendrier se répète chaque année (fév→mai) ; lançable à la
@@ -17,10 +22,13 @@ jobs:
         with:
           node-version: '20'
       - run: node scripts/harvest-schools.js
+        env:
+          TARGET: ${{ github.event.inputs.target || 'all' }}
       - name: Commit du répertoire
         run: |
           git config user.name "nateiva-harvest-bot"
           git config user.email "noreply@nateiva.com"
-          git add nateiva-schools-directory.generated.js
-          git diff --cached --quiet || git commit -m "Répertoire écoles: récolte OpenStreetMap automatique"
+          git add nateiva-schools-directory.generated.js nateiva-geo.generated.js
+          git diff --cached --quiet || git commit -m "Répertoire écoles/quartiers: récolte OpenStreetMap automatique"
+          git pull --rebase origin main || true
           git push
