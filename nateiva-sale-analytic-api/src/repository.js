@@ -582,6 +582,43 @@ async function getDayTypeFor(username, dateStr) {
   return rows.length ? rows[0].day_type : "";
 }
 
+// === Documents & notes par école ===
+function mapDocument(row) {
+  return {
+    id: row.id, schoolKey: row.school_key, schoolName: row.school_name, kind: row.kind,
+    title: row.title || '', note: row.note || '', fileName: row.file_name || '', mime: row.mime || '',
+    sizeBytes: row.size_bytes || 0, clientRef: row.client_ref || '',
+    createdByUsername: row.created_by_username, createdByFullName: row.created_by_fullname || '',
+    createdAt: row.created_at
+  };
+}
+async function insertDocument(input) {
+  const result = await query(
+    `INSERT INTO school_documents (school_key, school_name, kind, title, note, file_name, mime, size_bytes, storage_path, client_ref, created_by_username, created_by_fullname)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`,
+    [schoolKeyNormalize(input.schoolName), String(input.schoolName || '').trim(), input.kind, input.title || '', input.note || null,
+     input.fileName || '', input.mime || '', input.sizeBytes || 0, input.storagePath || '', input.clientRef || '',
+     input.createdByUsername, input.createdByFullName || '']
+  );
+  const rows = await query(`SELECT * FROM school_documents WHERE id = ? LIMIT 1`, [result.insertId]);
+  return rows.length ? mapDocument(rows[0]) : null;
+}
+async function listDocumentsForSchool(schoolName) {
+  const rows = await query(
+    `SELECT * FROM school_documents WHERE school_key = ? AND deleted_at IS NULL ORDER BY created_at DESC, id DESC`,
+    [schoolKeyNormalize(schoolName)]
+  );
+  return rows.map(mapDocument);
+}
+async function getDocumentRow(id) {
+  const rows = await query(`SELECT * FROM school_documents WHERE id = ? AND deleted_at IS NULL LIMIT 1`, [id]);
+  return rows.length ? rows[0] : null;
+}
+async function softDeleteDocument(id) {
+  await query(`UPDATE school_documents SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+}
+
 async function getBootstrapPayload(viewer, extra) {
   const campaignStartIso = (extra && extra.campaignStartIso) || "2027-01-01T00:00:00";
   const campaignYear = (extra && extra.campaignYear) || 2027;
@@ -642,5 +679,9 @@ module.exports = {
   decideClaimRequest,
   listWorkSchedules,
   setWorkSchedules,
-  getDayTypeFor
+  getDayTypeFor,
+  insertDocument,
+  listDocumentsForSchool,
+  getDocumentRow,
+  softDeleteDocument
 };

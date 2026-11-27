@@ -103,3 +103,25 @@ CREATE TABLE IF NOT EXISTS work_schedules (
   UNIQUE KEY ws_member_date (member_username, work_date),
   KEY ws_date_idx (work_date)
 );
+
+CREATE TABLE IF NOT EXISTS school_documents (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  school_key VARCHAR(255) NOT NULL,
+  school_name VARCHAR(255) NOT NULL,
+  kind ENUM('note','file') NOT NULL,
+  title VARCHAR(255) NOT NULL DEFAULT '',
+  note TEXT NULL,
+  file_name VARCHAR(255) NOT NULL DEFAULT '',
+  mime VARCHAR(120) NOT NULL DEFAULT '',
+  size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+  storage_path VARCHAR(500) NOT NULL DEFAULT '',
+  client_ref VARCHAR(80) NOT NULL DEFAULT '',
+  created_by_username VARCHAR(120) NOT NULL,
+  created_by_fullname VARCHAR(255) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY sd_school_idx (school_key),
+  KEY sd_creator_idx (created_by_username),
+  UNIQUE KEY sd_client_ref (client_ref, created_by_username)
+);

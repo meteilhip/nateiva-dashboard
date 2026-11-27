@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest, listWorkSchedules, setWorkSchedules, getDayTypeFor } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest, listWorkSchedules, setWorkSchedules, getDayTypeFor, insertDocument, listDocumentsForSchool, getDocumentRow, softDeleteDocument } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
@@ -331,6 +331,106 @@ app.post("/api/schedule", authRequired, async function setScheduleHandler(req, r
     }
     const results = await setWorkSchedules(viewer, Array.isArray(req.body.entries) ? req.body.entries : []);
     return res.json({ success: true, results });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// === Documents & notes par école ===
+// Fichiers stockés HORS du dossier de release (règle d'hébergement VPS) :
+// NATEIVA_DOCS_DIR, par défaut /var/lib/nateiva-sale-analytic-api/documents.
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const DOCS_DIR = process.env.NATEIVA_DOCS_DIR || "/var/lib/nateiva-sale-analytic-api/documents";
+const DOC_MAX_BYTES = 3.5 * 1024 * 1024; // 3,5 Mo par fichier (limite du proxy Vercel ≈ 4,5 Mo)
+const DOC_MIME_OK = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet))|application\/vnd\.ms-excel|text\/plain)$/;
+
+async function canSeeSchoolDocs(viewer, schoolName, uploaderUsername) {
+  if (!viewer) return false;
+  if (viewer.role === "SuperAdmin" || viewer.role === "SubAdmin") return true;
+  if (viewer.permissions && viewer.permissions.dataScope === "all") return true;
+  if (uploaderUsername && String(uploaderUsername).toLowerCase() === String(viewer.username).toLowerCase()) return true;
+  try {
+    const claim = await findCampaignClaimForSchool(CAMPAIGN_START_ISO, schoolName);
+    if (claim && (String(claim.owner || "").toLowerCase() === String(viewer.fullName || "").toLowerCase() || String(claim.ownerUsername || "").toLowerCase() === String(viewer.username || "").toLowerCase())) return true;
+  } catch (e) { }
+  return false;
+}
+
+app.post("/api/documents", authRequired, async function createDocumentHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const schoolName = String(req.body.schoolName || "").trim();
+    const kind = req.body.kind === "file" ? "file" : "note";
+    if (!schoolName) return res.status(400).json({ success: false, error: "École requise" });
+    let storagePath = "", sizeBytes = 0, mime = "", fileName = "";
+    if (kind === "file") {
+      mime = String(req.body.mime || "").toLowerCase();
+      fileName = String(req.body.fileName || "document").replace(/[^\w.\- ()À-ÿ]/g, "_").slice(0, 200);
+      if (!DOC_MIME_OK.test(mime)) return res.status(400).json({ success: false, error: "Type de fichier non accepté (photo, PDF, Word, Excel, texte)" });
+      const buf = Buffer.from(String(req.body.dataBase64 || ""), "base64");
+      if (!buf.length) return res.status(400).json({ success: false, error: "Fichier vide" });
+      if (buf.length > DOC_MAX_BYTES) return res.status(413).json({ success: false, error: "Fichier trop lourd (3,5 Mo max)" });
+      const sub = new Date().toISOString().slice(0, 7);
+      const dir = path.join(DOCS_DIR, sub);
+      fs.mkdirSync(dir, { recursive: true });
+      const name = crypto.randomBytes(12).toString("hex") + path.extname(fileName).slice(0, 10);
+      storagePath = path.join(sub, name);
+      fs.writeFileSync(path.join(DOCS_DIR, storagePath), buf);
+      sizeBytes = buf.length;
+    }
+    const doc = await insertDocument({
+      schoolName, kind, title: String(req.body.title || "").slice(0, 250), note: kind === "note" ? String(req.body.note || "").slice(0, 8000) : String(req.body.note || "").slice(0, 2000),
+      fileName, mime, sizeBytes, storagePath, clientRef: String(req.body.clientRef || "").slice(0, 80),
+      createdByUsername: viewer.username, createdByFullName: viewer.fullName
+    });
+    return res.json({ success: true, document: doc });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/documents", authRequired, async function listDocumentsHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const schoolName = String(req.query.school || "").trim();
+    if (!schoolName) return res.status(400).json({ success: false, error: "École requise" });
+    const docs = await listDocumentsForSchool(schoolName);
+    const allowedAll = await canSeeSchoolDocs(viewer, schoolName, "");
+    const visible = allowedAll ? docs : docs.filter((d) => String(d.createdByUsername).toLowerCase() === String(viewer.username).toLowerCase());
+    return res.json({ success: true, documents: visible });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/documents/:id/raw", authRequired, async function rawDocumentHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const row = await getDocumentRow(Number(req.params.id));
+    if (!row || row.kind !== "file") return res.status(404).json({ success: false, error: "Document introuvable" });
+    if (!(await canSeeSchoolDocs(viewer, row.school_name, row.created_by_username))) return res.status(403).json({ success: false, error: "Accès refusé" });
+    const full = path.resolve(DOCS_DIR, row.storage_path);
+    if (!full.startsWith(path.resolve(DOCS_DIR) + path.sep) || !fs.existsSync(full)) return res.status(404).json({ success: false, error: "Fichier introuvable" });
+    res.setHeader("Content-Type", row.mime || "application/octet-stream");
+    res.setHeader("Content-Disposition", "inline; filename*=UTF-8''" + encodeURIComponent(row.file_name || "document"));
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return fs.createReadStream(full).pipe(res);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/documents/:id", authRequired, async function deleteDocumentHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const row = await getDocumentRow(Number(req.params.id));
+    if (!row) return res.status(404).json({ success: false, error: "Document introuvable" });
+    const own = String(row.created_by_username).toLowerCase() === String(viewer.username).toLowerCase();
+    if (!own && viewer.role !== "SuperAdmin") return res.status(403).json({ success: false, error: "Seul l'auteur ou le Super Admin peut supprimer" });
+    await softDeleteDocument(row.id);
+    return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

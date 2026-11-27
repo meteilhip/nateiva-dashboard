@@ -140,6 +140,7 @@
       }
       var cxM = getDayCx();
       if (cxM && !editableExisting) { meta.dayCity = cxM.city; meta.dayQuartier = cxM.quartier; }
+      applySignMeta(meta, editableExisting);
     } catch (eR) { }
     try {
       if (editableExisting && typeof splitFollowupNotes === 'function') {
@@ -390,6 +391,7 @@
       flushPendingRequests();
       flushPendingSchedules();
       invalidateStripCache();
+      setTimeout(flushDocQueue, 1500);
     } catch (e) { }
   };
 
@@ -835,6 +837,7 @@
     if (myDay) h += '<div style="margin:-6px 0 14px">' + dayTypeChip(myDay) + '</div>';
     h += '<div class="c27-tabs">'
       + tabBtn('list', '📞 Liste prioritaire', tab)
+      + tabBtn('signed', '🏆 Signées', tab)
       + tabBtn('claims', '👑 Attributions & demandes', tab)
       + (admin ? tabBtn('team', '👥 Mon équipe', tab) : '')
       + (admin ? tabBtn('plan', '🗓 Planning', tab) : '')
@@ -844,6 +847,7 @@
 
     if (tab === 'map') tab = 'list'; // la carte est désormais sa propre page 🗺
     if (tab === 'list') h += renderPriorityTab(priority, admin);
+    else if (tab === 'signed') h += renderSignedTab();
     else if (tab === 'claims') h += renderClaimsTab(myClaims, superA, admin);
     else if (tab === 'team') h += renderTeamTab();
     else if (tab === 'plan') h += renderPlanningTab();
@@ -2566,6 +2570,16 @@
           return;
         }
       } catch (e2) { }
+      // Signature : infos obligatoires quand le statut est 🟢 Converti.
+      try {
+        ensureSignBlock();
+        var miss = signMissing();
+        if (miss) {
+          var sw = document.getElementById('c27SignWrap'); if (sw) sw.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          _toast('✍️ École signée : indiquez ' + miss, true);
+          return;
+        }
+      } catch (eS) { }
       // Ville + quartier du jour appliqués si le champ est resté vide.
       try {
         var qIn = document.getElementById('fuQuartier');
@@ -2728,7 +2742,7 @@
   // « Détails complémentaires » et reste facultatif. Les admins gardent le
   // formulaire complet par défaut ; chacun peut basculer.
   var FORM_MODE_LS = 'nateiva_c27_form_mode'; // 'simple' | 'full' | '' (auto)
-  var SIMPLE_HIDE_IDS = ['fuAppMode', 'fuBudgetTiming', 'fuCallDuration', 'fuCallRating', 'fuCallStart', 'fuCampusCount', 'fuCategory', 'fuCurrentSystem', 'fuDaysToAnswer', 'fuDecisionMaker', 'fuDecisionReach', 'fuDeliveryMode', 'fuDepositor', 'fuDepotDate', 'fuDepotLocation', 'fuFollowedUpBy', 'fuInternetQuality', 'fuPowerQuality', 'fuPreferredChannel', 'fuProductType', 'fuProspectionYear', 'fuRecordedAt', 'fuRequestedModules', 'fuResponseDate', 'fuResponseReceived', 'fuSecondCall', 'fuSector', 'fuSupportRequest', 'fuTimesCalled', 'fuToSuperior', 'fuWhatsappDocs'];
+  var SIMPLE_HIDE_IDS = ['fuBudgetTiming', 'fuCallDuration', 'fuCallRating', 'fuCallStart', 'fuCampusCount', 'fuCategory', 'fuCurrentSystem', 'fuDaysToAnswer', 'fuDecisionMaker', 'fuDecisionReach', 'fuDeliveryMode', 'fuDepositor', 'fuDepotDate', 'fuDepotLocation', 'fuFollowedUpBy', 'fuInternetQuality', 'fuPowerQuality', 'fuPreferredChannel', 'fuProductType', 'fuProspectionYear', 'fuRecordedAt', 'fuRequestedModules', 'fuResponseDate', 'fuResponseReceived', 'fuSecondCall', 'fuSector', 'fuSupportRequest', 'fuTimesCalled', 'fuToSuperior', 'fuWhatsappDocs'];
 
   function formModeActive() {
     var stored = lsGet(FORM_MODE_LS, '');
@@ -3346,6 +3360,8 @@
       }
       // f) photo des lieux, juste sous la note de localisation
       ensurePhotoField();
+      // f2) bloc Signature (visible quand le statut est 🟢 Converti)
+      ensureSignBlock();
       // g) ville + quartier du jour appliqués aux nouvelles saisies
       applyDayCxToForm(false);
     } catch (e) { }
@@ -3459,7 +3475,7 @@
         if (!anchor) return;
         anchor.parentNode.insertBefore(old, anchor.nextSibling);
       }
-      if (!items.length) { old.innerHTML = '<div class="note teal" style="margin:0">🆕 Aucun échange enregistré avec cette école pour l\'instant.</div>'; return; }
+      if (!items.length) { old.innerHTML = '<div class="note teal" style="margin:0">🆕 Aucun échange enregistré avec cette école pour l\'instant.</div>'; attachDocsToHistory(); return; }
       var visits = items.filter(function (x) { return x.type === 'VISIT' || x.type === 'PROSPECTION'; }).length;
       var calls = items.filter(function (x) { return x.type === 'CALL'; }).length;
       var people = {};
@@ -3484,6 +3500,7 @@
       });
       h += '</tbody></table></div>' + (items.length > 10 ? '<div class="c27-muted" style="margin-top:6px">+ ' + (items.length - 10) + ' échange(s) plus ancien(s) dans l\'historique du portefeuille.</div>' : '') + '</div>';
       old.innerHTML = h;
+      attachDocsToHistory();
     } catch (e) { }
   }
   function chipH(label, n) { return '<span style="background:#fff;border:1px solid #E7E5E4;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700">' + label + ' : <b style="font-family:Fraunces,serif;font-size:15px">' + n + '</b></span>'; }
@@ -3618,12 +3635,343 @@
     } catch (e) { }
   }
 
+  /* ======================= 17. SIGNATURES, DOCUMENTS & NOTES ============== */
+  // 17a. Bloc « Signature » : dès que le statut est 🟢 Converti, la saisie
+  //      exige le nom complet et le téléphone du signataire, la version signée
+  //      (Online / Offline) et la ville.
+  function isConverti() { var st = document.getElementById('fuStatus'); return !!st && st.value === 'Converti'; }
+  function ensureSignBlock() {
+    try {
+      var st = document.getElementById('fuStatus');
+      if (!st) return;
+      var wrap = document.getElementById('c27SignWrap');
+      if (!wrap) {
+        var anchor = st.closest ? st.closest('.form-field') : null;
+        if (!anchor) return;
+        wrap = document.createElement('div');
+        wrap.id = 'c27SignWrap';
+        wrap.className = 'form-field full';
+        wrap.style.gridColumn = '1/-1';
+        wrap.innerHTML = '<div style="border:2px solid #DC2626;border-radius:14px;background:#FEF2F2;padding:14px 16px">'
+          + '<div style="font-weight:900;color:#991B1B;font-size:14px;margin-bottom:10px">✍️ Signature — obligatoire pour une école signée</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+          + '<div><label style="font-size:11px;font-weight:800;text-transform:uppercase;color:#7F1D1D">Nom complet du signataire</label><input id="c27SignName" placeholder="Ex : Mme Simo Clarisse" style="width:100%"></div>'
+          + '<div><label style="font-size:11px;font-weight:800;text-transform:uppercase;color:#7F1D1D">Téléphone du signataire</label><input id="c27SignPhone" type="tel" inputmode="tel" placeholder="6XX XX XX XX" style="width:100%"></div>'
+          + '<div><label style="font-size:11px;font-weight:800;text-transform:uppercase;color:#7F1D1D">Version signée</label><div style="display:flex;gap:6px">'
+          + '<button type="button" id="c27SignOnline" onclick="c27SignMode(\'Online\')" style="flex:1;border:1.5px solid #D6D3D1;background:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">🌐 Online</button>'
+          + '<button type="button" id="c27SignOffline" onclick="c27SignMode(\'Offline\')" style="flex:1;border:1.5px solid #D6D3D1;background:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">💾 Offline</button></div></div>'
+          + '<div><label style="font-size:11px;font-weight:800;text-transform:uppercase;color:#7F1D1D">Ville</label><input id="c27SignCity" placeholder="Ville" style="width:100%"></div>'
+          + '</div><input type="hidden" id="c27SignModeVal"></div>';
+        anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+        st.addEventListener('change', updateSignBlock);
+      }
+      updateSignBlock();
+    } catch (e) { }
+  }
+  window.c27SignMode = function (m) {
+    var v = document.getElementById('c27SignModeVal'); if (v) v.value = m;
+    var app = document.getElementById('fuAppMode'); if (app) app.value = m; // alimente aussi l'analyse Online/Offline
+    ['Online', 'Offline'].forEach(function (k) {
+      var b = document.getElementById('c27Sign' + k);
+      if (b) { var on = k === m; b.style.background = on ? '#1C1917' : '#fff'; b.style.color = on ? '#F4EBD6' : '#1C1917'; b.style.borderColor = on ? '#1C1917' : '#D6D3D1'; }
+    });
+  };
+  function updateSignBlock() {
+    var wrap = document.getElementById('c27SignWrap');
+    if (!wrap) return;
+    var show = isConverti();
+    wrap.style.display = show ? '' : 'none';
+    if (show) {
+      var city = document.getElementById('c27SignCity');
+      var fuCity = document.getElementById('fuCity');
+      if (city && !city.value && fuCity && fuCity.value) city.value = fuCity.value;
+      var mode = document.getElementById('c27SignModeVal');
+      var app = document.getElementById('fuAppMode');
+      if (mode && !mode.value && app && app.value) window.c27SignMode(app.value);
+    }
+  }
+  function signMissing() {
+    if (!isConverti()) return '';
+    var n = (document.getElementById('c27SignName') || {}).value || '';
+    var p = digitsOnly((document.getElementById('c27SignPhone') || {}).value || '');
+    var m = (document.getElementById('c27SignModeVal') || {}).value || '';
+    var c = (document.getElementById('c27SignCity') || {}).value || '';
+    if (n.trim().length < 3) return 'le nom complet du signataire';
+    if (p.length < 8) return 'le téléphone du signataire';
+    if (!m) return 'la version signée (Online ou Offline)';
+    if (!c.trim()) return 'la ville';
+    return '';
+  }
+  function applySignMeta(meta, editableExisting) {
+    var prev = {};
+    try { if (editableExisting) prev = splitFollowupNotes(editableExisting.Notes).meta || {}; } catch (e) { }
+    if (isConverti()) {
+      var n = ((document.getElementById('c27SignName') || {}).value || '').trim();
+      var p = ((document.getElementById('c27SignPhone') || {}).value || '').trim();
+      var m = (document.getElementById('c27SignModeVal') || {}).value || '';
+      var c = ((document.getElementById('c27SignCity') || {}).value || '').trim();
+      meta.signerName = n || prev.signerName || '';
+      meta.signerPhone = p || prev.signerPhone || '';
+      meta.signedMode = m || prev.signedMode || '';
+      meta.signedCity = c ? geoKey(c) : (prev.signedCity || '');
+      meta.signedAt = prev.signedAt || new Date(Date.now()).toISOString();
+      if (meta.signedMode) meta.appMode = meta.signedMode;
+      ['c27SignName', 'c27SignPhone', 'c27SignCity', 'c27SignModeVal'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      window.c27SignMode('');
+    } else if (prev.signerName) {
+      ['signerName', 'signerPhone', 'signedMode', 'signedCity', 'signedAt'].forEach(function (k) { if (prev[k]) meta[k] = prev[k]; });
+    }
+  }
+
+  // 17b. Registre des écoles signées (onglet 🏆 de la page 2027).
+  function signedRegister() {
+    var bySchool = {};
+    fullVisibleFups().forEach(function (f) {
+      if (!f || f.Status !== 'Converti') return;
+      var k = schoolKey(f.SchoolName); if (!k) return;
+      var m = entryMetaOf(f), ts = tsMs(f.Timestamp) || 0;
+      var cur = bySchool[k];
+      // on garde la saisie de signature la plus complète, puis la plus récente
+      var score = (m.signerName ? 2 : 0) + (m.signerPhone ? 1 : 0);
+      if (!cur || score > cur._score || (score === cur._score && ts > cur.ts)) {
+        bySchool[k] = {
+          _score: score, ts: ts, school: f.SchoolName, signer: m.signerName || f.ContactName || '', phone: m.signerPhone || f.ContactPhone || '',
+          mode: m.signedMode || normalizeAppModeSafe(m.appMode || f.AppMode || ''), city: m.signedCity || f.City || '',
+          by: canonicalPersonName(f.Expert), date: m.signedAt ? tsMs(m.signedAt) : ts,
+          complete: !!(m.signerName && m.signerPhone && m.signedMode)
+        };
+      }
+    });
+    return Object.keys(bySchool).map(function (k) { return bySchool[k]; }).sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+  }
+  function normalizeAppModeSafe(v) { try { return typeof normalizeAppMode === 'function' ? normalizeAppMode(v) : v; } catch (e) { return v; } }
+  function renderSignedTab() {
+    var rows = signedRegister();
+    var online = rows.filter(function (r) { return /online/i.test(r.mode); }).length;
+    var offline = rows.filter(function (r) { return /offline/i.test(r.mode); }).length;
+    var incomplete = rows.filter(function (r) { return !r.complete; }).length;
+    var h = '<div class="c27-card"><div class="c27-klabel">Écoles signées</div><h3>🏆 Registre des signatures</h3>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px">'
+      + '<span class="c27-chip deni" style="font-size:13px">✅ ' + rows.length + ' signée(s)</span>'
+      + '<span class="c27-chip nouveau" style="font-size:13px">🌐 ' + online + ' Online</span>'
+      + '<span class="c27-chip froid" style="font-size:13px">💾 ' + offline + ' Offline</span>'
+      + (incomplete ? '<span class="c27-chip pend" style="font-size:13px">⚠️ ' + incomplete + ' à compléter</span>' : '')
+      + '<button class="c27-act" onclick="c27ExportSigned()">⬇️ CSV</button></div>';
+    if (!rows.length) return h + '<div class="c27-empty">Aucune école signée pour l\'instant. Une saisie au statut 🟢 Converti l\'ajoute ici.</div></div>';
+    h += '<div style="overflow-x:auto"><table class="c27-tbl"><thead><tr><th>École</th><th>Signataire</th><th>Téléphone</th><th>Version</th><th>Ville</th><th>Date</th><th></th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      h += '<tr><td class="c27-school">' + _esc(r.school) + (r.complete ? '' : '<div class="c27-muted" style="color:#C2410C">⚠️ infos de signature à compléter</div>') + '<div class="c27-muted">par ' + _esc(r.by) + '</div></td>'
+        + '<td>' + _esc(r.signer || '—') + '</td>'
+        + '<td>' + (r.phone ? '<a href="tel:' + _attr(digitsOnly(r.phone)) + '">' + _esc(r.phone) + '</a>' : '—') + '</td>'
+        + '<td>' + (/online/i.test(r.mode) ? '<span class="c27-chip nouveau">🌐 Online</span>' : /offline/i.test(r.mode) ? '<span class="c27-chip froid">💾 Offline</span>' : '—') + '</td>'
+        + '<td>' + _esc(r.city || '—') + '</td>'
+        + '<td class="c27-muted">' + (r.date ? new Date(r.date).toLocaleDateString('fr-FR') : '—') + '</td>'
+        + '<td><button class="c27-act" onclick="c27OpenDocs(' + jsArg(r.school) + ')">📎</button></td></tr>';
+    });
+    return h + '</tbody></table></div></div>';
+  }
+  window.c27ExportSigned = function () {
+    var rows = [['Ecole', 'Signataire', 'Telephone', 'Version', 'Ville', 'Date', 'Prospecteur', 'Complet']];
+    signedRegister().forEach(function (r) { rows.push([r.school, r.signer, r.phone, r.mode, r.city, r.date ? new Date(r.date).toISOString().slice(0, 10) : '', r.by, r.complete ? 'oui' : 'non']); });
+    downloadCsv('nateiva-ecoles-signees.csv', rows);
+  };
+
+  // 17c. Documents & notes par école — stockés sur le serveur NATEIVA ; si le
+  //      serveur ne répond pas encore (hors-ligne ou pas encore mis à jour),
+  //      gardés sur le téléphone (IndexedDB) et envoyés automatiquement ensuite.
+  var DOC_MAX = 3.5 * 1024 * 1024;
+  function idbOpen() {
+    return new Promise(function (res, rej) {
+      if (!window.indexedDB) return rej(new Error('no idb'));
+      var r = indexedDB.open('nateiva-docs', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('queue', { keyPath: 'clientRef' }); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+  function idbDo(mode, fn) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction('queue', mode), st = tx.objectStore('queue'), out = fn(st);
+        tx.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); };
+        tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }
+  function queuePut(item) { return idbDo('readwrite', function (st) { st.put(item); }); }
+  function queueDel(ref) { return idbDo('readwrite', function (st) { st.delete(ref); }); }
+  function queueAll() { return idbDo('readonly', function (st) { return st.getAll(); }).catch(function () { return []; }); }
+  function backendReady() { return typeof backendRequest === 'function' && typeof isBackendConfigured === 'function' && isBackendConfigured() && !!window.nateivaApiToken; }
+  function sendDoc(item) {
+    // Résout : 'ok' | 'later' (à garder en file) | message d'erreur définitif
+    if (!backendReady()) return Promise.resolve('later');
+    return backendRequest('/api/documents', { method: 'POST', body: item.payload }).then(function (res) {
+      if (res && res.success) return 'ok';
+      if (res && /413|400|non accept|trop lourd|vide|requise/i.test(String(res.error || ''))) return String(res.error);
+      return 'later';
+    }).catch(function () { return 'later'; });
+  }
+  function flushDocQueue() {
+    if (!backendReady()) return;
+    queueAll().then(function (items) {
+      (items || []).forEach(function (it) {
+        sendDoc(it).then(function (r) { if (r === 'ok' || (r !== 'later')) queueDel(it.clientRef); if (r === 'ok') refreshDocsPanels(); });
+      });
+    });
+  }
+  function fileToBase64(file) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () { res(String(fr.result).split(',')[1] || ''); };
+      fr.onerror = function () { rej(fr.error); };
+      fr.readAsDataURL(file);
+    });
+  }
+  function compressImage(file) {
+    // Photos de téléphone (souvent 3–8 Mo) ramenées à ~1600 px JPEG.
+    return new Promise(function (res) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 900 * 1024) return res(file);
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        try {
+          var sc = Math.min(1, 1600 / Math.max(img.width, img.height));
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          cv.toBlob(function (b) { URL.revokeObjectURL(url); res(b ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file); }, 'image/jpeg', 0.8);
+        } catch (e) { URL.revokeObjectURL(url); res(file); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); res(file); };
+      img.src = url;
+    });
+  }
+  function newRef() { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  window.c27AddDocFile = function (school, input) {
+    var file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    compressImage(file).then(function (f) {
+      if (f.size > DOC_MAX) { _toast('Fichier trop lourd (3,5 Mo max)', true); return; }
+      return fileToBase64(f).then(function (b64) {
+        var item = { clientRef: newRef(), school: school, at: Date.now(), payload: { schoolName: school, kind: 'file', fileName: f.name || file.name, mime: f.type || file.type || 'application/octet-stream', dataBase64: b64, title: '', clientRef: '' } };
+        item.payload.clientRef = item.clientRef;
+        return deliverDoc(item);
+      });
+    });
+  };
+  window.c27AddDocNote = function (school) {
+    var ta = document.getElementById('c27DocNoteTxt');
+    var txt = ta ? ta.value.trim() : '';
+    if (!txt) { _toast('Écrivez la note d\'abord', true); return; }
+    var item = { clientRef: newRef(), school: school, at: Date.now(), payload: { schoolName: school, kind: 'note', note: txt, clientRef: '' } };
+    item.payload.clientRef = item.clientRef;
+    if (ta) ta.value = '';
+    deliverDoc(item);
+  };
+  function deliverDoc(item) {
+    return sendDoc(item).then(function (r) {
+      if (r === 'ok') { _toast(item.payload.kind === 'note' ? 'Note enregistrée ✓' : 'Document enregistré ✓'); refreshDocsPanels(); return; }
+      if (r !== 'later') { _toast(r, true); return; }
+      return queuePut(item).then(function () {
+        _toast('Gardé sur ce téléphone — envoi automatique dès que le serveur répond ⏳');
+        refreshDocsPanels();
+      }).catch(function () { _toast('Enregistrement impossible sur ce téléphone', true); });
+    });
+  }
+  window.c27OpenServerDoc = function (id, name) {
+    fetch(getApiBaseUrl() + '/api/documents/' + encodeURIComponent(id) + '/raw', { headers: { Authorization: 'Bearer ' + window.nateivaApiToken } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(function (b) { openBlob(b, name); })
+      .catch(function () { _toast('Ouverture impossible (connexion ?)', true); });
+  };
+  window.c27OpenLocalDoc = function (ref) {
+    queueAll().then(function (items) {
+      var it = (items || []).filter(function (x) { return x.clientRef === ref; })[0];
+      if (!it || it.payload.kind !== 'file') return;
+      var bin = atob(it.payload.dataBase64), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      openBlob(new Blob([arr], { type: it.payload.mime }), it.payload.fileName);
+    });
+  };
+  function openBlob(blob, name) {
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    if (!/^image\/|pdf/.test(blob.type)) a.download = name || 'document';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
+  window.c27DeleteDoc = function (id) {
+    backendRequest('/api/documents/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function (r) { _toast(r && r.success ? 'Supprimé' : ((r && r.error) || 'Suppression impossible'), !(r && r.success)); refreshDocsPanels(); })
+      .catch(function () { _toast('Suppression impossible (connexion ?)', true); });
+  };
+
+  function docIcon(mime) { return /pdf/.test(mime) ? '📄' : /^image/.test(mime) ? '🖼' : /sheet|excel/.test(mime) ? '📊' : /word/.test(mime) ? '📝' : '📎'; }
+  function renderDocsPanel(box, school) {
+    if (!box || !school) return;
+    box.setAttribute('data-c27-docs', school);
+    var meU = String((window.currentUser && window.currentUser.username) || '').toLowerCase();
+    var superA = (typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser);
+    var head = '<div style="font-weight:900;font-size:14px;margin-bottom:8px">📎 Documents & notes</div>'
+      + '<textarea id="c27DocNoteTxt" rows="2" placeholder="Ajouter une note sur cette école…" style="width:100%;margin-bottom:6px"></textarea>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      + '<button type="button" class="c27-ask-btn" style="margin:0" onclick="c27AddDocNote(' + jsArg(school) + ')">➕ Note</button>'
+      + '<label class="c27-ask-btn" style="margin:0;display:inline-flex;align-items:center;cursor:pointer">➕ Document / photo<input type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" style="display:none" onchange="c27AddDocFile(' + jsArg(school) + ', this)"></label>'
+      + '</div>';
+    box.innerHTML = head + '<div class="c27-muted" id="c27DocList">Chargement…</div>';
+    var listEl = box.querySelector('#c27DocList');
+    Promise.all([
+      backendReady() ? backendRequest('/api/documents?school=' + encodeURIComponent(school)).catch(function () { return null; }) : Promise.resolve(null),
+      queueAll()
+    ]).then(function (res) {
+      var server = res[0] && res[0].success ? (res[0].documents || []) : null;
+      var local = (res[1] || []).filter(function (x) { return schoolKey(x.school) === schoolKey(school); });
+      var html = '';
+      local.forEach(function (x) {
+        var p = x.payload;
+        html += '<div class="c27-flag" style="border-color:#FDE68A;background:#FFFBEB">⏳ ' + (p.kind === 'note' ? '💬 ' + _esc(String(p.note).slice(0, 200)) : docIcon(p.mime) + ' <a href="javascript:void(0)" onclick="c27OpenLocalDoc(\'' + x.clientRef + '\')">' + _esc(p.fileName) + '</a>')
+          + '<div class="c27-muted">en attente d\'envoi · ' + new Date(x.at).toLocaleString('fr-FR') + '</div></div>';
+      });
+      (server || []).forEach(function (d) {
+        var mine = String(d.createdByUsername || '').toLowerCase() === meU;
+        html += '<div class="c27-flag">' + (d.kind === 'note' ? '💬 ' + _esc(d.note) : docIcon(d.mime) + ' <a href="javascript:void(0)" onclick="c27OpenServerDoc(' + d.id + ',' + jsArg(d.fileName) + ')">' + _esc(d.fileName) + '</a> <span class="c27-muted">(' + Math.max(1, Math.round((d.sizeBytes || 0) / 1024)) + ' Ko)</span>')
+          + '<div class="c27-muted">' + _esc(d.createdByFullName || d.createdByUsername) + ' · ' + (d.createdAt ? new Date(d.createdAt).toLocaleString('fr-FR') : '')
+          + ((mine || superA) ? ' · <a href="javascript:void(0)" style="color:#B91C1C" onclick="c27DeleteDoc(' + d.id + ')">supprimer</a>' : '') + '</div></div>';
+      });
+      if (!html) html = '<div class="c27-muted">Aucun document ni note pour cette école.</div>';
+      if (server === null && backendReady()) html += '<div class="c27-muted" style="margin-top:6px">ℹ️ Serveur des documents pas encore disponible : vos ajouts restent sur ce téléphone et partiront automatiquement.</div>';
+      listEl.innerHTML = html;
+      listEl.className = '';
+    });
+  }
+  function refreshDocsPanels() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-c27-docs]'), function (b) { renderDocsPanel(b, b.getAttribute('data-c27-docs')); });
+  }
+  window.c27OpenDocs = function (school) {
+    modalShell('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-family:Fraunces,serif;font-size:19px">' + _esc(school) + '</b><a href="javascript:void(0)" onclick="c27CloseModal()" style="font-size:22px;text-decoration:none;color:#78716C">✕</a></div><div id="c27DocsModalBox"></div>');
+    renderDocsPanel(document.getElementById('c27DocsModalBox'), school);
+  };
+  function attachDocsToHistory() {
+    // Sous l'historique de l'école sélectionnée dans le formulaire.
+    try {
+      var sel = document.getElementById('fuSchool');
+      var hist = document.getElementById('c27SchoolHist');
+      var box = document.getElementById('c27FormDocs');
+      if (!sel || !hist || !sel.value || sel.value === '__other__') { if (box) box.remove(); return; }
+      if (!box) { box = document.createElement('div'); box.id = 'c27FormDocs'; box.style.cssText = 'margin-top:10px;border:1px solid #E7E5E4;border-radius:14px;padding:12px 14px;background:#fff'; hist.appendChild(box); }
+      if (box.getAttribute('data-c27-docs') !== sel.value) renderDocsPanel(box, sel.value);
+    } catch (e) { }
+  }
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
     injectStripCss();
     injectMobileCss();
     registerServiceWorker();
+    try { window.addEventListener('online', function () { flushDocQueue(); }); } catch (eO) { }
+    setTimeout(flushDocQueue, 5000);
     // 1. Périmètre annuel : filtre global des données + sélecteur d'année.
     installScopeWrappers();
     injectScopePill();
@@ -3683,7 +4031,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile, myPosition: myPosition, positionCardHtml: positionCardHtml };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile, myPosition: myPosition, positionCardHtml: positionCardHtml, signMissing: signMissing, ensureSignBlock: ensureSignBlock, signedRegister: signedRegister, renderSignedTab: renderSignedTab, renderDocsPanel: renderDocsPanel };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
