@@ -1500,13 +1500,13 @@
       Object.keys(STRIP_PANES).forEach(function (key) {
         var orig = m[key];
         if (typeof orig !== 'function' || orig.__c27Wrapped) return;
-        var wrapped = function () { var r = orig.apply(this, arguments); prependStrip(key); return r; };
+        var wrapped = function () { var r = orig.apply(this, arguments); prependStrip(key); if (key === 'home') setTimeout(function () { injectPositionCard('p-home'); }, 60); return r; };
         wrapped.__c27Wrapped = true;
         m[key] = wrapped;
       });
       var origSuivi = m.suivi;
       if (typeof origSuivi === 'function' && !origSuivi.__c27Wrapped) {
-        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(collapseHistory, 40); setTimeout(function () { ensureGeo(enhanceForm); }, 120); setTimeout(applySimpleForm, 150); return r; };
+        var wrappedSuivi = function () { var r = origSuivi.apply(this, arguments); setTimeout(reorganizeWorkspace, 30); setTimeout(collapseHistory, 40); setTimeout(function () { injectPositionCard('p-suivi'); }, 60); setTimeout(function () { ensureGeo(enhanceForm); }, 120); setTimeout(applySimpleForm, 150); return r; };
         wrappedSuivi.__c27Wrapped = true;
         m.suivi = wrappedSuivi;
       }
@@ -3488,10 +3488,142 @@
   }
   function chipH(label, n) { return '<span style="background:#fff;border:1px solid #E7E5E4;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700">' + label + ' : <b style="font-family:Fraunces,serif;font-size:15px">' + n + '</b></span>'; }
 
+  /* ======================= 16. TÉLÉPHONE : RAPIDE, CLAIR, CONCIS ========== */
+  // 16a. Ouverture instantanée : service worker (application gardée en mémoire
+  //      du téléphone) + bandeau quand une nouvelle version est prête.
+  function showUpdateBar() {
+    if (document.getElementById('c27UpdateBar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'c27UpdateBar';
+    bar.style.cssText = 'position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:99999;background:#1C1917;color:#F4EBD6;border:1.5px solid #D4AF37;border-radius:999px;padding:12px 20px;font:700 13.5px "DM Sans",sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;white-space:nowrap';
+    bar.innerHTML = '⬆️ Nouvelle version — <u>toucher pour actualiser</u>';
+    bar.onclick = function () { window.location.reload(); };
+    document.body.appendChild(bar);
+  }
+  function registerServiceWorker() {
+    try {
+      if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+      navigator.serviceWorker.register('/sw.js').catch(function () { });
+      navigator.serviceWorker.addEventListener('message', function (ev) {
+        if (ev.data && ev.data.type === 'nateiva-update') showUpdateBar();
+      });
+    } catch (e) { }
+  }
+
+  // 16b. Mise en page téléphone : moins de texte, cibles tactiles larges,
+  //      en-tête compact, champs à 16 px (pas de zoom automatique sur iPhone).
+  var MOBILE_CSS = '@media (max-width:720px){'
+    + '.page-intro p,.workspace-action-copy p,.workspace-action-note,.c27-sub,.c27-note,.c27-hero p,.nav-desc,.exec-insight,.impact-summary p{display:none!important}'
+    + '.page-intro h2{font-size:22px!important;margin:0 0 6px!important}'
+    + '.app{padding:10px 10px 110px!important}'
+    + '.meta-pill.red{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px!important}'
+    + '.c27-hero{padding:16px 18px!important;margin-bottom:12px!important;border-radius:16px!important}'
+    + '.c27-hero h2{font-size:24px!important;margin:0!important}'
+    + '.c27-card{padding:14px 14px!important;border-radius:14px!important;margin-bottom:12px!important}'
+    + '.c27-card h3{font-size:17px!important}'
+    + '.c27-tabs{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:12px!important}'
+    + '.c27-tab{white-space:nowrap;padding:10px 14px!important}'
+    + '.c27-act,.c27-tab,.c27-ask-btn,.bottom-tab{min-height:44px}'
+    + 'input,select,textarea{font-size:16px!important}'
+    + '.c27-tbl{font-size:12px!important}.c27-tbl th,.c27-tbl td{padding:8px 6px!important}'
+    + '#c27MapBox{height:60vh!important}'
+    + '.c27-strip{padding:10px!important;gap:6px!important}.c27-chipk{padding:5px 9px!important}.c27-chipk i{display:none}'
+    + '}';
+  function injectMobileCss() {
+    if (document.getElementById('c27-mobile-style')) return;
+    var st = document.createElement('style');
+    st.id = 'c27-mobile-style';
+    st.textContent = MOBILE_CSS;
+    document.head.appendChild(st);
+  }
+
+  // 16c. « Ma position » : où j'en suis dans l'écosystème NATEIVA, en un coup
+  //      d'œil — rang, objectif du mois, mes écoles, signatures, relances du
+  //      jour, confiance, niveau.
+  function monthStartMs() { var d = new Date(Date.now()); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); }
+  function myPosition() {
+    var me = _me();
+    if (!me) return null;
+    var mStart = monthStartMs(), today = todayStr();
+    var mine = fullFups().filter(function (f) { return f && samePerson(f.Expert, me); });
+    var mineRows = fullRows().filter(function (r) { return r && samePerson(r.e, me); });
+    var inMonth = function (ts) { var m = tsMs(ts); return m != null && m >= mStart; };
+    var entries = mine.filter(function (f) { return inMonth(f.Timestamp); }).length + mineRows.filter(function (r) { return inMonth(r.t); }).length;
+    var visits = mine.filter(function (f) { return inMonth(f.Timestamp) && (f.FollowupType === 'VISIT' || f.FollowupType === 'PROSPECTION'); }).length + mineRows.filter(function (r) { return inMonth(r.t); }).length;
+    var calls = mine.filter(function (f) { return inMonth(f.Timestamp) && f.FollowupType === 'CALL'; }).length;
+    var T = ((window.NATEIVA_CONFIG || {}).MONTHLY_TARGETS) || { entries: 100, calls: 80, visits: 40, conversions: 2 };
+    var pct = Math.min(100, Math.round(100 * entries / Math.max(1, T.entries)));
+    var dueToday = mine.filter(function (f) { return f.NextDate && String(f.NextDate).slice(0, 10) <= today && f.Status !== 'Converti' && f.Status !== 'Terminé'; }).length;
+    var claims = 0;
+    try { var cm = getClaimsMap(); Object.keys(cm).forEach(function (k) { if (samePerson(cm[k].owner, me)) claims++; }); } catch (e) { }
+    var signed = 0;
+    try { buildMapSchools().forEach(function (s) { if (s.stage === 'gagne' && samePerson(s.owner || '', me)) signed++; }); } catch (e) { }
+    // Rang : saisies de la campagne en cours parmi les membres de l'équipe.
+    var counts = {};
+    fullFups().forEach(function (f) { if (f && f.Expert && inCampaignOrScope(f.Timestamp)) { var n = canonicalPersonName(f.Expert); counts[n] = (counts[n] || 0) + 1; } });
+    fullRows().forEach(function (r) { if (r && r.e && inCampaignOrScope(r.t)) { var n = canonicalPersonName(r.e); counts[n] = (counts[n] || 0) + 1; } });
+    var board = Object.keys(counts).map(function (n) { return { n: n, c: counts[n] }; }).sort(function (a, b) { return b.c - a.c; });
+    var rank = 0; board.forEach(function (b, i) { if (samePerson(b.n, me)) rank = i + 1; });
+    var trust = null;
+    try { var tr = computeTrust(false).report.filter(function (r) { return samePerson(r.expert, me); })[0]; if (tr) trust = tr.score; } catch (e) { }
+    var level = pct >= 100 ? ['🥇', 'Or'] : pct >= 60 ? ['🥈', 'Argent'] : pct >= 30 ? ['🥉', 'Bronze'] : ['🌱', 'Démarrage'];
+    return { entries: entries, visits: visits, calls: calls, T: T, pct: pct, dueToday: dueToday, claims: claims, signed: signed, rank: rank, teamSize: board.length, trust: trust, level: level };
+  }
+  function inCampaignOrScope(ts) { return campaignStarted() ? inCampaign(ts) : true; }
+
+  function positionCardHtml() {
+    var p = myPosition();
+    if (!p) return '';
+    var cx = getDayCx();
+    function tile(icon, val, label, onclick, accent) {
+      return '<button type="button" onclick="' + (onclick || '') + '" style="flex:1 1 30%;min-width:92px;border:1px solid #E7E5E4;background:#fff;border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;font-family:inherit">'
+        + '<div style="font-size:20px;line-height:1">' + icon + '</div>'
+        + '<div style="font-family:Fraunces,serif;font-size:22px;font-weight:700;color:' + (accent || '#1C1917') + ';line-height:1.2;margin-top:4px">' + val + '</div>'
+        + '<div style="font-size:10.5px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:.04em">' + label + '</div></button>';
+    }
+    var trustColor = p.trust == null ? '#78716C' : p.trust >= 85 ? '#047857' : p.trust >= 70 ? '#4D7C0F' : p.trust >= 50 ? '#C2410C' : '#B91C1C';
+    return '<div id="c27PosCard" style="background:linear-gradient(135deg,#1C1917,#2A2419 70%,#3B301A);border-radius:18px;padding:14px;margin:0 0 14px;color:#F4EBD6">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">'
+      + '<div style="font-weight:800;font-size:15px">' + p.level[0] + ' Niveau ' + p.level[1] + '</div>'
+      + '<button type="button" onclick="c27OpenDayCx()" style="background:#F7F1E3;color:#7A5F1C;border:none;border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px;cursor:pointer;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ' + (cx ? _esc(cx.quartier) : 'Ma journée') + '</button></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+      + '<div style="flex:1;height:10px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden"><i style="display:block;height:100%;width:' + p.pct + '%;background:linear-gradient(90deg,#B08D2F,#D4AF37);border-radius:99px"></i></div>'
+      + '<div style="font-weight:800;font-size:13px;white-space:nowrap">🎯 ' + p.entries + '/' + p.T.entries + '</div></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+      + tile('🏅', p.rank ? '#' + p.rank + '<span style="font-size:13px;color:#A8A29E">/' + p.teamSize + '</span>' : '—', 'Rang')
+      + tile('🏫', p.claims, 'Mes écoles', 'c27GoTab(\'claims\')')
+      + tile('✅', p.signed, 'Signées', '', '#B91C1C')
+      + tile('⏰', p.dueToday, 'À relancer', 'c27GoRelances()', p.dueToday ? '#C2410C' : '#1C1917')
+      + tile('🚶', p.visits + '<span style="font-size:13px;color:#A8A29E">/' + p.T.visits + '</span>', 'Visites')
+      + tile('🛡', p.trust == null ? '—' : p.trust, 'Confiance', '', trustColor)
+      + '</div></div>';
+  }
+  window.c27GoTab = function (t) { lsSet(LS_KEYS.tab, t); var b = document.querySelector('.nav-btn[data-pane="c27"]'); if (b) b.click(); };
+  window.c27GoRelances = function () { if (typeof activateSuiviPanel === 'function') activateSuiviPanel('planner', { scroll: true }); };
+  function injectPositionCard(paneId) {
+    try {
+      var pane = document.getElementById(paneId);
+      if (!pane || !window.currentUser) return;
+      if ((typeof isSuperAdmin === 'function') && isSuperAdmin(window.currentUser)) return; // le Super Admin a le Pilotage
+      var old = document.getElementById('c27PosCard_' + paneId); if (old) old.remove();
+      var html = positionCardHtml();
+      if (!html) return;
+      var div = document.createElement('div');
+      div.innerHTML = html;
+      var card = div.firstChild;
+      card.id = 'c27PosCard_' + paneId;
+      var intro = pane.querySelector('.page-intro');
+      var anchor = (intro && intro.parentElement === pane) ? intro.nextSibling : pane.firstChild;
+      pane.insertBefore(card, anchor);
+    } catch (e) { }
+  }
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
     injectStripCss();
+    injectMobileCss();
+    registerServiceWorker();
     // 1. Périmètre annuel : filtre global des données + sélecteur d'année.
     installScopeWrappers();
     injectScopePill();
@@ -3551,7 +3683,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile, myPosition: myPosition, positionCardHtml: positionCardHtml };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
