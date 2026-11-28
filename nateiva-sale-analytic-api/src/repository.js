@@ -619,6 +619,42 @@ async function softDeleteDocument(id) {
   await query(`UPDATE school_documents SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
 }
 
+// === Villes & quartiers ajoutés / supprimés par l'équipe ===
+function geoKeyNormalize(x) {
+  return String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+}
+function mapGeoPlace(row) {
+  return {
+    id: row.id, kind: row.kind, action: row.action, region: row.region || '', cityKey: row.city_key || '',
+    name: row.name, nameKey: row.name_key, lat: row.lat == null ? null : Number(row.lat), lng: row.lng == null ? null : Number(row.lng),
+    by: row.created_by_fullname || row.created_by_username || '', byUsername: row.created_by_username || '',
+    updatedBy: row.updated_by_username || '', at: row.updated_at || row.created_at
+  };
+}
+async function listGeoPlaces() {
+  const rows = await query(`SELECT * FROM geo_places ORDER BY kind, city_key, name_key`);
+  return rows.map(mapGeoPlace);
+}
+async function getGeoPlace(kind, cityKey, nameKey) {
+  const rows = await query(`SELECT * FROM geo_places WHERE kind = ? AND city_key = ? AND name_key = ? LIMIT 1`, [kind, cityKey, nameKey]);
+  return rows.length ? mapGeoPlace(rows[0]) : null;
+}
+async function upsertGeoPlace(input) {
+  await query(
+    `INSERT INTO geo_places (kind, action, region, city_key, name, name_key, lat, lng, created_by_username, created_by_fullname, updated_by_username)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE action = VALUES(action),
+       region = IF(VALUES(region) = '', region, VALUES(region)),
+       name = IF(VALUES(action) = 'add', VALUES(name), name),
+       lat = COALESCE(VALUES(lat), lat), lng = COALESCE(VALUES(lng), lng),
+       updated_by_username = VALUES(updated_by_username)`,
+    [input.kind, input.action, input.region || '', input.cityKey, input.name, input.nameKey,
+     input.lat == null ? null : input.lat, input.lng == null ? null : input.lng,
+     input.username || '', input.fullName || '', input.username || '']
+  );
+  return getGeoPlace(input.kind, input.cityKey, input.nameKey);
+}
+
 async function getBootstrapPayload(viewer, extra) {
   const campaignStartIso = (extra && extra.campaignStartIso) || "2027-01-01T00:00:00";
   const campaignYear = (extra && extra.campaignYear) || 2027;
@@ -641,9 +677,12 @@ async function getBootstrapPayload(viewer, extra) {
   } catch (e) {
     workSchedules = []; // table pas encore migrée
   }
+  let geoPlaces = [];
+  try { geoPlaces = await listGeoPlaces(); } catch (e) { geoPlaces = []; } // table pas encore migrée
   return {
     user: viewer,
     users: await listUsers(),
+    geoPlaces,
     followups: await listVisibleFollowups(viewer),
     campaignClaims,
     claimRequests,
@@ -660,6 +699,10 @@ async function getBootstrapPayload(viewer, extra) {
 }
 
 module.exports = {
+  geoKeyNormalize,
+  listGeoPlaces,
+  getGeoPlace,
+  upsertGeoPlace,
   defaultPermissionsForRole,
   findUserByUsername,
   listUsers,

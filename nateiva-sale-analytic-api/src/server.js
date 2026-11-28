@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { port, allowedOrigins, defaultCallCount, apiName } = require("./config");
 const { comparePassword, createToken, verifyToken, hashPassword } = require("./auth");
-const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest, listWorkSchedules, setWorkSchedules, getDayTypeFor, insertDocument, listDocumentsForSchool, getDocumentRow, softDeleteDocument } = require("./repository");
+const { findUserByUsername, createUser, updateUserAccess, upsertFollowup, updateFollowup, deleteFollowup, logSyncEvent, getBootstrapPayload, findCampaignClaimForSchool, hasApprovedClaimRequest, createClaimRequest, listClaimRequests, decideClaimRequest, listWorkSchedules, setWorkSchedules, getDayTypeFor, insertDocument, listDocumentsForSchool, getDocumentRow, softDeleteDocument, geoKeyNormalize, listGeoPlaces, getGeoPlace, upsertGeoPlace } = require("./repository");
 const { normalizeRole, normalizePermissions } = require("./utils");
 
 const app = express();
@@ -431,6 +431,49 @@ app.delete("/api/documents/:id", authRequired, async function deleteDocumentHand
     if (!own && viewer.role !== "SuperAdmin") return res.status(403).json({ success: false, error: "Seul l'auteur ou le Super Admin peut supprimer" });
     await softDeleteDocument(row.id);
     return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// === Villes & quartiers partagés ===
+// Tout utilisateur peut ajouter une ville ou un quartier ; seuls les Sub Admins
+// et le Super Admin peuvent en supprimer (ou rétablir un lieu supprimé).
+app.get("/api/geo/places", authRequired, async function listGeoPlacesHandler(req, res) {
+  try {
+    return res.json({ success: true, places: await listGeoPlaces() });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/geo/places", authRequired, async function upsertGeoPlaceHandler(req, res) {
+  try {
+    const viewer = await loadViewer(req);
+    const isAdmin = viewer.role === "SuperAdmin" || viewer.role === "SubAdmin";
+    const kind = req.body.kind === "city" ? "city" : (req.body.kind === "quartier" ? "quartier" : "");
+    const action = req.body.action === "hide" ? "hide" : "add";
+    const name = String(req.body.name || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    const nameKey = geoKeyNormalize(name);
+    if (!kind) return res.status(400).json({ success: false, error: "Type de lieu requis (ville ou quartier)" });
+    if (nameKey.length < 2) return res.status(400).json({ success: false, error: "Nom trop court" });
+    const cityKey = kind === "city" ? "" : geoKeyNormalize(req.body.city);
+    if (kind === "quartier" && !cityKey) return res.status(400).json({ success: false, error: "Ville requise pour un quartier" });
+    if (action === "hide" && !isAdmin) return res.status(403).json({ success: false, error: "Seuls les Sub Admins et le Super Admin peuvent supprimer un lieu" });
+    const existing = await getGeoPlace(kind, cityKey, nameKey);
+    if (action === "add" && existing && existing.action === "hide" && !isAdmin) {
+      return res.status(403).json({ success: false, error: "Ce lieu a été supprimé par un responsable — demandez à votre Sub Admin de le rétablir" });
+    }
+    let lat = req.body.lat == null || req.body.lat === "" ? null : Number(req.body.lat);
+    let lng = req.body.lng == null || req.body.lng === "" ? null : Number(req.body.lng);
+    // Cameroun : lat 1.6–13.1, lng 8.4–16.2 ; sinon la position est ignorée.
+    if (!(lat >= 1.5 && lat <= 13.2 && lng >= 8.3 && lng <= 16.3)) { lat = null; lng = null; }
+    const place = await upsertGeoPlace({
+      kind, action, region: String(req.body.region || "").slice(0, 120), cityKey, name, nameKey,
+      lat: action === "add" ? lat : null, lng: action === "add" ? lng : null,
+      username: viewer.username, fullName: viewer.fullName
+    });
+    return res.json({ success: true, place });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

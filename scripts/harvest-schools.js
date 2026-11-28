@@ -154,7 +154,7 @@ async function harvestGeo() {
   console.log('GEO TOTAL', towns, 'villes OSM,', quarters, 'quartiers géolocalisés');
 }
 
-const TARGET = (process.env.TARGET || 'all').toLowerCase();
+const TARGET = (process.env.TARGET || 'schools').toLowerCase();
 
 (async () => {
   if (TARGET === 'geo' || TARGET === 'all') {

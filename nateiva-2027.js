@@ -388,6 +388,8 @@
         c27State.schedules = payload.workSchedules;
         lsSet('nateiva_c27_schedules', c27State.schedules);
       }
+      if (payload && Array.isArray(payload.geoPlaces)) setServerPlaces(payload.geoPlaces);
+      flushPlaces();
       flushPendingRequests();
       flushPendingSchedules();
       invalidateStripCache();
@@ -843,6 +845,7 @@
       + (admin ? tabBtn('plan', '🗓 Planning', tab) : '')
       + (admin ? tabBtn('pilot', '📊 Pilotage & IA', tab) : '')
       + (admin ? tabBtn('trust', '🛡 Score de confiance', tab) : '')
+      + (isGeoAdmin() ? tabBtn('places', '📍 Villes & quartiers', tab) : '')
       + '</div>';
 
     if (tab === 'map') tab = 'list'; // la carte est désormais sa propre page 🗺
@@ -853,6 +856,7 @@
     else if (tab === 'plan') h += renderPlanningTab();
     else if (tab === 'pilot') h += renderPilotTab(priority);
     else if (tab === 'trust') h += renderTrustTab();
+    else if (tab === 'places') h += isGeoAdmin() ? renderPlacesTab() : '';
 
     h += '</div>';
     el.innerHTML = h;
@@ -3074,18 +3078,19 @@
   // 15a. Référentiel géographique (régions → villes → quartiers), chargé à la
   //      demande (nateiva-geo.generated.js) + quartiers vus dans nos données.
   var _geoLoading = false;
+  var GEO_FILE_REV = 'ref';
   function ensureGeo(cb) {
     if (window.NATEIVA_GEO && window.NATEIVA_GEO.regions) return cb();
     if (_geoLoading) { setTimeout(function () { ensureGeo(cb); }, 300); return; }
     _geoLoading = true;
     var sc = document.createElement('script');
-    sc.src = 'nateiva-geo.generated.js?v=' + (Date.now() - Date.now() % 3600000);
+    sc.src = 'nateiva-geo.generated.js?v=' + GEO_FILE_REV; // même adresse que le préchargement de index.html
     sc.onload = function () { _geoLoading = false; cb(); };
     sc.onerror = function () { _geoLoading = false; window.NATEIVA_GEO = window.NATEIVA_GEO || { regions: [] }; cb(); };
     document.head.appendChild(sc);
   }
   function geoKey(x) { return String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim(); }
-  function geoRegions() { return (window.NATEIVA_GEO && window.NATEIVA_GEO.regions) || []; }
+  function geoRegions() { return mergedRegions(); } // référentiel livré + ajouts/suppressions de l'équipe
   function geoCity(cityKey) {
     var k = geoKey(cityKey), found = null;
     geoRegions().forEach(function (r) { r.cities.forEach(function (c) { if (!found && (c.key === k || geoKey(c.name) === k)) found = Object.assign({ region: r.name, regionCode: r.code }, c); }); });
@@ -3094,12 +3099,12 @@
   function geoQuartiers(cityKey) {
     // Quartiers du référentiel + quartiers déjà saisis par l'équipe pour cette ville.
     var c = geoCity(cityKey), map = {};
-    (c ? c.quartiers : []).forEach(function (q) { map[geoKey(q.n)] = { n: geoKey(q.n), lat: q.lat, lng: q.lng }; });
+    (c ? c.quartiers : []).forEach(function (q) { map[geoKey(q.n)] = { n: geoKey(q.n), lat: q.lat, lng: q.lng, custom: !!q.custom, by: q.by || '', pending: !!q.pending }; });
     try {
       buildMapSchools().forEach(function (s) {
         if (geoKey(s.city) !== geoKey(cityKey) || !s.quartier) return;
         var k = geoKey(s.quartier);
-        if (!map[k]) map[k] = { n: k };
+        if (!map[k] && !isQuartierHidden(cityKey, k)) map[k] = { n: k, seen: true };
       });
     } catch (e) { }
     return Object.keys(map).sort().map(function (k) { return map[k]; });
@@ -3150,33 +3155,33 @@
     var keys = prof.cities && prof.cities.length ? prof.cities : null;
     var opts = '';
     geoRegions().forEach(function (r) {
-      var cs = r.cities.filter(function (c) { return !keys || keys.indexOf(c.key) > -1; });
+      var cs = r.cities.filter(function (c) { return !keys || keys.indexOf(c.key) > -1 || c.key === selected; });
       if (!cs.length) return;
       opts += '<optgroup label="' + _attr(r.name) + '">' + cs.map(function (c) { return '<option value="' + _attr(c.key) + '"' + (c.key === selected ? ' selected' : '') + '>' + _esc(c.name) + '</option>'; }).join('') + '</optgroup>';
     });
-    return opts;
+    return opts + '<option value="__addcity__">➕ Ville absente ? L\'ajouter pour tous…</option>';
   }
   function quartierOptions(cityKey, selected) {
     var qs = geoQuartiers(cityKey);
     var sel = geoKey(selected);
     var o = '<option value="">— Choisir le quartier —</option>' + qs.map(function (q) { return '<option value="' + _attr(q.n) + '"' + (q.n === sel ? ' selected' : '') + '>' + _esc(q.n) + (q.lat != null ? ' 📍' : '') + '</option>'; }).join('');
     if (sel && !qs.some(function (q) { return q.n === sel; })) o += '<option value="' + _attr(sel) + '" selected>' + _esc(sel) + '</option>';
-    return o + '<option value="__autre__">✏️ Autre quartier (saisir)…</option>';
+    return o + '<option value="__add__">➕ Quartier absent ? L\'ajouter pour tous…</option>';
   }
 
-  window.c27OpenDayCx = function () {
+  window.c27OpenDayCx = function (cityOverride, qOverride) {
     ensureGeo(function () {
-      var cx = getDayCx() || {};
+      var cx = Object.assign({}, getDayCx() || {});
+      if (typeof qOverride === 'string') cx.quartier = qOverride;
       var prof = getProfile();
-      var city = cx.city || (prof.cities && prof.cities[0]) || 'DOUALA';
+      var city = (typeof cityOverride === 'string' && cityOverride) || cx.city || (prof.cities && prof.cities[0]) || 'DOUALA';
       var h = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#B08D2F">Ma journée · ' + new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'
         + '<h3 style="font-family:Fraunces,serif;font-size:24px;margin:6px 0 4px">📍 Où travaillez-vous aujourd\'hui ?</h3>'
         + '<p style="font-size:13px;color:#78716C;margin:0 0 16px;line-height:1.55">La ville et le quartier choisis s\'appliquent automatiquement à toutes vos saisies de la journée. Vous pouvez les changer à tout moment.</p>'
         + '<label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#57534E">Ville</label>'
         + '<select id="c27CxCity" style="width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:5px 0 12px;font-size:14px" onchange="c27CxCityChanged(this.value)">' + cityOptionsForUser(city) + '</select>'
         + '<label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#57534E">Quartier</label>'
-        + '<select id="c27CxQ" style="width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:5px 0 6px;font-size:14px" onchange="document.getElementById(\'c27CxQOther\').style.display=this.value===\'__autre__\'?\'\':\'none\'">' + quartierOptions(city, cx.quartier) + '</select>'
-        + '<input id="c27CxQOther" placeholder="Nom du quartier" style="display:none;width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:4px 0 6px;font-size:14px">'
+        + '<select id="c27CxQ" style="width:100%;padding:11px;border-radius:10px;border:1px solid #D6D3D1;margin:5px 0 6px;font-size:14px" onchange="c27CxQChanged(this.value)">' + quartierOptions(city, cx.quartier) + '</select>'
         + '<div style="font-size:11.5px;color:#A8A29E;margin-bottom:16px">📍 = quartier géolocalisé : vos visites y seront contrôlées par GPS.</div>'
         + '<button onclick="c27CxSave()" style="width:100%;background:#1C1917;color:#F4EBD6;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14.5px;cursor:pointer">Commencer ma journée</button>'
         + '<div style="display:flex;justify-content:space-between;margin-top:12px;font-size:12.5px">'
@@ -3185,15 +3190,24 @@
       modalShell(h);
     });
   };
+  window.c27CxQChanged = function (v) {
+    if (v !== '__add__') return;
+    var city = (document.getElementById('c27CxCity') || {}).value || '';
+    window.c27AddPlace('quartier', city, function (key) { window.c27OpenDayCx(city, key || ''); });
+  };
   window.c27CxCityChanged = function (city) {
+    if (city === '__addcity__') {
+      window.c27AddPlace('city', '', function (key) { window.c27OpenDayCx(key || '', ''); });
+      return;
+    }
     var q = document.getElementById('c27CxQ');
     if (q) q.innerHTML = quartierOptions(city, '');
   };
   window.c27CxSave = function () {
     var city = (document.getElementById('c27CxCity') || {}).value || '';
     var qSel = (document.getElementById('c27CxQ') || {}).value || '';
-    var q = qSel === '__autre__' ? ((document.getElementById('c27CxQOther') || {}).value || '') : qSel;
-    if (!city || !q) { _toast('Choisissez la ville ET le quartier', true); return; }
+    var q = qSel === '__add__' ? '' : qSel;
+    if (!city || city === '__addcity__' || !q) { _toast('Choisissez la ville ET le quartier', true); return; }
     setDayCx(city, q);
     closeModal();
     _toast('📍 Journée : ' + (geoCity(city) ? geoCity(city).name : city) + ' · ' + geoKey(q));
@@ -3286,7 +3300,7 @@
   }
   function fieldOf(id) { var el = document.getElementById(id); return el && el.closest ? el.closest('.form-field') : null; }
 
-  function selectFor(input, id, options, placeholder) {
+  function selectFor(input, id, options, placeholder, addOpt) {
     // Liste déroulante devant un champ texte existant (qui reste la source de
     // vérité pour l'enregistrement) ; « Autre » révèle le champ libre.
     if (document.getElementById(id)) return document.getElementById(id);
@@ -3299,13 +3313,24 @@
       var inList = list.some(function (o) { return geoKey(o) === v; });
       sel.innerHTML = '<option value="">' + placeholder + '</option>' + list.map(function (o) { return '<option value="' + _attr(o) + '"' + (geoKey(o) === v && v ? ' selected' : '') + '>' + _esc(o) + '</option>'; }).join('')
         + (v && !inList ? '<option value="__cur__" selected>' + _esc(cur) + '</option>' : '')
-        + '<option value="__autre__">✏️ Autre (saisir)…</option>';
-      input.style.display = (v && !inList) ? '' : 'none';
+        + (addOpt ? '<option value="__add__">' + addOpt.label + '</option>' : '<option value="__autre__">✏️ Autre (saisir)…</option>');
+      input.style.display = (v && !inList && !addOpt) ? '' : 'none';
     }
     sel.__fill = fill;
     sel.addEventListener('change', function () {
       if (sel.value === '__autre__') { input.style.display = ''; input.__c27Silent = true; input.value = ''; input.__c27Silent = false; input.focus(); return; }
       if (sel.value === '__cur__') return;
+      if (sel.value === '__add__') {
+        var prev = input.value;
+        fill(prev);
+        addOpt.onAdd(function (key) {
+          var nv = key || prev;
+          input.__c27Silent = true; input.value = nv; input.__c27Silent = false;
+          fill(nv);
+          if (key) input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        return;
+      }
       input.__c27Silent = true; input.value = sel.value; input.__c27Silent = false;
       input.style.display = 'none';
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3336,7 +3361,9 @@
       var q = document.getElementById('fuQuartier');
       var city = document.getElementById('fuCity');
       if (q && city) {
-        var qs = selectFor(q, 'c27QuartierSel', function () { return geoQuartiers(city.value).map(function (x) { return x.n; }); }, '— Choisir le quartier —');
+        var qs = selectFor(q, 'c27QuartierSel', function () { return geoQuartiers(city.value).map(function (x) { return x.n; }); }, '— Choisir le quartier —',
+          { label: '➕ Quartier absent ? L\'ajouter pour tous…', onAdd: function (done) { window.c27AddPlace('quartier', city.value, done); } });
+        ensureAddCityLink(city);
         if (!city.__c27CityHooked) {
           city.__c27CityHooked = true;
           ensureCityOption(city);
@@ -3367,8 +3394,23 @@
     } catch (e) { }
   }
 
+  function ensureAddCityLink(city) {
+    if (document.getElementById('c27AddCityLink') || !city.parentNode) return;
+    var a = document.createElement('a');
+    a.id = 'c27AddCityLink'; a.href = 'javascript:void(0)';
+    a.style.cssText = 'display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;color:#7A5F1C';
+    a.textContent = '➕ Ville absente de la liste ? L\'ajouter pour tous';
+    a.onclick = function () {
+      window.c27AddPlace('city', '', function (key) {
+        if (!key) return;
+        ensureCityOption(city); city.value = key;
+        city.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    city.parentNode.insertBefore(a, city.nextSibling);
+  }
   function ensureCityOption(sel) {
-    // Les villes du référentiel absentes de la liste d'origine y sont ajoutées.
+    // Les villes du référentiel (+ ajouts de l'équipe) absentes de la liste d'origine y sont ajoutées.
     try {
       var have = {};
       Array.prototype.forEach.call(sel.options, function (o) { have[geoKey(o.value)] = 1; });
@@ -3964,13 +4006,249 @@
     } catch (e) { }
   }
 
+  /* ======================= 18. VILLES & QUARTIERS PARTAGÉS ================ */
+  // Le référentiel (nateiva-geo.generated.js) est livré avec l'application et
+  // n'est rafraîchi qu'une fois par an (robot du 1er février). Par-dessus, les
+  // lieux ajoutés par l'équipe (et ceux supprimés par un Sub Admin / le Super
+  // Admin) sont stockés sur le serveur et partagés avec tout le monde.
+  var PLACES_LS = 'nateiva_c27_geo_places', PLACES_PENDING_LS = 'nateiva_c27_geo_pending';
+  var _places = lsGet(PLACES_LS, []), _placesPending = lsGet(PLACES_PENDING_LS, []);
+  var _mergedGeo = null;
+  function isGeoAdmin() {
+    var u = window.currentUser || {};
+    return u.role === 'SuperAdmin' || u.role === 'SubAdmin' || ((typeof isSuperAdmin === 'function') && isSuperAdmin(u));
+  }
+  function placeId(p) { return p.kind + '|' + (p.kind === 'city' ? '' : geoKey(p.cityKey || p.city)) + '|' + geoKey(p.nameKey || p.name); }
+  function effectivePlaces() {
+    var map = {};
+    (_places || []).forEach(function (p) { map[placeId(p)] = p; });
+    (_placesPending || []).forEach(function (p) { map[placeId(p)] = Object.assign({}, map[placeId(p)] || {}, p, { pending: true }); });
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+  function hiddenSets() {
+    var cities = {}, qs = {};
+    effectivePlaces().forEach(function (p) {
+      if (p.action !== 'hide') return;
+      if (p.kind === 'city') cities[geoKey(p.nameKey || p.name)] = 1;
+      else qs[geoKey(p.cityKey || p.city) + '|' + geoKey(p.nameKey || p.name)] = 1;
+    });
+    return { cities: cities, qs: qs };
+  }
+  function invalidateGeo() { _mergedGeo = null; }
+  function baseRegions() { return (window.NATEIVA_GEO && window.NATEIVA_GEO.regions) || []; }
+  function mergedRegions() {
+    var base = baseRegions();
+    if (_mergedGeo && _mergedGeo.__base === base) return _mergedGeo;
+    if (!base.length && !effectivePlaces().length) return base;
+    var regions = base.map(function (r) {
+      return Object.assign({}, r, { cities: r.cities.map(function (c) { return Object.assign({}, c, { quartiers: c.quartiers.slice() }); }) });
+    });
+    var hid = hiddenSets(), cityIdx = {};
+    regions.forEach(function (r) { r.cities.forEach(function (c) { cityIdx[c.key] = c; }); });
+    var adds = effectivePlaces().filter(function (p) { return p.action === 'add'; });
+    adds.filter(function (p) { return p.kind === 'city'; }).forEach(function (p) {
+      var k = geoKey(p.nameKey || p.name);
+      if (cityIdx[k]) return;
+      var rk = geoKey(p.region), reg = null;
+      regions.forEach(function (r) { if (!reg && (geoKey(r.name) === rk || geoKey(r.code) === rk)) reg = r; });
+      if (!reg) {
+        reg = regions.filter(function (r) { return r.code === 'XX'; })[0];
+        if (!reg) { reg = { code: 'XX', name: 'Autres villes', cities: [] }; regions.push(reg); }
+      }
+      var c = { key: k, name: p.name, quartiers: [], custom: true, by: p.by || '', pending: !!p.pending };
+      reg.cities.push(c); cityIdx[k] = c;
+    });
+    adds.filter(function (p) { return p.kind === 'quartier'; }).forEach(function (p) {
+      var c = cityIdx[geoKey(p.cityKey || p.city)];
+      if (!c) return;
+      var n = geoKey(p.nameKey || p.name);
+      var ex = c.quartiers.filter(function (q) { return geoKey(q.n) === n; })[0];
+      if (ex) { if (ex.lat == null && p.lat != null) { ex.lat = p.lat; ex.lng = p.lng; } return; }
+      c.quartiers.push({ n: n, lat: p.lat == null ? undefined : p.lat, lng: p.lng == null ? undefined : p.lng, custom: true, by: p.by || '', pending: !!p.pending });
+    });
+    regions.forEach(function (r) {
+      r.cities = r.cities.filter(function (c) { return !hid.cities[c.key]; });
+      r.cities.forEach(function (c) { c.quartiers = c.quartiers.filter(function (q) { return !hid.qs[c.key + '|' + geoKey(q.n)]; }); });
+    });
+    _mergedGeo = regions.filter(function (r) { return r.cities.length || r.code !== 'XX'; });
+    _mergedGeo.__base = base;
+    return _mergedGeo;
+  }
+  function isQuartierHidden(cityKey, q) { return !!hiddenSets().qs[geoKey(cityKey) + '|' + geoKey(q)]; }
+
+  function setServerPlaces(list) {
+    if (!Array.isArray(list)) return;
+    _places = list; lsSet(PLACES_LS, _places);
+    // les envois en attente déjà présents sur le serveur sont retirés
+    var srv = {}; list.forEach(function (p) { srv[placeId(p)] = p.action; });
+    _placesPending = (_placesPending || []).filter(function (p) { return srv[placeId(p)] !== p.action; });
+    lsSet(PLACES_PENDING_LS, _placesPending);
+    invalidateGeo();
+  }
+  function sendPlace(p) {
+    if (!backendReady()) return Promise.resolve('later');
+    return backendRequest('/api/geo/places', { method: 'POST', body: { kind: p.kind, action: p.action, region: p.region || '', city: p.cityKey || p.city || '', name: p.name, lat: p.lat, lng: p.lng } })
+      .then(function (res) {
+        if (res && res.success && res.place) {
+          _places = (_places || []).filter(function (x) { return placeId(x) !== placeId(res.place); }).concat([res.place]);
+          lsSet(PLACES_LS, _places); invalidateGeo();
+          return 'ok';
+        }
+        if (res && res.error && /refus|supprim|requis|court|Seuls/i.test(res.error)) return String(res.error);
+        return 'later';
+      }).catch(function () { return 'later'; });
+  }
+  function savePlace(p) {
+    // Appliqué tout de suite sur ce téléphone ; envoyé au serveur (ou mis en attente).
+    p.by = (window.currentUser && (window.currentUser.fullName || window.currentUser.username)) || '';
+    _placesPending = (_placesPending || []).filter(function (x) { return placeId(x) !== placeId(p); }).concat([p]);
+    lsSet(PLACES_PENDING_LS, _placesPending); invalidateGeo();
+    return sendPlace(p).then(function (r) {
+      if (r === 'ok' || r !== 'later') {
+        _placesPending = _placesPending.filter(function (x) { return placeId(x) !== placeId(p); });
+        lsSet(PLACES_PENDING_LS, _placesPending); invalidateGeo();
+      }
+      return r;
+    });
+  }
+  function flushPlaces() {
+    if (!backendReady() || !(_placesPending || []).length) return;
+    _placesPending.slice().forEach(function (p) {
+      sendPlace(p).then(function (r) {
+        if (r === 'later') return;
+        _placesPending = _placesPending.filter(function (x) { return placeId(x) !== placeId(p); });
+        lsSet(PLACES_PENDING_LS, _placesPending); invalidateGeo();
+      });
+    });
+  }
+  function refreshPlaces() {
+    if (!backendReady()) return;
+    backendRequest('/api/geo/places').then(function (r) { if (r && r.success) setServerPlaces(r.places || []); }).catch(function () { });
+  }
+
+  // Fenêtre « Ajouter une ville / un quartier » (ouverte depuis le formulaire,
+  // Ma journée ou l'onglet 📍 Lieux). onDone(nomNormalisé) est rappelé après.
+  var _addPlaceCb = null;
+  window.c27AddPlace = function (kind, cityKey, onDone) {
+    ensureGeo(function () {
+      _addPlaceCb = onDone || null;
+      var c = kind === 'quartier' ? geoCity(cityKey) : null;
+      if (kind === 'quartier' && !geoKey(cityKey)) { _toast('Choisissez d\'abord la ville', true); return; }
+      var fix = bestRecentFix();
+      var h = '<h3 style="font-family:Fraunces,serif;font-size:21px;margin:0 0 4px">' + (kind === 'city' ? '➕ Ajouter une ville' : '➕ Ajouter un quartier') + '</h3>'
+        + '<p style="font-size:13px;color:#78716C;margin:0 0 14px">' + (kind === 'city' ? 'La ville sera proposée à toute l\'équipe.' : 'Quartier de <b>' + _esc(c ? c.name : geoKey(cityKey)) + '</b> — proposé ensuite à toute l\'équipe.') + '</p>'
+        + '<input id="c27PlName" placeholder="' + (kind === 'city' ? 'Nom de la ville' : 'Nom du quartier') + '" style="width:100%;padding:12px;border-radius:10px;border:1px solid #D6D3D1;font-size:15px;margin-bottom:10px">';
+      if (kind === 'city') {
+        h += '<select id="c27PlRegion" style="width:100%;padding:12px;border-radius:10px;border:1px solid #D6D3D1;font-size:14px;margin-bottom:10px"><option value="">— Province —</option>'
+          + baseRegions().map(function (r) { return '<option value="' + _attr(r.name) + '">' + _esc(r.name) + '</option>'; }).join('') + '</select>';
+      } else if (fix) {
+        h += '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px"><input type="checkbox" id="c27PlHere"> 📍 Je suis dans ce quartier en ce moment (enregistrer sa position)</label>';
+      }
+      h += '<button onclick="c27AddPlaceSave(\'' + kind + '\',' + jsArg(geoKey(cityKey)) + ')" style="width:100%;background:#1C1917;color:#F4EBD6;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14.5px;cursor:pointer">✓ Ajouter pour toute l\'équipe</button>'
+        + '<div style="text-align:right;margin-top:10px"><a href="javascript:void(0)" onclick="c27AddPlaceCancel()" style="color:#78716C;font-size:12.5px">Annuler</a></div>';
+      modalShell(h);
+      setTimeout(function () { var i = document.getElementById('c27PlName'); if (i) i.focus(); }, 50);
+    });
+  };
+  window.c27AddPlaceCancel = function () { closeModal(); var cb = _addPlaceCb; _addPlaceCb = null; if (cb) cb(''); };
+  window.c27AddPlaceSave = function (kind, cityKey) {
+    var name = String((document.getElementById('c27PlName') || {}).value || '').replace(/\s+/g, ' ').trim();
+    var key = geoKey(name);
+    if (key.length < 2) { _toast('Indiquez le nom', true); return; }
+    var p = { kind: kind, action: 'add', name: name, nameKey: key, at: Date.now() };
+    if (kind === 'city') {
+      p.region = (document.getElementById('c27PlRegion') || {}).value || '';
+      if (!p.region) { _toast('Choisissez la province', true); return; }
+      if (geoCity(key)) { _toast('Cette ville est déjà dans la liste'); closeModal(); finish(); return; }
+    } else {
+      p.cityKey = cityKey;
+      var dup = geoQuartiers(cityKey).some(function (q) { return q.n === key; });
+      if (dup) { _toast('Ce quartier est déjà dans la liste'); closeModal(); finish(); return; }
+      var here = document.getElementById('c27PlHere'), fix = bestRecentFix();
+      if (here && here.checked && fix) { p.lat = Math.round(fix.lat * 1e6) / 1e6; p.lng = Math.round(fix.lng * 1e6) / 1e6; }
+    }
+    closeModal();
+    savePlace(p).then(function (r) {
+      if (r === 'ok') _toast('✓ ' + key + ' ajouté pour toute l\'équipe');
+      else if (r === 'later') _toast('✓ ' + key + ' ajouté — partagé avec l\'équipe dès que le serveur répond ⏳');
+      else { _toast(r, true); return; }
+    });
+    finish();
+    function finish() { var cb = _addPlaceCb; _addPlaceCb = null; if (cb) cb(key); }
+  };
+  window.c27HidePlace = function (kind, cityKey, name) {
+    if (!isGeoAdmin()) { _toast('Réservé aux Sub Admins et au Super Admin', true); return; }
+    savePlace({ kind: kind, action: 'hide', cityKey: cityKey, name: name, nameKey: geoKey(name), at: Date.now() }).then(function (r) {
+      _toast(r === 'ok' ? '🗑 ' + geoKey(name) + ' supprimé pour tous' : r === 'later' ? '🗑 Supprimé — appliqué à l\'équipe dès que le serveur répond ⏳' : r, r !== 'ok' && r !== 'later');
+      if (typeof window.rC27 === 'function') window.rC27();
+    });
+    if (typeof window.rC27 === 'function') window.rC27();
+  };
+  window.c27RestorePlace = function (kind, cityKey, name, region) {
+    if (!isGeoAdmin()) return;
+    savePlace({ kind: kind, action: 'add', cityKey: cityKey, region: region || '', name: name, nameKey: geoKey(name), at: Date.now() }).then(function (r) {
+      _toast(r === 'ok' || r === 'later' ? '↩ ' + geoKey(name) + ' rétabli' : r, r !== 'ok' && r !== 'later');
+      if (typeof window.rC27 === 'function') window.rC27();
+    });
+    if (typeof window.rC27 === 'function') window.rC27();
+  };
+
+  // Onglet 📍 Lieux (Sub Admins / Super Admin) : voir, ajouter, supprimer, rétablir.
+  window.c27PlacesCity = function (k) { lsSet('nateiva_c27_places_city', k); if (typeof window.rC27 === 'function') window.rC27(); };
+  function renderPlacesTab() {
+    var regions = geoRegions();
+    if (!regions.length) { ensureGeo(function () { if (typeof window.rC27 === 'function') window.rC27(); }); return '<div class="c27-card c27-empty">Chargement des villes…</div>'; }
+    var cur = lsGet('nateiva_c27_places_city', 'DOUALA');
+    if (!geoCity(cur)) cur = regions[0].cities[0] ? regions[0].cities[0].key : '';
+    var c = geoCity(cur) || { name: cur, quartiers: [] };
+    var nCities = 0, nQ = 0, nCustom = 0;
+    regions.forEach(function (r) { r.cities.forEach(function (x) { nCities++; nQ += x.quartiers.length; if (x.custom) nCustom++; x.quartiers.forEach(function (q) { if (q.custom) nCustom++; }); }); });
+    var gen = (window.NATEIVA_GEO && window.NATEIVA_GEO.generatedAt) || '';
+    var h = '<div class="c27-card"><div class="c27-klabel">Référentiel partagé</div><h3>📍 Villes & quartiers</h3>'
+      + '<div class="c27-muted" style="margin-bottom:10px">' + nCities + ' villes · ' + nQ + ' quartiers · ' + nCustom + ' ajout(s) de l\'équipe' + (gen ? ' · référentiel du ' + _esc(gen) + ' (mis à jour une fois par an, le 1er février)' : '') + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'
+      + '<select onchange="c27PlacesCity(this.value)" style="padding:10px;border-radius:10px;border:1px solid #D6D3D1;font-size:14px;min-width:200px">'
+      + regions.map(function (r) { return '<optgroup label="' + _attr(r.name) + '">' + r.cities.map(function (x) { return '<option value="' + _attr(x.key) + '"' + (x.key === cur ? ' selected' : '') + '>' + _esc(x.name) + (x.custom ? ' ✚' : '') + '</option>'; }).join('') + '</optgroup>'; }).join('')
+      + '</select>'
+      + '<button class="c27-act" onclick="c27AddPlace(\'quartier\',' + jsArg(cur) + ',function(){rC27()})">➕ Quartier</button>'
+      + '<button class="c27-act" onclick="c27AddPlace(\'city\',\'\',function(k){if(k)c27PlacesCity(k);else rC27()})">➕ Ville</button>'
+      + '<button class="c27-act" style="color:#B91C1C" onclick="if(confirmDel(' + jsArg(c.name) + '))c27HidePlace(\'city\',\'\',' + jsArg(cur) + ')">🗑 Supprimer la ville</button>'
+      + '</div>';
+    var qs = geoQuartiers(cur);
+    if (!qs.length) h += '<div class="c27-empty">Aucun quartier pour ' + _esc(c.name) + '. Ajoutez-en avec ➕ Quartier.</div>';
+    else {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      qs.forEach(function (q) {
+        var src = q.custom ? 'ajouté' + (q.by ? ' par ' + q.by : '') + (q.pending ? ' ⏳' : '') : q.seen ? 'vu dans les saisies' : 'référentiel';
+        h += '<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid ' + (q.custom ? '#B08D2F' : '#E7E5E4') + ';background:' + (q.custom ? '#F7F1E3' : '#fff') + ';border-radius:999px;padding:6px 10px;font-size:12.5px" title="' + _attr(src) + '">'
+          + _esc(q.n) + (q.lat != null ? ' 📍' : '') + (q.custom ? ' ✚' : '')
+          + ' <a href="javascript:void(0)" style="text-decoration:none;color:#B91C1C;font-weight:800" onclick="c27HidePlace(\'quartier\',' + jsArg(cur) + ',' + jsArg(q.n) + ')" title="Supprimer pour tous">✕</a></span>';
+      });
+      h += '</div><div class="c27-muted" style="margin-top:8px">✚ = ajouté par l\'équipe · 📍 = position connue (contrôle GPS du quartier) · ✕ = supprimer pour tous</div>';
+    }
+    var hidden = effectivePlaces().filter(function (p) { return p.action === 'hide'; });
+    if (hidden.length) {
+      h += '<div style="margin-top:16px;font-weight:800;font-size:13px">🗑 Supprimés (' + hidden.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+      hidden.forEach(function (p) {
+        var label = p.kind === 'city' ? '🏙 ' + geoKey(p.nameKey || p.name) : geoKey(p.nameKey || p.name) + ' · ' + geoKey(p.cityKey || p.city);
+        h += '<span style="display:inline-flex;gap:6px;align-items:center;border:1px dashed #D6D3D1;border-radius:999px;padding:6px 10px;font-size:12.5px;color:#78716C">' + _esc(label)
+          + ' <a href="javascript:void(0)" style="text-decoration:none;font-weight:800" onclick="c27RestorePlace(' + jsArg(p.kind) + ',' + jsArg(p.cityKey || '') + ',' + jsArg(p.nameKey || p.name) + ',' + jsArg(p.region || '') + ')">↩ rétablir</a></span>';
+      });
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+  window.confirmDel = function (name) { return window.confirm ? window.confirm('Supprimer « ' + name + ' » et ses quartiers pour toute l\'équipe ?') : true; };
+
   /* ======================= 7. BRANCHEMENTS (HOOKS) ======================== */
   function boot() {
     injectCss();
     injectStripCss();
     injectMobileCss();
     registerServiceWorker();
-    try { window.addEventListener('online', function () { flushDocQueue(); }); } catch (eO) { }
+    try { window.addEventListener('online', function () { flushDocQueue(); flushPlaces(); }); } catch (eO) { }
+    ensureGeo(function () { invalidateGeo(); });          // référentiel préchargé (déjà en mémoire du téléphone)
+    setTimeout(function () { flushPlaces(); refreshPlaces(); }, 6000);
     setTimeout(flushDocQueue, 5000);
     // 1. Périmètre annuel : filtre global des données + sélecteur d'année.
     installScopeWrappers();
@@ -4031,7 +4309,7 @@
     flushPendingRequests();
   }
   // Points d'entrée internes pour les tests automatisés (sans effet en prod).
-  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile, myPosition: myPosition, positionCardHtml: positionCardHtml, signMissing: signMissing, ensureSignBlock: ensureSignBlock, signedRegister: signedRegister, renderSignedTab: renderSignedTab, renderDocsPanel: renderDocsPanel };
+  window.__c27Test = { buildMapSchools: buildMapSchools, buildStripHtml: buildStripHtml, scopeActive: scopeActive, osmMatchesOurs: osmMatchesOurs, osmNameTokens: osmNameTokens, osmKindOf: osmKindOf, computeGpsRefusals: computeGpsRefusals, photoRequired: photoRequired, setPhoto: function (p) { _photoState = p; }, renderGpsRefusalReport: renderGpsRefusalReport, ocrMatchSchool: ocrMatchSchool, buildPhotoReviewList: buildPhotoReviewList, renderPhotoReviewQueue: renderPhotoReviewQueue, dayTypeFor: dayTypeFor, applyScheduleLocally: applyScheduleLocally, hasPriorVisitPhoto: hasPriorVisitPhoto, renderPlanningTab: renderPlanningTab, myDayTypeToday: myDayTypeToday, renderTeamTab: renderTeamTab, quartiersOf: quartiersOf, buildEstimates: buildEstimates, kindBucket: kindBucket, computeZones: computeZones, bearingLabel: bearingLabel, entryIsNew: entryIsNew, geoQuartiers: geoQuartiers, geoCity: geoCity, setDayCx: function (c, q) { setDayCx(c, q); }, getDayCx: getDayCx, geofenceCheck: geofenceCheck, schoolHistory: schoolHistory, enhanceForm: enhanceForm, setFix: function (f) { GEO.fixes = [f]; }, REMARKS: REMARKS, ROLES: ROLES, getProfile: getProfile, myPosition: myPosition, positionCardHtml: positionCardHtml, signMissing: signMissing, ensureSignBlock: ensureSignBlock, signedRegister: signedRegister, renderSignedTab: renderSignedTab, renderDocsPanel: renderDocsPanel, geoRegions: geoRegions, geoQuartiers: geoQuartiers, setServerPlaces: setServerPlaces, savePlace: savePlace, renderPlacesTab: renderPlacesTab, effectivePlaces: effectivePlaces, quartierOptions: quartierOptions, cityOptionsForUser: cityOptionsForUser };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

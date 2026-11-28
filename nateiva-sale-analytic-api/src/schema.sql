@@ -125,3 +125,25 @@ CREATE TABLE IF NOT EXISTS school_documents (
   KEY sd_creator_idx (created_by_username),
   UNIQUE KEY sd_client_ref (client_ref, created_by_username)
 );
+
+-- Villes & quartiers ajoutés / supprimés par l'équipe (partagés par tous).
+-- Une ligne par lieu ; action 'add' (ajouté) ou 'hide' (supprimé par un
+-- Sub Admin / Super Admin, y compris un lieu du référentiel livré).
+CREATE TABLE IF NOT EXISTS geo_places (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  kind ENUM('city','quartier') NOT NULL,
+  action ENUM('add','hide') NOT NULL DEFAULT 'add',
+  region VARCHAR(120) NOT NULL DEFAULT '',
+  city_key VARCHAR(120) NOT NULL DEFAULT '',
+  name VARCHAR(160) NOT NULL,
+  name_key VARCHAR(160) NOT NULL,
+  lat DECIMAL(9,6) NULL DEFAULT NULL,
+  lng DECIMAL(9,6) NULL DEFAULT NULL,
+  created_by_username VARCHAR(120) NOT NULL DEFAULT '',
+  created_by_fullname VARCHAR(255) NOT NULL DEFAULT '',
+  updated_by_username VARCHAR(120) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY gp_place (kind, city_key, name_key)
+);

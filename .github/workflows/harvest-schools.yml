@@ -3,13 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Quoi récolter : all (écoles + quartiers), schools, geo"
+        description: "Quoi récolter : schools (écoles), geo (villes & quartiers), all (les deux)"
         required: false
-        default: "all"
+        default: "schools"
   schedule:
-    # Le 1er février, puis le 1er de chaque mois jusqu'au 1er mai (03h17 UTC).
-    # Note : ce calendrier se répète chaque année (fév→mai) ; lançable à la
-    # main à tout moment via l'onglet Actions de GitHub.
+    # Écoles : le 1er février, puis le 1er de chaque mois jusqu'au 1er mai.
+    # Villes & quartiers : UNE SEULE FOIS PAR AN, avec la récolte du 1er février.
+    # (03h17 UTC ; lançable à la main via l'onglet Actions de GitHub.)
     - cron: '17 3 1 2-5 *'
 permissions:
   contents: write
@@ -21,9 +21,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Choix de la récolte
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Villes & quartiers seulement en février (1 fois par an) ; écoles chaque mois.
+            if [ "$(date -u +%m)" = "02" ]; then echo "target=all" >> "$GITHUB_OUTPUT"; else echo "target=schools" >> "$GITHUB_OUTPUT"; fi
+          else
+            echo "target=${{ github.event.inputs.target || 'schools' }}" >> "$GITHUB_OUTPUT"
+          fi
       - run: node scripts/harvest-schools.js
         env:
-          TARGET: ${{ github.event.inputs.target || 'all' }}
+          TARGET: ${{ steps.pick.outputs.target }}
       - name: Commit du répertoire
         run: |
           git config user.name "nateiva-harvest-bot"
